@@ -3,7 +3,8 @@
 storage# cosmos
 # cosmos
 
-# data structure
-# client
-# super node
-# front node
+## Task list
+* data structure
+* client
+* super node
+* front node
