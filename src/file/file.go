@@ -74,7 +74,7 @@ func Split(file *os.File, size int) (map[int]string, error) {
 	for i := 0; i < num; i++ {
 		n, err := file.Read(buf)
 		if err != nil && err != io.EOF {
-			fmt.Println(err2, "failed to read from:", file)
+			fmt.Println(err, "failed to read from:", file)
 			break
 		}
 		if n <= 0 {
