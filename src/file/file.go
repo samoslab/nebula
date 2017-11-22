@@ -1,23 +1,25 @@
-package file
+package main
 
 import (
 	"errors"
 	"fmt"
 	"github.com/skycoin/skycoin/src/cipher"
+	"log"
 	"os"
+	"path"
 	"time"
 )
 
 type MetaInfo struct {
 	Size     float32 `json:"size"`
 	FileName string  `json:"file_name"`
-	PubKey   string  `json:"public_key"`
+	PubKey   []byte  `json:"public_key"`
 
 	Hash       []byte `json:"hash"`
 	Sig        string `json:"sig"`
 	CreateTime int    `json:"create_time"`
 
-	Blocks map[string]string `json:"blocks"`
+	Blocks map[int]string `json:"blocks"`
 }
 
 type Block struct {
@@ -26,16 +28,16 @@ type Block struct {
 	Data   []byte `json:"Data"`
 }
 
-type FileName os.file
-
-func (m *MetaInfo) SetMetaInfo(filePath string) error {
+func (m *MetaInfo) SetMetaInfo(filePath string, pubKey []byte) error {
 	finfo, err := os.Stat(filePath)
 	if err != nil && !os.IsNotExist(err) {
 		log.Fatalln(err)
 	}
 	m.Size = float32(finfo.Size())
 	m.FileName = path.Base(filePath)
-	m.PubKey = cipher.pubKey
+	m.PubKey = pubKey
+
+	cipher.PubKey = pubKey
 
 	m.Hash = cipher.SHA256
 	m.Sig = cipher.Sig
@@ -53,8 +55,13 @@ func (m *MetaInfo) Print() {
 func (b *Block) SetBlock(data string) error {
 	b.hash = cipher.SHA256
 	b.data = data
-	b.PubKey = cipher.pubKey 
+	b.PubKey = cipher.pubKey
 	return nil
+}
+
+func main() {
+	m := MetaInfo{}
+	fmt.Println(m)
 }
 
 func Split(file *os.File, size int) (map[int]string, error) {
