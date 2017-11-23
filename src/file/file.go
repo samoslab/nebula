@@ -1,13 +1,14 @@
-package main
+package file
 
 import (
-	"errors"
+	//"errors"
 	"fmt"
-	"github.com/skycoin/skycoin/src/cipher"
+	//"github.com/skycoin/skycoin/src/cipher"
 	"log"
 	"os"
-	"path"
 	"time"
+	"bytes"
+	"encoding/json"
 )
 
 type MetaInfo struct {
@@ -15,34 +16,53 @@ type MetaInfo struct {
 	FileName string  `json:"file_name"`
 	PubKey   []byte  `json:"public_key"`
 
-	Hash       []byte `json:"hash"`
+	Hash       string `json:"hash"`
 	Sig        string `json:"sig"`
-	CreateTime int    `json:"create_time"`
+	CreateTime int64    `json:"create_time"`
 
-	Blocks map[int]string `json:"blocks"`
+	Blocks map[int]Block `json:"blocks"`
 }
 
 type Block struct {
-	PubKey string `json:"public_key"`
+	PubKey []byte `json:"public_key"`
 	Hash   string `json:"hash"`
 	Data   []byte `json:"Data"`
 }
+
+//func main() {
+//	m := MetaInfo{}
+//	m.SetMetaInfo("/tmp/a", []byte("abcd"))
+	//fmt.Println(m)
+//}
 
 func (m *MetaInfo) SetMetaInfo(filePath string, pubKey []byte) error {
 	finfo, err := os.Stat(filePath)
 	if err != nil && !os.IsNotExist(err) {
 		log.Fatalln(err)
 	}
+
+	fp, err := os.Open(filePath)
+    defer fp.Close()
+	if err != nil {
+		log.Fatalln(err)
+	}
+
 	m.Size = float32(finfo.Size())
-	m.FileName = path.Base(filePath)
+	m.FileName = finfo.Name()
 	m.PubKey = pubKey
 
-	cipher.PubKey = pubKey
-
-	m.Hash = cipher.SHA256
-	m.Sig = cipher.Sig
+	m.Hash = "" //cipher.SHA256
+	m.Sig = "" //cipher.Sig
 	m.CreateTime = time.Now().Unix()
-	m.Blocks = ""
+
+	blocks := split(fp)
+	for key, content := range bytes.Fields(blocks) {
+		content, err := block(content, []byte("abc"))
+		if nil != err{
+			log.Fatalln(err)
+		}
+		m.Blocks[key] = content
+    }
 
 	return nil
 }
@@ -52,44 +72,27 @@ func (m *MetaInfo) Print() {
 	fmt.Println(string(data))
 }
 
-func (b *Block) SetBlock(data string) error {
-	b.hash = cipher.SHA256
-	b.data = data
-	b.PubKey = cipher.pubKey
-	return nil
+func block(data []byte, pubKey []byte) (Block, error) {
+	block := Block{
+		Hash :"",
+		Data : data,
+		PubKey :pubKey,
+	}
+	return block, nil
 }
 
-func main() {
-	m := MetaInfo{}
-	fmt.Println(m)
-}
-
-func Split(file *os.File, size int) (map[int]string, error) {
-	finfo, err := file.Stat()
-	if err != nil {
-		//fmt.Println("get file info failed:", file, size)
-		return _, errors.New("get file info failed")
-	}
-
-	bufsize := 1024 * 1024
-	if size < bufsize {
-		bufsize = size
-	}
-
-	buf := make([]byte, bufsize)
-	num := (int(finfo.Size()) + size - 1) / size
-
-	blocks = make(map[int]string)
-	for i := 0; i < num; i++ {
-		n, err := file.Read(buf)
-		if err != nil && err != io.EOF {
-			fmt.Println(err, "failed to read from:", file)
-			break
-		}
-		if n <= 0 {
-			break
-		}
-		blocks[i] = buf[:n]
-	}
-	return blocks, nil
+func split(f *os.File) []byte {
+    var blocks []byte
+    for {
+        buf := make([]byte, 1024)
+        switch nr, err := f.Read(buf[:]); true {
+        case nr < 0:
+            fmt.Fprintf(os.Stderr, "cat: error reading: %s\n", err.Error())
+            os.Exit(1)
+        case nr == 0: // EOF
+            return blocks
+        case nr > 0:
+            blocks = append(blocks, buf...)
+        }
+    }
 }
