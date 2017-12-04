@@ -1,0 +1,175 @@
+package main
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"log"
+	"os"
+	"path"
+	"time"
+
+	"github.com/skycoin/skycoin/src/cipher"
+)
+
+type MetaInfo struct {
+	Size        float32  `json:"size"`         //文件大小
+	FileName    string   `json:"file_name"`    //文件名字
+	Publisher   string   `json:"publisher"`    //文件上传者的公钥
+	Expire      int      `json:"expire"`       //过期时间
+	Priority    int      `json:"priority"`     //优先级
+	FileHash    string   `json:"file_hash"`    //文件的hash
+	Sig         string   `json:"sig"`          //上传用户的签名
+	CreateTime  int      `json:"create_time"`  //创建时间
+	UpdateTime  int      `json:"update_time"`  //更新时间
+	Ver         int      `json:"version"`      //版本，只有s
+	BlockLength int      `json:"block_length"` //每一块的大小
+	Blocks      []string `json:"blocks"`       //每一块的hash
+	Cipher      string   `json:"cipher"`       //文件token密文，[方法|密文],比如[aes256|xxxxxxxx]，如果不为空，则blocks数据保密
+	Comment     string   `json:"comment"`      //文件注释
+	Tag         string   `json:"tag"`          //文件tag
+	Announce    string   `json:"announce"`     //最开始接收服务的地址，公钥地址（相当于Tracker)；可以多个，逗号分隔
+	//add more
+
+}
+
+type Block struct {
+	Hash string `json:"hash"`
+	Data []byte `json:"Data"`
+}
+
+^^^
+github.com/skycoin/bbs
+
+
+//try to upload a file , hash(file)
+-->query_hash from the network
+-->network has the hash of file,
+	-->quick upload
+
+A--->has file_hash  30 days
+B-->quick upload,
+save the ref counter to file
+
+
+keep the ref coutner on the storege node
+
+DHT
+
+==============
+	mirror a real site such as ,taobao.com---> to spaco network
+if the source update content
+	push
+	or 
+	pull
+
+	feeds to the site huge,--->flood to
+		==>
+
+static
+
+api call
+  dynamic content-->
+	skymessager-->
+
+
+netdisk
+	for small files 1kb,2
+	tar the files to append
+
+	files-->index
+
+
+route the public address ,nows depends on skywire
+
+github.com/skycoin/net
+
+
+micropay iota
+微支付直接用K:V
+
+
+
+
+DAG
+- CXO
+- github.com/skycoin/cxo
+
+
+
+
+
+
+nodes  
+	overhead is too high
+
+
+	here 
+
+
+func (m *MetaInfo) SetMetaInfo(filePath string, pubKey []byte) error {
+	finfo, err := os.Stat(filePath)
+	if err != nil && !os.IsNotExist(err) {
+		log.Fatalln(err)
+	}
+	m.Size = float32(finfo.Size())
+	m.FileName = path.Base(filePath)
+	m.PubKey = pubKey
+
+	cipher.PubKey = pubKey
+
+	m.Hash = cipher.SHA256
+	m.Sig = cipher.Sig
+	m.CreateTime = time.Now().Unix()
+	m.Blocks = ""
+
+	return nil
+}
+
+func (m *MetaInfo) Print() {
+	data, _ := json.MarshalIndent(*m, "", "    ")
+	fmt.Println(string(data))
+}
+
+func (b *Block) SetBlock(data string) error {
+	b.hash = cipher.SHA256
+	b.data = data
+	b.PubKey = cipher.pubKey
+	return nil
+}
+
+func main() {
+	m := MetaInfo{}
+	fmt.Println(m)
+}
+
+func Split(file *os.File, size int) (map[int]string, error) {
+	finfo, err := file.Stat()
+	if err != nil {
+		//fmt.Println("get file info failed:", file, size)
+		return _, errors.New("get file info failed")
+	}
+
+	bufsize := 1024 * 1024
+	if size < bufsize {
+		bufsize = size
+	}
+
+	buf := make([]byte, bufsize)
+	num := (int(finfo.Size()) + size - 1) / size
+
+	blocks = make(map[int]string)
+	for i := 0; i < num; i++ {
+		n, err := file.Read(buf)
+		if err != nil && err != io.EOF {
+			fmt.Println(err, "failed to read from:", file)
+			break
+		}
+		if n <= 0 {
+			break
+		}
+		blocks[i] = buf[:n]
+	}
+	return blocks, nil
+}
