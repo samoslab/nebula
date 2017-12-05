@@ -68,12 +68,31 @@ type DirMeta struct {
 	Tag        string     `json:"tag,omitempty"`         //目录tag
 }
 
-type FileMeta struct {
-	Size float64 `json:"size,omitempty"` //文件总大小
-	Name string  `json:"file_name"`      //文件名字
-	Hash string  `json:"file_hash"`      //文件的hash
+type Extends struct {
+	IsShare int8   `json:"is_share"`
+	Cipher  string `json:"share_cipher,omitempty"`
+	//FileMeta密文，[方法|密文],比如[aes256|xxxxxxxx]，如果不为空，则blocks数据保密
+	//如果IsShare == 0,
+	//BodyHash公开，
 
-	Blocks map[int]Block `json:"blocks"` //每一块的hash，一个文件多块
+}
+
+//
+//高安全性文件
+//	默认加密
+//高可用性文件
+//
+
+type FileMeta struct {
+	MetaHash []string `json:"meta_hash"` //MetaHash = sha256(BodyHash+Owner)
+	//如果是同一个人上传，提示文件已经存在
+	//不同的人，copy一份metainfo
+	Extends  Extends `json:"extends,omitempty"`
+	Size     float64 `json:"size,omitempty"` //文件总大小
+	Name     string  `json:"file_name"`      //文件名字
+	BodyHash string  `json:"body_hash"`      //文件的hash
+
+	BlockMap map[int]Block `json:"blocks"` //每一块的hash，一个文件多块
 
 	Owner       string `json:"owner"`                  //文件上传者的公钥
 	Expire      int    `json:"expire"`                 //过期时间
@@ -83,7 +102,6 @@ type FileMeta struct {
 	UpdateTime  int    `json:"update_time,omitempty"`  //更新时间
 	Ver         int    `json:"version,omitempty"`      //版本，只有s
 	BlockLength int    `json:"block_length,omitempty"` //每一块的大小，默认512K
-	Cipher      string `json:"cipher,omitempty"`       //文件token密文，[方法|密文],比如[aes256|xxxxxxxx]，如果不为空，则blocks数据保密
 	Comment     string `json:"comment,omitempty"`      //文件注释
 	Tag         string `json:"tag,omitempty"`          //文件tag
 	Announce    string `json:"announce,omitempty"`     //最开始接收服务的地址，公钥地址（相当于Tracker)；可以多个，逗号分隔

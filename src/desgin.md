@@ -28,4 +28,29 @@ Cosmos storage system is designed for replace Netdisk\bittorrent\File Transfer s
 
 
 spp--->浏览器  ---》skywire （）-----》
+spp     http--->local backend server--------->remote proxy gateway--->source site(jd.com)
+
+
+
+
+## 场景
+
+下载：要求速度快 []
+视频、游戏：延时低
+网盘：可靠性高、上传快
+DropBox:大量的小文件()
+
+
+### 业务模型
+文件大小、业务类别（CDN/P2P）、其它限制
+
+
+
+
+
+### 存储结构
+
+### 网络结构（包括NAT、P2P）
+
+
 
