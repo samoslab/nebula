@@ -1,0 +1,53 @@
+syntax = "proto3";
+package provider.pb;
+
+service ProviderService {
+  rpc Ping(PingReq) returns (PingResp){}
+
+	rpc Store(stream StoreReq) returns (StoreResp){}
+
+	rpc Retrieve(RetrieveReq) returns (stream RetrieveResp){}
+
+	rpc GetFragment(GetFragmentReq) returns (GetFragmentResp){}
+}
+
+
+message PingReq {
+  string nodeId = 1;
+}
+
+message PingResp{
+	string nodeId = 1;
+}
+
+message StoreReq {
+  bytes data=1;
+	string auth = 2;
+	string ticket = 3;
+	string key = 4;
+}
+
+message StoreResp{
+	bool result = 1;
+}
+
+message RetrieveReq {
+	string auth = 1;
+	string ticket = 2;
+	string key = 3;
+}
+
+message RetrieveResp {
+   bytes data=1;
+}
+
+message GetFragmentReq {
+  string auth = 1;
+	string key = 2;
+	int32 size = 3;
+	bytes positions = 4;
+}
+
+message GetFragmentResp {
+   repeated bytes data=1;
+}
