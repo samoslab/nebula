@@ -9,11 +9,26 @@ import (
 
 	"github.com/pkg/errors"
 	pb "github.com/spolabs/nebula/provider/pb"
+	"github.com/syndtr/goleveldb/leveldb"
 )
 
 const stream_data_size = 32 * 1024
 
 type ProviderServer struct {
+	PathDb *leveldb.DB
+}
+
+func NewProviderServer() *ProviderServer {
+	ps = &ProviderServer{}
+	ps.PathDb, err := leveldb.OpenFile("path/to/db", nil)
+	if err!=nil{
+		panic(err)
+	}
+	return ps
+}
+
+func (self *ProviderServer) Close(){
+	self.PathDb.Close()
 }
 
 func (self *ProviderServer) wrapErr(err error, info string) error {
@@ -51,7 +66,7 @@ func (self *ProviderServer) Store(stream pb.ProviderService_StoreServer) error {
 				return err
 			}
 			file, err = os.OpenFile(
-				"/tmp/t/"+req.Key+".blk",
+				self.getPath(req.Key, req.FileSize),
 				os.O_WRONLY|os.O_TRUNC|os.O_CREATE,
 				0666)
 			if err != nil {
@@ -82,7 +97,7 @@ func (self *ProviderServer) Retrieve(req *pb.RetrieveReq, stream pb.ProviderServ
 	if err := self.checkAuth(req.Auth, req.Key); err != nil {
 		return err
 	}
-	file, err := os.Open("/tmp/t/" + req.Key + ".blk")
+	file, err := os.Open(self.queryPath(req.Key))
 	if err != nil {
 		fmt.Printf("open file failed: %s", err.Error())
 		return self.wrapErr(err, "open file failed")
@@ -113,4 +128,19 @@ func (self *ProviderServer) Retrieve(req *pb.RetrieveReq, stream pb.ProviderServ
 func (self *ProviderServer) GetFragment(ctx context.Context, req *pb.GetFragmentReq) (*pb.GetFragmentResp, error) {
 
 	return nil, nil
+}
+
+const max_combine_file_size = 1048576
+
+func (self *ProviderServer) queryPath(key string) string {
+	// query PathDb
+	return "/tmp/t/" + key + ".blk"
+}
+
+func (self *ProviderServer) savePath(key string, path string){
+	
+}
+func (self *ProviderServer) getPath(key string, fileSize uint64) {
+
+	return "/tmp/t/" + key + ".blk"
 }

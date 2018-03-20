@@ -23,7 +23,7 @@ func Ping(client pb.ProviderServiceClient) (string, error) {
 	return resp.NodeId, nil
 }
 
-func Store(client pb.ProviderServiceClient, filePath string, auth string, ticket string, key string) error {
+func Store(client pb.ProviderServiceClient, filePath string, auth string, ticket string, key string, fileSize uint64) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		fmt.Printf("open file failed: %s", err.Error())
@@ -49,7 +49,7 @@ func Store(client pb.ProviderServiceClient, filePath string, auth string, ticket
 		}
 		if first {
 			first = false
-			if err := stream.Send(&pb.StoreReq{Data: buf[:bytesRead], Auth: auth, Ticket: ticket, Key: key}); err != nil {
+			if err := stream.Send(&pb.StoreReq{Data: buf[:bytesRead], Auth: auth, Ticket: ticket, Key: key, FileSize: fileSize}); err != nil {
 				fmt.Printf("RPC Send StoreReq failed: %s", err.Error())
 				return err
 			}

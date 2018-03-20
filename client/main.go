@@ -32,7 +32,11 @@ func main() {
 	fmt.Println("==========test Store RPC==========")
 	path := "/home/lijt/go/bin/godoc"
 	hash := sha256Sum(path)
-	err = client.Store(psc, path, "mock-auth", "mock-ticket", hash)
+	fileInfo, err := os.Stat(path)
+	if err != nil {
+		panic(err)
+	}
+	err = client.Store(psc, path, "mock-auth", "mock-ticket", hash, fileInfo.Size())
 	if err != nil {
 		fmt.Println(err)
 	}

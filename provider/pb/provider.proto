@@ -25,6 +25,7 @@ message StoreReq {
 	string auth = 2;
 	string ticket = 3;
 	string key = 4;
+	uint64 fileSize=5;
 }
 
 message StoreResp{

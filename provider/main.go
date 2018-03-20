@@ -16,6 +16,6 @@ func main() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 	grpcServer := grpc.NewServer()
-	pb.RegisterProviderServiceServer(grpcServer, &server.ProviderServer{})
+	pb.RegisterProviderServiceServer(grpcServer, &server.NewProviderServer())
 	grpcServer.Serve(lis)
 }
