@@ -68,7 +68,7 @@ func Store(client pb.ProviderServiceClient, filePath string, auth string, ticket
 		fmt.Printf("RPC CloseAndRecv failed: %s", err.Error())
 		return err
 	}
-	if !storeResp.Result {
+	if !storeResp.Success {
 		fmt.Println("RPC return false")
 		return errors.New("RPC return false")
 	}

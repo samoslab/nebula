@@ -28,7 +28,7 @@ message StoreReq {
 }
 
 message StoreResp{
-	bool result = 1;
+	bool success = 1;
 }
 
 message RetrieveReq {

@@ -1,0 +1,37 @@
+syntax = "proto3";
+package provider.client.pb;
+
+service ProviderRegisterService {
+
+    rpc GetPublicKey(Empty) returns (PublicKeyResp){}
+
+	rpc Register(RegisterReq) returns (RegisterResp){}
+
+}
+message Empty {}
+
+message PublicKeyResp {
+  bytes publicKey=1;
+}
+enum CurrencyType {
+        SPO = 0;
+        SKY = 1;
+}
+message RegisterReq{
+	string nodeId = 1;
+    bytes publicKey=2;
+    CurrencyType currencyType=3;
+    string walletAddress=4;
+    string billEmail=5;
+    uint64 storageVolume=6;
+    uint64 upBandwidth=7;
+    uint64 downBandwidth=8;
+    uint64 testUpBandwidth=9;
+    uint64 testDownBandwidth=10;
+    float availability=11;
+}
+
+message RegisterResp{
+	bool success = 1;
+    
+}

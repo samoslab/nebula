@@ -71,7 +71,7 @@ func (self *ProviderServer) Store(stream pb.ProviderService_StoreServer) error {
 	}
 	// TODO send log with ticket
 	fmt.Println(ticket)
-	if err := stream.SendAndClose(&pb.StoreResp{Result: true}); err != nil {
+	if err := stream.SendAndClose(&pb.StoreResp{Success: true}); err != nil {
 		fmt.Printf("RPC SendAndClose failed: %s", err.Error())
 		return self.wrapErr(err, "SendAndClose failed")
 	}

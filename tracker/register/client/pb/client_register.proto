@@ -1,0 +1,24 @@
+syntax = "proto3";
+package register.client.pb;
+
+service ClientRegisterService {
+
+    rpc GetPublicKey(Empty) returns (PublicKeyResp){}
+
+	rpc Register(RegisterReq) returns (RegisterResp){}
+
+}
+message Empty {}
+
+message PublicKeyResp {
+  bytes publicKey=1;
+}
+
+message RegisterReq{
+	string nodeId = 1;
+    bytes publicKey=2;
+}
+
+message RegisterResp{
+	bool success = 1;
+}
