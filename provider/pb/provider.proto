@@ -13,19 +13,18 @@ service ProviderService {
 
 
 message PingReq {
-  string nodeId = 1;
 }
 
 message PingResp{
-	string nodeId = 1;
 }
 
 message StoreReq {
   bytes data=1;
-	string auth = 2;
+	bytes auth = 2;
 	string ticket = 3;
 	string key = 4;
 	uint64 fileSize=5;
+	sint64 timestamp=6;
 }
 
 message StoreResp{
@@ -33,9 +32,11 @@ message StoreResp{
 }
 
 message RetrieveReq {
-	string auth = 1;
+	bytes auth = 1;
 	string ticket = 2;
 	string key = 3;
+	uint64 fileSize=4;
+	sint64 timestamp=5;
 }
 
 message RetrieveResp {
@@ -43,10 +44,11 @@ message RetrieveResp {
 }
 
 message GetFragmentReq {
-  string auth = 1;
+  bytes auth = 1;
 	string key = 2;
 	int32 size = 3;
 	bytes positions = 4;
+	sint64 timestamp=5;
 }
 
 message GetFragmentResp {

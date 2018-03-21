@@ -13,17 +13,18 @@ import (
 
 const stream_data_size = 32 * 1024
 
-func Ping(client pb.ProviderServiceClient) (string, error) {
+func Ping(client pb.ProviderServiceClient) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	resp, err := client.Ping(ctx, &pb.PingReq{NodeId: "localhost"}) // TODO change nodeId
-	if err != nil {
-		return "", err
-	}
-	return resp.NodeId, nil
+	_, err := client.Ping(ctx, &pb.PingReq{})
+	return err
 }
-
-func Store(client pb.ProviderServiceClient, filePath string, auth string, ticket string, key string, fileSize uint64) error {
+func updateStoreReqAuth(obj *pb.StoreReq) *pb.StoreReq {
+	// TODO
+	obj.Auth = []byte("mock-auth")
+	return obj
+}
+func Store(client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, key string, fileSize uint64) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		fmt.Printf("open file failed: %s", err.Error())
@@ -49,7 +50,7 @@ func Store(client pb.ProviderServiceClient, filePath string, auth string, ticket
 		}
 		if first {
 			first = false
-			if err := stream.Send(&pb.StoreReq{Data: buf[:bytesRead], Auth: auth, Ticket: ticket, Key: key, FileSize: fileSize}); err != nil {
+			if err := stream.Send(updateStoreReqAuth(&pb.StoreReq{Data: buf[:bytesRead], Ticket: ticket, Key: key, FileSize: fileSize, Timestamp: time.Now().Unix()})); err != nil {
 				fmt.Printf("RPC Send StoreReq failed: %s", err.Error())
 				return err
 			}
@@ -75,7 +76,13 @@ func Store(client pb.ProviderServiceClient, filePath string, auth string, ticket
 	return nil
 }
 
-func Retrieve(client pb.ProviderServiceClient, filePath string, auth string, ticket string, key string) error {
+func updateRetrieveReqAuth(obj *pb.RetrieveReq) *pb.RetrieveReq {
+	// TODO
+	obj.Auth = []byte("mock-auth")
+	return obj
+
+}
+func Retrieve(client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, key string) error {
 	file, err := os.OpenFile(filePath,
 		os.O_WRONLY|os.O_TRUNC|os.O_CREATE,
 		0666)
@@ -84,7 +91,7 @@ func Retrieve(client pb.ProviderServiceClient, filePath string, auth string, tic
 		return err
 	}
 	defer file.Close()
-	stream, err := client.Retrieve(context.Background(), &pb.RetrieveReq{Auth: auth, Ticket: ticket, Key: key})
+	stream, err := client.Retrieve(context.Background(), updateRetrieveReqAuth(&pb.RetrieveReq{Ticket: ticket, Key: key, Timestamp: time.Now().Unix()}))
 	for {
 		resp, err := stream.Recv()
 		if err == io.EOF {

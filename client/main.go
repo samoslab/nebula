@@ -23,11 +23,9 @@ func main() {
 	defer conn.Close()
 	psc := pb.NewProviderServiceClient(conn)
 	fmt.Println("==========test Ping RPC==========")
-	res, err := client.Ping(psc)
+	err = client.Ping(psc)
 	if err != nil {
 		fmt.Println(err)
-	} else {
-		fmt.Println(res)
 	}
 	fmt.Println("==========test Store RPC==========")
 	path := "/home/lijt/go/bin/godoc"
@@ -36,12 +34,12 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	err = client.Store(psc, path, "mock-auth", "mock-ticket", hash, fileInfo.Size())
+	err = client.Store(psc, path, []byte("mock-auth"), "mock-ticket", hash, uint64(fileInfo.Size()))
 	if err != nil {
 		fmt.Println(err)
 	}
 	fmt.Println("==========test Retrieve RPC==========")
-	err = client.Retrieve(psc, "/tmp/t/godoc", "mock-auth", "mock-ticket", hash)
+	err = client.Retrieve(psc, "/tmp/godoc", []byte("mock-auth"), "mock-ticket", hash)
 	if err != nil {
 		fmt.Println(err)
 	}

@@ -4,30 +4,32 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"golang.org/x/net/context"
 
+	"github.com/boltdb/bolt"
 	"github.com/pkg/errors"
 	pb "github.com/spolabs/nebula/provider/pb"
-	"github.com/syndtr/goleveldb/leveldb"
 )
 
 const stream_data_size = 32 * 1024
 
 type ProviderServer struct {
-	PathDb *leveldb.DB
+	PathDb *bolt.DB
 }
 
-func NewProviderServer() *ProviderServer {
-	ps = &ProviderServer{}
-	ps.PathDb, err := leveldb.OpenFile("path/to/db", nil)
-	if err!=nil{
+func NewProviderServer(configDir string) *ProviderServer {
+	ps := &ProviderServer{}
+	var err error
+	ps.PathDb, err = bolt.Open("/tmp/my.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
+	if err != nil {
 		panic(err)
 	}
 	return ps
 }
 
-func (self *ProviderServer) Close(){
+func (self *ProviderServer) Close() {
 	self.PathDb.Close()
 }
 
@@ -35,14 +37,13 @@ func (self *ProviderServer) wrapErr(err error, info string) error {
 	return errors.Wrapf(err, info)
 }
 
-func (self *ProviderServer) checkAuth(auth string, key string) error {
+func (self *ProviderServer) checkAuth(method string, auth []byte, ticket string, key string, fileSize uint64, timestamp int64) error {
 	// TODO check auth
 	return nil
 }
 
 func (self *ProviderServer) Ping(ctx context.Context, req *pb.PingReq) (*pb.PingResp, error) {
-	fmt.Println(req.NodeId)
-	return &pb.PingResp{NodeId: ""}, nil //TODO return real nodeId
+	return &pb.PingResp{}, nil
 }
 
 func (self *ProviderServer) Store(stream pb.ProviderService_StoreServer) error {
@@ -61,12 +62,20 @@ func (self *ProviderServer) Store(stream pb.ProviderService_StoreServer) error {
 		if first {
 			first = false
 			ticket = req.Ticket
-			if err = self.checkAuth(req.Auth, req.Key); err != nil {
+			if err = self.checkAuth("Store", req.Auth, ticket, req.Key, req.FileSize, req.Timestamp); err != nil {
 				fmt.Printf("check auth failed: %s", err.Error())
 				return err
 			}
+			path := self.getPath(req.Key, req.FileSize)
+			fileInfo, err := os.Stat(path)
+			if err == nil {
+				return os.ErrExist
+			}
+			if fileInfo != nil && fileInfo.IsDir() {
+				return errors.New("exist directory")
+			}
 			file, err = os.OpenFile(
-				self.getPath(req.Key, req.FileSize),
+				path,
 				os.O_WRONLY|os.O_TRUNC|os.O_CREATE,
 				0666)
 			if err != nil {
@@ -94,7 +103,7 @@ func (self *ProviderServer) Store(stream pb.ProviderService_StoreServer) error {
 }
 
 func (self *ProviderServer) Retrieve(req *pb.RetrieveReq, stream pb.ProviderService_RetrieveServer) error {
-	if err := self.checkAuth(req.Auth, req.Key); err != nil {
+	if err := self.checkAuth("Retrieve", req.Auth, req.Ticket, req.Key, req.FileSize, req.Timestamp); err != nil {
 		return err
 	}
 	file, err := os.Open(self.queryPath(req.Key))
@@ -130,17 +139,17 @@ func (self *ProviderServer) GetFragment(ctx context.Context, req *pb.GetFragment
 	return nil, nil
 }
 
-const max_combine_file_size = 1048576
+const max_combine_file_size = 1048576 //1M
 
 func (self *ProviderServer) queryPath(key string) string {
 	// query PathDb
-	return "/tmp/t/" + key + ".blk"
+	return "/tmp/" + key + ".blk"
 }
 
-func (self *ProviderServer) savePath(key string, path string){
-	
-}
-func (self *ProviderServer) getPath(key string, fileSize uint64) {
+func (self *ProviderServer) savePath(key string, path string) {
 
-	return "/tmp/t/" + key + ".blk"
+}
+func (self *ProviderServer) getPath(key string, fileSize uint64) string {
+
+	return "/tmp/" + key + ".blk"
 }

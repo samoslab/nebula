@@ -29,6 +29,7 @@ message RegisterReq{
     uint64 testUpBandwidth=9;
     uint64 testDownBandwidth=10;
     float availability=11;
+    bytes auth=12;
 }
 
 message RegisterResp{
