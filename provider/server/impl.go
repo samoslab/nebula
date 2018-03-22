@@ -11,19 +11,53 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"github.com/spolabs/nebula/provider/config"
+	"github.com/spolabs/nebula/provider/node"
 	pb "github.com/spolabs/nebula/provider/pb"
 )
 
 const stream_data_size = 32 * 1024
+const sys_folder = "nebula"
+const sep = string(os.PathSeparator)
 
 type ProviderServer struct {
+	Node   *node.Node
 	PathDb *bolt.DB
 }
 
-func NewProviderServer(configDir string) *ProviderServer {
+func initAllStorage(conf *config.ProviderConfig) {
+	initStorage(conf.MainStoragePath)
+	for k, _ := range conf.ExtraStorage {
+		initStorage(k)
+	}
+}
+
+func initStorage(path string) {
+	fileInfo, err := os.Stat(path)
+	if err != nil && os.IsNotExist(err) {
+		p := path + sep + sys_folder
+		err = os.Mkdir(p, os.ModePerm)
+		if err != nil {
+			log.Fatalf("mkdir sys folder failed:%s", err)
+		}
+		newFile, err := os.Create(p + sep + "do_not_delete.txt")
+		if err != nil {
+			log.Fatalf("create notice file failed:%s", err)
+		}
+		newFile.Close()
+	} else if fileInfo.Mode().IsRegular() {
+		log.Fatalf("%s is regular file", path)
+	}
+}
+
+func NewProviderServer() *ProviderServer {
+	conf := config.GetProviderConfig()
+	initAllStorage(conf)
 	ps := &ProviderServer{}
+	ps.Node = node.LoadFormConfig()
 	var err error
-	ps.PathDb, err = bolt.Open("/tmp/my.db", 0600, &bolt.Options{Timeout: 1 * time.Second})
+	ps.PathDb, err = bolt.Open(conf.MainStoragePath+sep+sys_folder+sep+"path.db",
+		0600, &bolt.Options{Timeout: 1 * time.Second})
 	if err != nil {
 		panic(err)
 	}

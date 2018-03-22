@@ -69,6 +69,13 @@ func main() {
 func daemon(configDir *string) {
 	err := config.LoadConfig(configDir)
 	if err != nil {
+		if err == config.NoConfErr {
+			fmt.Printf(`Config file is not ready, please run "%s register" first`, os.Args[0])
+			return
+		} else if err == config.ConfVerifyErr {
+			fmt.Println("Config file error, can not start.")
+			return
+		}
 		log.Fatalf("failed to LoadConfig: %v", err)
 	}
 	config.StartAutoReload()
@@ -78,7 +85,7 @@ func daemon(configDir *string) {
 		log.Fatalf("failed to listen: %v", err)
 	}
 	grpcServer := grpc.NewServer()
-	pb.RegisterProviderServiceServer(grpcServer, server.NewProviderServer(*configDir))
+	pb.RegisterProviderServiceServer(grpcServer, server.NewProviderServer())
 	grpcServer.Serve(lis)
 }
 

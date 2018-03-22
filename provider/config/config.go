@@ -3,6 +3,7 @@ package config
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -12,16 +13,22 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var NoConfErr = errors.New("not found config file")
+
+var ConfVerifyErr = errors.New("verify config file failed")
+
 type ProviderConfig struct {
 	NodeId            string
 	WalletAddress     string
 	BillEmail         string
-	EncryptKey        string
+	PublicKey         string
+	PrivateKey        string
 	Availability      float64
 	MainStoragePath   string
 	MainStorageVolume uint64
 	UpBandwidth       uint64
 	DownBandwidth     uint64
+	EncryptKey        map[string]string
 	ExtraStorage      map[string]uint64
 }
 
@@ -36,11 +43,24 @@ var cronRunner *cron.Cron
 
 func LoadConfig(configDir *string) error {
 	configFilePath = *configDir + string(os.PathSeparator) + config_filename
+	_, err := os.Stat(configFilePath)
+	if err != nil {
+		log.Errorf("Stat config Error: %s\n", err)
+		return NoConfErr
+	}
 	pc, err := readConfig()
 	if err != nil {
 		return err
 	}
+	if err = verifyConfig(pc); err != nil {
+		return ConfVerifyErr
+	}
 	providerConfig = pc
+	return nil
+}
+
+func verifyConfig(pc *ProviderConfig) error {
+	//TODO
 	return nil
 }
 
@@ -64,7 +84,7 @@ func checkAndReload() {
 		pc, err := readConfig()
 		if err != nil {
 			log.Errorf("readConfig Error: %s\n", err)
-		} else {
+		} else if verifyConfig(pc) == nil {
 			providerConfig = pc
 		}
 
