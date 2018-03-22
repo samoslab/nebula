@@ -9,12 +9,14 @@ import (
 
 	"github.com/koding/multiconfig"
 	"github.com/robfig/cron"
+	log "github.com/sirupsen/logrus"
 )
 
 type ProviderConfig struct {
 	NodeId            string
 	WalletAddress     string
 	BillEmail         string
+	EncryptKey        string
 	Availability      float64
 	MainStoragePath   string
 	MainStorageVolume uint64
@@ -32,9 +34,14 @@ var configFileModTs int64
 
 var cronRunner *cron.Cron
 
-func LoadConfig(configDir *string) {
+func LoadConfig(configDir *string) error {
 	configFilePath = *configDir + string(os.PathSeparator) + config_filename
-	providerConfig = readConfig()
+	pc, err := readConfig()
+	if err != nil {
+		return err
+	}
+	providerConfig = pc
+	return nil
 }
 
 func StartAutoReload() {
@@ -50,11 +57,17 @@ func StopAutoReload() {
 func checkAndReload() {
 	modTs, err := getConfigFileModTime()
 	if err != nil {
-		fmt.Printf("getConfigFileModTime Error: %s\n", err)
+		log.Errorf("getConfigFileModTime Error: %s\n", err)
 		return
 	}
 	if modTs != configFileModTs {
-		providerConfig = readConfig()
+		pc, err := readConfig()
+		if err != nil {
+			log.Errorf("readConfig Error: %s\n", err)
+		} else {
+			providerConfig = pc
+		}
+
 	}
 }
 
@@ -66,20 +79,19 @@ func getConfigFileModTime() (int64, error) {
 	return fileInfo.ModTime().Unix(), nil
 }
 
-func readConfig() *ProviderConfig {
+func readConfig() (*ProviderConfig, error) {
 	m := multiconfig.NewWithPath(configFilePath) // supports TOML, JSON and YAML
 	pc := new(ProviderConfig)
 	err := m.Load(pc) // Check for error
 	if err != nil {
-		fmt.Printf("readConfig Error: %s\n", err)
-		panic(err)
+		return nil, err
 	}
 	m.MustLoad(pc) // Panic's if there is any error
 	configFileModTs, err = getConfigFileModTime()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return pc
+	return pc, nil
 }
 
 func GetProviderConfig() *ProviderConfig {

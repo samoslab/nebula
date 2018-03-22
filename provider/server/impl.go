@@ -10,6 +10,7 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
 	pb "github.com/spolabs/nebula/provider/pb"
 )
 
@@ -56,14 +57,14 @@ func (self *ProviderServer) Store(stream pb.ProviderService_StoreServer) error {
 			if err == io.EOF {
 				break
 			}
-			fmt.Printf("RPC Recv failed: %s", err.Error())
+			log.Errorf("RPC Recv failed: %s", err.Error())
 			return self.wrapErr(err, "failed unexpectadely while reading chunks from stream")
 		}
 		if first {
 			first = false
 			ticket = req.Ticket
 			if err = self.checkAuth("Store", req.Auth, ticket, req.Key, req.FileSize, req.Timestamp); err != nil {
-				fmt.Printf("check auth failed: %s", err.Error())
+				log.Warnf("check auth failed: %s", err.Error())
 				return err
 			}
 			path := self.getPath(req.Key, req.FileSize)

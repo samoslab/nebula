@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/user"
 
+	"github.com/spolabs/nebula/provider/config"
 	pb "github.com/spolabs/nebula/provider/pb"
 	"github.com/spolabs/nebula/provider/server"
 	"google.golang.org/grpc"
@@ -66,6 +67,12 @@ func main() {
 }
 
 func daemon(configDir *string) {
+	err := config.LoadConfig(configDir)
+	if err != nil {
+		log.Fatalf("failed to LoadConfig: %v", err)
+	}
+	config.StartAutoReload()
+	defer config.StopAutoReload()
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", 6666))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
