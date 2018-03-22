@@ -37,7 +37,7 @@ func (self *ProviderServer) wrapErr(err error, info string) error {
 	return errors.Wrapf(err, info)
 }
 
-func (self *ProviderServer) checkAuth(method string, auth []byte, ticket string, key string, fileSize uint64, timestamp int64) error {
+func (self *ProviderServer) checkAuth(method string, auth []byte, ticket string, key string, fileSize uint64, timestamp uint64) error {
 	// TODO check auth
 	return nil
 }

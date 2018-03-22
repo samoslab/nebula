@@ -29,8 +29,8 @@ func main() {
 	walletAddressFlag := registerCommand.String("walletAddress", "", "wallet address to accept earnings")
 	billEmailFlag := registerCommand.String("billEmail", "", "email where send bill to")
 	availabilityFlag := registerCommand.String("availability", "", "promise availability: 98%, 99%, 99.9%")
-	upBandwidthFlag := registerCommand.Uint64("upBandwidth", 0, "upload bandwidth, unit: Mbps, eg: 100, 20, 8, 4")
-	downBandwidthFlag := registerCommand.Uint64("downBandwidth", 0, "download bandwidth, unit: Mbps, eg: 100, 20")
+	upBandwidthFlag := registerCommand.Uint("upBandwidth", 0, "upload bandwidth, unit: Mbps, eg: 100, 20, 8, 4")
+	downBandwidthFlag := registerCommand.Uint("downBandwidth", 0, "download bandwidth, unit: Mbps, eg: 100, 20")
 	mainStoragePathFlag := registerCommand.String("mainStoragePath", "", "main storage path")
 	mainStorageVolumeFlag := registerCommand.String("mainStorageVolume", "", "main storage volume size, unit TB or GB, eg: 2TB or 500GB")
 	extraStorageFlag := registerCommand.String("extraStorage", "", "extra storage, format:path1:volume1;path2:volume2, eg: /mnt/sde1:1T;/mnt/sdf1:800G;/mnt/sdg1:500G")
@@ -38,8 +38,7 @@ func main() {
 	addStorageCommand := flag.NewFlagSet("addStorage", flag.ExitOnError)
 	addStorageConfigDir := addStorageCommand.String("configDir", usr.HomeDir+string(os.PathSeparator)+home_config_folder, "config director")
 	pathFlag := addStorageCommand.String("path", "", "add storage path")
-	volumeFlag := addStorageCommand.Uint64("volume", 0, "add storage volume size")
-
+	volumeFlag := addStorageCommand.String("volume", "", "add storage volume size, unit TB or GB, eg: 2TB or 500GB")
 	if len(os.Args) == 1 {
 		fmt.Printf("usage: %s <command> [<args>]\n", os.Args[0])
 		fmt.Println("The most commonly used commands are: ")
@@ -77,11 +76,11 @@ func daemon(configDir *string) {
 }
 
 func register(configDir *string, walletAddress *string, billEmail *string,
-	availability *string, upBandwidth *uint64, downBandwidth *uint64,
+	availability *string, upBandwidth *uint, downBandwidth *uint,
 	mainStoragePath *string, mainStorageVolume *string, extraStorageFlag *string) {
 	fmt.Printf("register billEmail:%s\n", *billEmail)
 }
 
-func addStorage(configDir *string, path *string, volume *uint64) {
-	fmt.Printf("addStorage path:%s, volume:%d\n", *path, *volume)
+func addStorage(configDir *string, path *string, volume *string) {
+	fmt.Printf("addStorage path:%s, volume:%s\n", *path, *volume)
 }

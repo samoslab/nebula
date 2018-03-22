@@ -3,20 +3,26 @@ package register.client.pb;
 
 service ClientRegisterService {
 
-    rpc GetPublicKey(Empty) returns (PublicKeyResp){}
+    rpc GetPublicKey(GetPublicKeyReq) returns (PublicKeyResp){}
 
 	rpc Register(RegisterReq) returns (RegisterResp){}
 
 }
-message Empty {}
+message GetPublicKeyReq {
+    uint32 version =1;
+}
 
 message PublicKeyResp {
-  bytes publicKey=1;
+    bytes publicKey=1;
 }
 
 message RegisterReq{
-	string nodeId = 1;
-    bytes publicKey=2;
+    uint32 version = 1;
+    bytes auth = 2;
+	bytes nodeIdEnc = 3;
+    bytes publicKeyEnc = 4;
+    bytes encryptKeyEnc = 5;
+    bytes contactEmailEnc = 6;
 }
 
 message RegisterResp{
