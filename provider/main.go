@@ -78,14 +78,16 @@ func daemon(configDir *string) {
 		}
 		log.Fatalf("failed to LoadConfig: %v", err)
 	}
-	config.StartAutoReload()
-	defer config.StopAutoReload()
+	config.StartAutoCheck()
+	defer config.StopAutoCheck()
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", 6666))
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
 	grpcServer := grpc.NewServer()
-	pb.RegisterProviderServiceServer(grpcServer, server.NewProviderServer())
+	providerServer := server.NewProviderServer()
+	defer providerServer.Close()
+	pb.RegisterProviderServiceServer(grpcServer, providerServer)
 	grpcServer.Serve(lis)
 }
 

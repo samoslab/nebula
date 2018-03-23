@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -45,18 +44,18 @@ func main() {
 	}
 }
 
-func sha256Sum(file string) string {
+func sha256Sum(file string) []byte {
 	f, err := os.Open(file)
 	if err != nil {
 		fmt.Printf("open file failed: %s", err.Error())
-		return ""
+		return nil
 	}
 	defer f.Close()
 
 	h := sha256.New()
 	if _, err := io.Copy(h, f); err != nil {
 		fmt.Printf("read file failed: %s", err.Error())
-		return ""
+		return nil
 	}
-	return hex.EncodeToString(h.Sum(nil))
+	return h.Sum(nil)
 }

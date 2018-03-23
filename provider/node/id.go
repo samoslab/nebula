@@ -23,7 +23,11 @@ type Node struct {
 
 func LoadFormConfig() *Node {
 	conf := config.GetProviderConfig()
-	pubK, err := x509.ParsePKCS1PublicKey([]byte(conf.PublicKey))
+	pubKeyBytes := []byte(conf.PublicKey)
+	if conf.NodeId != hex.EncodeToString(sha1Sum(pubKeyBytes)) {
+		log.Fatalln("NodeId is not match PublicKey")
+	}
+	pubK, err := x509.ParsePKCS1PublicKey(pubKeyBytes)
 	if err != nil {
 		log.Fatalf("ParsePKCS1PublicKey failed: %s\n", err)
 	}
@@ -39,6 +43,7 @@ func LoadFormConfig() *Node {
 	if err != nil {
 		log.Fatalf("DecodeString node id hex string failed: %s\n", err)
 	}
+
 	return &Node{NodeId: nodeId, PubKey: pubK, PriKey: priK, EncryptKey: m}
 }
 func NewNode(difficulty int) *Node {
@@ -50,10 +55,7 @@ func NewNode(difficulty int) *Node {
 		}
 		n.PriKey = pk
 		n.PubKey = &pk.PublicKey
-		byteSlice, err := x509.MarshalPKIXPublicKey(n.PubKey)
-		if err != nil {
-			fmt.Printf("MarshalPKIXPublicKey failed:%s\n", err.Error())
-		}
+		byteSlice := x509.MarshalPKCS1PublicKey(n.PubKey)
 		n.NodeId = sha1Sum(byteSlice)
 		if count_preceding_zero_bits(sha1Sum(n.NodeId)) < difficulty {
 			break

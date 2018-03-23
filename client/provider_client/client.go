@@ -24,7 +24,7 @@ func updateStoreReqAuth(obj *pb.StoreReq) *pb.StoreReq {
 	obj.Auth = []byte("mock-auth")
 	return obj
 }
-func Store(client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, key string, fileSize uint64) error {
+func Store(client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, key []byte, fileSize uint64) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		fmt.Printf("open file failed: %s", err.Error())
@@ -50,7 +50,7 @@ func Store(client pb.ProviderServiceClient, filePath string, auth []byte, ticket
 		}
 		if first {
 			first = false
-			if err := stream.Send(updateStoreReqAuth(&pb.StoreReq{Data: buf[:bytesRead], Ticket: ticket, Key: key, FileSize: fileSize, Timestamp: time.Now().Unix()})); err != nil {
+			if err := stream.Send(updateStoreReqAuth(&pb.StoreReq{Data: buf[:bytesRead], Ticket: ticket, Key: key, FileSize: fileSize, Timestamp: uint64(time.Now().Unix())})); err != nil {
 				fmt.Printf("RPC Send StoreReq failed: %s", err.Error())
 				return err
 			}
@@ -82,7 +82,7 @@ func updateRetrieveReqAuth(obj *pb.RetrieveReq) *pb.RetrieveReq {
 	return obj
 
 }
-func Retrieve(client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, key string) error {
+func Retrieve(client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, key []byte) error {
 	file, err := os.OpenFile(filePath,
 		os.O_WRONLY|os.O_TRUNC|os.O_CREATE,
 		0666)
@@ -91,7 +91,7 @@ func Retrieve(client pb.ProviderServiceClient, filePath string, auth []byte, tic
 		return err
 	}
 	defer file.Close()
-	stream, err := client.Retrieve(context.Background(), updateRetrieveReqAuth(&pb.RetrieveReq{Ticket: ticket, Key: key, Timestamp: time.Now().Unix()}))
+	stream, err := client.Retrieve(context.Background(), updateRetrieveReqAuth(&pb.RetrieveReq{Ticket: ticket, Key: key, Timestamp: uint64(time.Now().Unix())}))
 	for {
 		resp, err := stream.Recv()
 		if err == io.EOF {

@@ -2,7 +2,7 @@ syntax = "proto3";
 package provider.pb;
 
 service ProviderService {
-  rpc Ping(PingReq) returns (PingResp){}
+	rpc Ping(PingReq) returns (PingResp){}
 
 	rpc Store(stream StoreReq) returns (StoreResp){}
 
@@ -20,12 +20,12 @@ message PingResp{
 }
 
 message StoreReq {
-  bytes data=1;
+	bytes data=1;
 	uint32 version=2;
 	bytes auth = 3;
 	uint64 timestamp=4;
 	string ticket = 5;
-	string key = 6;
+	bytes key = 6;
 	uint64 fileSize=7;
 }
 
@@ -38,24 +38,24 @@ message RetrieveReq {
 	bytes auth = 2;
 	uint64 timestamp=3;
 	string ticket = 4;
-	string key = 5;
+	bytes key = 5;
 	uint64 fileSize=6;
 	
 }
 
 message RetrieveResp {
-   bytes data=1;
+	bytes data=1;
 }
 
 message GetFragmentReq {
 	uint32 version =1;
 	bytes auth = 2;
 	uint64 timestamp=3;
-	string key = 4;
+	bytes key = 4;
 	uint32 size = 5;
 	bytes positions = 6;
 }
 
 message GetFragmentResp {
-   repeated bytes data=1;
+	repeated bytes data=1;
 }

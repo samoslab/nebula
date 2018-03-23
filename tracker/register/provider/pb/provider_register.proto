@@ -30,7 +30,10 @@ message RegisterReq{
     uint64 testUpBandwidth=11;
     uint64 testDownBandwidth=12;
     float availability=13;
-    repeated uint64 extraStorageVolume=14;
+    uint32 port=14;
+    bytes ipEnc=15;
+    bytes dynamicDomain=16;
+    repeated uint64 extraStorageVolume=17;
 }
 
 message RegisterResp{
