@@ -66,7 +66,7 @@ func NewNode(difficulty int) *Node {
 
 func count_preceding_zero_bits(nodeIdHash []byte) int {
 	res := 0
-	for b := range nodeIdHash {
+	for _, b := range nodeIdHash {
 		str := strconv.FormatInt(int64(b), 2)
 		if len(str) > 1 {
 			res += (8 - len(str))

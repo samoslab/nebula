@@ -250,6 +250,11 @@ func sendFileToStream(path string, file *os.File, stream pb.ProviderService_Retr
 }
 
 func (self *ProviderServer) GetFragment(ctx context.Context, req *pb.GetFragmentReq) (*pb.GetFragmentResp, error) {
+	for i, b := range req.Positions {
+		if b >= 100 {
+			return nil, errors.New("posisiton out of bounds, Posistion " + strconv.Itoa(i) + ": " + strconv.Itoa(int(b)))
+		}
+	}
 	if err := self.checkAuth("GetFragment", req.Auth, req.Key, uint64(req.Size), req.Timestamp); err != nil {
 		log.Warnf("check auth failed: %s", err.Error())
 		return nil, err
@@ -287,14 +292,14 @@ func (self *ProviderServer) saveFile(key []byte, fileSize uint64, tmpFilePath st
 	if fileSize > max_combine_file_size {
 		le := len(key)
 		var val uint32
-		val = uint32(key[le-1]) + 256*uint32(key[le-2]) + 256*256*uint32(key[le-3]) + 256*256*256*uint32(key[le-4])
+		val = uint32(key[le-1]) | (uint32(key[le-2]) << 8) | (uint32(key[le-3]) << 16) | (uint32(key[le-4]) << 24)
 		sub1 := config.FixLength(val%config.ModFactor, 4)
 		sub2 := config.FixLength((val/config.ModFactor)%config.ModFactor, 4)
 		path := []byte("/" + sub1 + "/" + sub2 + "/" + filename + filename_suffix)
 		pathSlice := make([]byte, 0, len(path)+1)
 		pathSlice[0] = 128 | storage.Index
-		for v, idx := range path {
-			pathSlice[idx+1] = byte(v)
+		for idx, v := range path {
+			pathSlice[idx+1] = v
 		}
 		fullPath := storage.Path + sep + sub1 + sep + sub2 + sep + filename + filename_suffix
 		_, err := os.Stat(fullPath)
@@ -325,8 +330,8 @@ func (self *ProviderServer) saveSmallFile(key []byte, fileSize uint64, tmpFilePa
 	currCombineSize := storage.CurrCombineSize()
 	fillByteSlice(pathSlice, 1, currCombineSize)
 	fillByteSlice(pathSlice, 5, uint32(fileSize))
-	for b, idx := range subPath {
-		pathSlice[9+idx] = byte(b)
+	for idx, b := range subPath {
+		pathSlice[9+idx] = b
 	}
 	var err error
 	if err = concatFile(storage.CurrCombinePath, tmpFilePath); err != nil {
@@ -343,8 +348,8 @@ func (self *ProviderServer) saveSmallFile(key []byte, fileSize uint64, tmpFilePa
 func fillByteSlice(bytes []byte, startIdx int, val uint32) {
 	// TODO optimize
 	for i := 3; i >= 0; i-- {
-		bytes[startIdx+i] = byte(val % 256)
-		val = val / 256
+		bytes[startIdx+i] = byte(val & 255)
+		val = val >> 8
 		if val == 0 {
 			break
 		}
