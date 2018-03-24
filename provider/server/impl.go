@@ -1,11 +1,14 @@
 package server
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"golang.org/x/net/context"
@@ -16,12 +19,17 @@ import (
 	"github.com/spolabs/nebula/provider/config"
 	"github.com/spolabs/nebula/provider/node"
 	pb "github.com/spolabs/nebula/provider/pb"
+	util_bytes "github.com/spolabs/nebula/util/bytes"
+	util_file "github.com/spolabs/nebula/util/file"
+	util_hash "github.com/spolabs/nebula/util/hash"
+	util_num "github.com/spolabs/nebula/util/num"
 )
 
 const stream_data_size = 32 * 1024
 const sys_folder = "nebula"
 const tmp_folder = "temp"
 const filename_suffix = ".blk"
+const slash = "/"
 
 const sep = string(os.PathSeparator)
 const timestamp_expired = 60
@@ -33,8 +41,8 @@ type ProviderServer struct {
 
 func initAllStorage(conf *config.ProviderConfig) {
 	initStorage(conf.MainStoragePath, 0)
-	for k, i := range conf.ExtraStorage {
-		initStorage(k, int(i+1))
+	for _, info := range conf.ExtraStorage {
+		initStorage(info.Path, int(info.Index+1))
 	}
 }
 
@@ -86,8 +94,15 @@ func (self *ProviderServer) checkAuth(method string, auth []byte, key []byte, fi
 	if nowTs-timestamp > timestamp_expired || timestamp-nowTs > timestamp_expired {
 		return errors.New("auth info expired")
 	}
-	// TODO check auth
-	return nil
+	hash := hmac.New(sha256.New, self.Node.PubKeyBytes)
+	hash.Write([]byte(method))
+	hash.Write(key)
+	hash.Write(util_bytes.FromUint64(fileSize))
+	hash.Write(util_bytes.FromUint64(timestamp))
+	if util_bytes.SameBytes(auth, hash.Sum(nil)) {
+		return nil
+	}
+	return errors.New("auth verify failed")
 }
 
 func (self *ProviderServer) Ping(ctx context.Context, req *pb.PingReq) (*pb.PingResp, error) {
@@ -153,6 +168,13 @@ func (self *ProviderServer) Store(stream pb.ProviderService_StoreServer) error {
 			return errors.Wrapf(err, "write file failed")
 		}
 	}
+	hash, err := util_hash.Sha1File(tempFilePath)
+	if err != nil {
+		return err
+	}
+	if !util_bytes.SameBytes(hash, key) {
+		return errors.New("hash verify failed")
+	}
 	if err := self.saveFile(key, fileSize, tempFilePath, storage); err != nil {
 		log.Errorf("save file failed, tempFilePath: %s", tempFilePath)
 		return err
@@ -170,9 +192,25 @@ func (self *ProviderServer) Retrieve(req *pb.RetrieveReq, stream pb.ProviderServ
 	if err := self.checkAuth("Retrieve", req.Auth, req.Key, req.FileSize, req.Timestamp); err != nil {
 		return err
 	}
-	path, bigFile, position, fileSize := self.queryPath(req.Key)
-	if path == "" {
+	subPath, bigFile, storageIdx, position, fileSize := self.querySubPath(req.Key)
+	if subPath == "" {
 		return os.ErrNotExist
+	}
+	path, err := getAbsPathOfSubPath(subPath, int(storageIdx))
+	if err != nil {
+		return err
+	}
+	var hash []byte
+	if bigFile {
+		hash, err = util_hash.Sha1File(path)
+	} else {
+		hash, err = util_hash.Sha1FilePiece(path, position, fileSize)
+	}
+	if err != nil {
+		return err
+	}
+	if !util_bytes.SameBytes(hash, req.Key) {
+		return errors.New("hash verify failed")
 	}
 	file, err := os.Open(path)
 	if err != nil {
@@ -250,6 +288,9 @@ func sendFileToStream(path string, file *os.File, stream pb.ProviderService_Retr
 }
 
 func (self *ProviderServer) GetFragment(ctx context.Context, req *pb.GetFragmentReq) (*pb.GetFragmentResp, error) {
+	if len(req.Positions) == 0 || req.Size == 0 {
+		return nil, errors.New("invalid req")
+	}
 	for i, b := range req.Positions {
 		if b >= 100 {
 			return nil, errors.New("posisiton out of bounds, Posistion " + strconv.Itoa(i) + ": " + strconv.Itoa(int(b)))
@@ -259,9 +300,37 @@ func (self *ProviderServer) GetFragment(ctx context.Context, req *pb.GetFragment
 		log.Warnf("check auth failed: %s", err.Error())
 		return nil, err
 	}
-	path, bigFile, position, fileSize := self.queryPath(req.Key)
-	if path == "" {
+	subPath, bigFile, storageIdx, position, size := self.querySubPath(req.Key)
+	if subPath == "" {
 		return nil, os.ErrNotExist
+	}
+	path, err := getAbsPathOfSubPath(subPath, int(storageIdx))
+	if err != nil {
+		return nil, err
+	}
+	var hash []byte
+	if bigFile {
+		hash, err = util_hash.Sha1File(path)
+	} else {
+		hash, err = util_hash.Sha1FilePiece(path, position, size)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !util_bytes.SameBytes(hash, req.Key) {
+		return nil, errors.New("hash verify failed")
+	}
+	var fileSize uint64
+	var startPos int64
+	if bigFile {
+		fileInfo, err := os.Stat(path)
+		if err != nil {
+			return nil, err
+		}
+		fileSize = uint64(fileInfo.Size())
+	} else {
+		fileSize = uint64(size)
+		startPos = int64(position)
 	}
 	file, err := os.Open(path)
 	if err != nil {
@@ -269,22 +338,37 @@ func (self *ProviderServer) GetFragment(ctx context.Context, req *pb.GetFragment
 		return nil, errors.Wrapf(err, "open file failed")
 	}
 	defer file.Close()
-	if bigFile {
-		//TODO
-	} else {
-		newPosition, err := file.Seek(int64(position), 0)
+	res := make([][]byte, 0, len(req.Positions))
+	for _, posPercent := range req.Positions {
+		pos := int64(posPercent) * int64(fileSize) / 100
+		if pos+int64(req.Size) > int64(fileSize) {
+			return nil, errors.New("file position out of bounds")
+		}
+		buf := make([]byte, req.Size)
+		_, err := file.Seek(startPos+pos, 0) // TODO optimize: Seek offset
 		if err != nil {
-			log.Errorf("Seek file: %s to %d failed: %s", path, position, err)
+			log.Errorf("Seek file: %s to %d failed: %s", path, startPos+pos, err)
 			return nil, err
 		}
-		if newPosition != int64(position) {
-			log.Errorf("Seek file: %s to %d failed", path, position)
-			return nil, errors.New("Seek file failed")
+		_, err = file.Read(buf)
+		if err != nil {
+			return nil, err
 		}
-		fmt.Println(fileSize)
-		// TODO
+		res = append(res, buf)
 	}
-	return nil, nil
+	return &pb.GetFragmentResp{Data: res}, nil
+}
+
+func getAbsPathOfSubPath(subPath string, storageIdx int) (string, error) {
+	conf := config.GetProviderConfig()
+	parent := conf.MainStoragePath
+	if storageIdx != 0 {
+		if storageIdx > len(conf.ExtraStorage) {
+			return "", errors.New("storage index out of bounds")
+		}
+		parent = conf.ExtraStorage[strconv.Itoa(storageIdx)].Path
+	}
+	return parent + strings.Replace(subPath, slash, sep, -1), nil
 }
 
 func (self *ProviderServer) saveFile(key []byte, fileSize uint64, tmpFilePath string, storage *config.Storage) error {
@@ -293,9 +377,10 @@ func (self *ProviderServer) saveFile(key []byte, fileSize uint64, tmpFilePath st
 		le := len(key)
 		var val uint32
 		val = uint32(key[le-1]) | (uint32(key[le-2]) << 8) | (uint32(key[le-3]) << 16) | (uint32(key[le-4]) << 24)
-		sub1 := config.FixLength(val%config.ModFactor, 4)
-		sub2 := config.FixLength((val/config.ModFactor)%config.ModFactor, 4)
-		path := []byte("/" + sub1 + "/" + sub2 + "/" + filename + filename_suffix)
+		sub1 := util_num.FixLength(val%config.ModFactor, 4)
+		sub2 := util_num.FixLength((val/config.ModFactor)%config.ModFactor, 4)
+		subPath := slash + sub1 + slash + sub2 + slash + filename + filename_suffix
+		path := []byte(subPath)
 		pathSlice := make([]byte, 0, len(path)+1)
 		pathSlice[0] = 128 | storage.Index
 		for idx, v := range path {
@@ -316,77 +401,41 @@ func (self *ProviderServer) saveFile(key []byte, fileSize uint64, tmpFilePath st
 		if err != nil {
 			return err
 		}
+		logPath(subPath, true, storage.Index, 0, 0)
 	} else {
-		return self.saveSmallFile(key, fileSize, tmpFilePath, storage)
+		return self.saveSmallFile(key, uint32(fileSize), tmpFilePath, storage)
 	}
 	return nil
 }
-func (self *ProviderServer) saveSmallFile(key []byte, fileSize uint64, tmpFilePath string, storage *config.Storage) error {
+func (self *ProviderServer) saveSmallFile(key []byte, fileSize uint32, tmpFilePath string, storage *config.Storage) error {
 	storage.SmallFileMutex.Lock()
 	defer storage.SmallFileMutex.Unlock()
-	subPath := []byte(storage.CurrCombineSubPath)
-	pathSlice := make([]byte, 0, len(subPath)+9)
+	subPath := storage.CurrCombineSubPath
+	path := []byte(subPath)
+	pathSlice := make([]byte, 0, len(path)+9)
 	pathSlice[0] = storage.Index
 	currCombineSize := storage.CurrCombineSize()
-	fillByteSlice(pathSlice, 1, currCombineSize)
-	fillByteSlice(pathSlice, 5, uint32(fileSize))
-	for idx, b := range subPath {
+	util_bytes.FillUint32(pathSlice, 1, currCombineSize)
+	util_bytes.FillUint32(pathSlice, 5, fileSize)
+	for idx, b := range path {
 		pathSlice[9+idx] = b
 	}
 	var err error
-	if err = concatFile(storage.CurrCombinePath, tmpFilePath); err != nil {
+	if err = util_file.ConcatFile(storage.CurrCombinePath, tmpFilePath, true); err != nil {
 		return err
 	}
 	err = self.savePath(key, pathSlice)
-	storage.NextCombinePath(currCombineSize, uint32(fileSize))
+	storage.NextCombinePath(currCombineSize, fileSize)
 	if err != nil {
 		return err
 	}
+	logPath(subPath, false, storage.Index, currCombineSize, fileSize)
 	return nil
 }
 
-func fillByteSlice(bytes []byte, startIdx int, val uint32) {
-	// TODO optimize
-	for i := 3; i >= 0; i-- {
-		bytes[startIdx+i] = byte(val & 255)
-		val = val >> 8
-		if val == 0 {
-			break
-		}
-	}
-}
-
-func concatFile(writeFile string, readFile string) error {
-	fi, err := os.Open(readFile)
-	if err != nil {
-		return err
-	}
-	defer fi.Close()
-	fo, err := os.OpenFile(writeFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0600)
-	if err != nil {
-		return err
-	}
-	defer fo.Close()
-	buf := make([]byte, 8192)
-	for {
-		// read a chunk
-		n, err := fi.Read(buf)
-		if err != nil && err != io.EOF {
-			return err
-		}
-		if n == 0 {
-			break
-		}
-		// write a chunk
-		if _, err := fo.Write(buf[:n]); err != nil {
-			return err
-		}
-	}
-	err = os.Remove(readFile)
-	if err != nil {
-		log.Errorf("Remove file: %s failed:%s", readFile, err)
-	}
-	return nil
+func logPath(subPath string, bigFile bool, storageIdx byte, position uint32, size uint32) {
+	// path := config.GetProviderConfig().MainStoragePath + sep + sys_folder + sep + "log"
+	// TODO
 }
 
 const max_combine_file_size = 1048576 //1M
@@ -403,20 +452,17 @@ func (self *ProviderServer) queryByKey(key []byte) []byte {
 	return res
 }
 
-func (self *ProviderServer) queryPath(key []byte) (string, bool, uint32, uint32) {
+func (self *ProviderServer) querySubPath(key []byte) (subPath string, bigFile bool, storageIdx byte, position uint32, size uint32) {
 	bytes := self.queryByKey(key)
 	if bytes == nil {
-		return "", false, 0, 0
+		return "", false, 0, 0, 0
 	}
-	bigFile := bytes[0]&128 == 128
+	bigFile = bytes[0]&128 == 128
+	storageIdx = bytes[0] & 128
 	if bigFile {
-		return string(bytes[1:]), bigFile, 0, 0
+		return string(bytes[1:]), bigFile, storageIdx, 0, 0
 	}
-	return string(bytes[9:]), bigFile, byteSliceToUint32(bytes, 1), byteSliceToUint32(bytes, 5)
-}
-
-func byteSliceToUint32(b []byte, startIdx int) uint32 {
-	return uint32(b[startIdx+3]) | uint32(b[startIdx+2])<<8 | uint32(b[startIdx+1])<<16 | uint32(b[startIdx])<<24
+	return string(bytes[9:]), bigFile, storageIdx, util_bytes.ToUint32(bytes, 1), util_bytes.ToUint32(bytes, 5)
 }
 
 func (self *ProviderServer) savePath(key []byte, pathSlice []byte) error {
