@@ -73,6 +73,7 @@ func NewNode(difficulty int) *Node {
 	}
 	m := make(map[string][]byte, 1)
 	m["0"] = randAesKey(256)
+	n.EncryptKey = m
 	return n
 }
 

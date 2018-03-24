@@ -17,9 +17,13 @@ func TestSaveProviderConfig(t *testing.T) {
 		MainStorageVolume: 200000000000,
 		UpBandwidth:       4,
 		DownBandwidth:     100,
-		ExtraStorage: map[string]uint64{
-			"/extra/storage/path1": 200000000000,
-			"/extra/storage/path2": 100000000000,
+		ExtraStorage: map[string]ExtraStorageInfo{
+			"1": ExtraStorageInfo{Path: "/extra/storage/path1",
+				Volume: 200000000000,
+				Index:  1},
+			"2": ExtraStorageInfo{Path: "/extra/storage/path2",
+				Volume: 100000000000,
+				Index:  2},
 		},
 	}
 	SaveProviderConfig()
@@ -30,7 +34,11 @@ func TestSaveProviderConfig(t *testing.T) {
 }
 
 func removeConfigFile() {
-	err := os.Remove(configFilePath)
+	_, err := os.Stat(configFilePath)
+	if err != nil && os.IsNotExist(err) {
+		return
+	}
+	err = os.Remove(configFilePath)
 	if err != nil {
 		panic(err)
 	}

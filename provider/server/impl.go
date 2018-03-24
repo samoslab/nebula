@@ -31,6 +31,8 @@ const tmp_folder = "temp"
 const filename_suffix = ".blk"
 const slash = "/"
 
+var skip_check_auth = false
+
 const sep = string(os.PathSeparator)
 const timestamp_expired = 60
 
@@ -47,37 +49,59 @@ func initAllStorage(conf *config.ProviderConfig) {
 }
 
 func initStorage(path string, index int) {
-	fileInfo, err := os.Stat(path)
-	if err != nil && os.IsNotExist(err) {
-		p := path + sep + sys_folder
-		err = os.Mkdir(p, 0700)
+	exist, fileInfo := util_file.ExistsWithInfo(path)
+	if !exist {
+		log.Fatalf("storage path not exists: %s", path)
+	}
+	if fileInfo != nil && fileInfo.Mode().IsRegular() {
+		log.Fatalf("storage path is a file: %s", path)
+	}
+	p := path + sep + sys_folder
+	exist, fileInfo = util_file.ExistsWithInfo(p)
+	if !exist {
+		err := os.Mkdir(p, 0700)
 		if err != nil {
-			log.Fatalf("mkdir sys folder failed:%s", err)
+			log.Fatalf("mkdir sys folder: %s failed: %s", p, err)
 		}
 		newFile, err := os.Create(p + sep + "storage-" + strconv.Itoa(index) + ".nebula")
 		if err != nil {
-			log.Fatalf("create storage index file failed:%s", err)
+			log.Fatalf("create storage index file failed: %s", err)
 		}
 		newFile, err = os.Create(p + sep + "do_not_delete.txt")
 		if err != nil {
-			log.Fatalf("create notice file failed:%s", err)
+			log.Fatalf("create notice file failed: %s", err)
 		}
 		newFile.Close()
-	} else if fileInfo.Mode().IsRegular() {
-		log.Fatalf("%s is regular file", path)
+	}
+	if fileInfo != nil && fileInfo.Mode().IsRegular() {
+		log.Fatalf("storage sys folder path is a file: %s", p)
 	}
 }
 
 func NewProviderServer() *ProviderServer {
 	conf := config.GetProviderConfig()
+	if os.Getenv("TEST_MODE") == "1" {
+		skip_check_auth = true
+	}
 	initAllStorage(conf)
 	ps := &ProviderServer{}
 	ps.Node = node.LoadFormConfig()
+	dbPath := conf.MainStoragePath + sep + sys_folder + sep + "provider.db"
+	exists := util_file.Exists(dbPath)
 	var err error
-	ps.ProviderDb, err = bolt.Open(conf.MainStoragePath+sep+sys_folder+sep+"provider.db",
+	ps.ProviderDb, err = bolt.Open(dbPath,
 		0600, &bolt.Options{Timeout: 1 * time.Second})
 	if err != nil {
-		panic(err)
+		log.Fatalf("open Provider DB failed:%s", err)
+	}
+	if !exists {
+		ps.ProviderDb.Update(func(tx *bolt.Tx) error {
+			_, err := tx.CreateBucket(path_bucket)
+			return err
+		})
+		if err != nil {
+			log.Fatalf("create bucket: %s", err)
+		}
 	}
 	return ps
 }
@@ -87,6 +111,9 @@ func (self *ProviderServer) Close() {
 }
 
 func (self *ProviderServer) checkAuth(method string, auth []byte, key []byte, fileSize uint64, timestamp uint64) error {
+	if skip_check_auth {
+		return nil
+	}
 	if len(key) < 4 {
 		return errors.New("empty key")
 	}
@@ -374,14 +401,13 @@ func getAbsPathOfSubPath(subPath string, storageIdx int) (string, error) {
 func (self *ProviderServer) saveFile(key []byte, fileSize uint64, tmpFilePath string, storage *config.Storage) error {
 	filename := hex.EncodeToString(key)
 	if fileSize > max_combine_file_size {
-		le := len(key)
-		var val uint32
-		val = uint32(key[le-1]) | (uint32(key[le-2]) << 8) | (uint32(key[le-3]) << 16) | (uint32(key[le-4]) << 24)
-		sub1 := util_num.FixLength(val%config.ModFactor, 4)
-		sub2 := util_num.FixLength((val/config.ModFactor)%config.ModFactor, 4)
+		val := util_bytes.ToUint32(key, len(key)-4)
+		sub1 := util_num.FixLength(val&(config.ModFactor-1), 4)
+		sub2 := util_num.FixLength((val>>config.ModFactorExp)&(config.ModFactor-1), 4)
 		subPath := slash + sub1 + slash + sub2 + slash + filename + filename_suffix
 		path := []byte(subPath)
 		pathSlice := make([]byte, 0, len(path)+1)
+		fmt.Println(storage.Index)
 		pathSlice[0] = 128 | storage.Index
 		for idx, v := range path {
 			pathSlice[idx+1] = v

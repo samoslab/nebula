@@ -9,7 +9,7 @@ import (
 type ProviderRegisterService struct {
 }
 
-func (self *ProviderRegisterService) GetPublicKey(ctx context.Context, req *pb.Empty) (*pb.PublicKeyResp, error) {
+func (self *ProviderRegisterService) GetPublicKey(ctx context.Context, req *pb.GetPublicKeyReq) (*pb.PublicKeyResp, error) {
 	return &pb.PublicKeyResp{PublicKey: []byte("test provider public key")}, nil //TODO return public key
 }
 

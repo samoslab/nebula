@@ -37,7 +37,7 @@ type ProviderConfig struct {
 	UpBandwidth       uint64
 	DownBandwidth     uint64
 	EncryptKey        map[string]string           // key: version, eg: 0, 1, 2
-	ExtraStorage      map[string]ExtraStorageInfo //key:storage index, eg: 1, 2, 3
+	ExtraStorage      map[string]ExtraStorageInfo `json:",omitempty"` //key:storage index, 1-based eg: 1, 2, 3
 }
 
 var providerConfig *ProviderConfig
@@ -51,9 +51,7 @@ var cronRunner *cron.Cron
 
 func LoadConfig(configDir string) error {
 	configFilePath = configDir + string(os.PathSeparator) + config_filename
-	_, err := os.Stat(configFilePath)
-	if err != nil {
-		log.Errorf("Stat config Error: %s", err)
+	if !util_file.Exists(configFilePath) {
 		return NoConfErr
 	}
 	pc, err := readConfig()
@@ -130,6 +128,11 @@ func GetProviderConfig() *ProviderConfig {
 }
 
 func CreateProviderConfig(configDir string, pc *ProviderConfig) {
+	if !util_file.Exists(configDir) {
+		if err := os.MkdirAll(configDir, 0700); err != nil {
+			log.Fatalf("mkdir config folder %s failed:%s", configDir, err)
+		}
+	}
 	path := configDir + string(os.PathSeparator) + config_filename
 	if util_file.Exists(path) {
 		log.Fatalf("config file is adready exsits:%s", configDir)
@@ -172,11 +175,13 @@ var storageSlice []*Storage
 
 const max_combine_file_size = 1024 * 1024 * 1024 // cannot more than max uint32 value: 4294967295
 const combine_filename_suffix = ".blks"
-const ModFactor = 8192
+const combine_folder = "combine"
+const ModFactorExp = 13
+const ModFactor = 1 << ModFactorExp
 const slash = "/"
 
 func (self *Storage) getFolderAndFileName(idx uint32) (string, string) {
-	return util_num.FixLength(idx%ModFactor, 4), util_num.FixLength(idx, 8) + combine_filename_suffix
+	return util_num.FixLength(idx&(ModFactor-1), 4), util_num.FixLength(idx, 8) + combine_filename_suffix
 }
 func (self *Storage) findOrTouchCombinePath() {
 	self.findOrTouchCombinePathFormIdx(0)
@@ -185,7 +190,7 @@ func (self *Storage) findOrTouchCombinePathFormIdx(i uint32) {
 	errTimes := 0
 	for ; i < 4294967295; i++ {
 		folder, filename := self.getFolderAndFileName(i)
-		folderPath := self.Path + string(os.PathSeparator) + folder
+		folderPath := self.Path + string(os.PathSeparator) + combine_folder + string(os.PathSeparator) + folder
 		filePath := folderPath + string(os.PathSeparator) + filename
 		fileInfo, err := os.Stat(filePath)
 		if err != nil && os.IsNotExist(err) {
@@ -243,6 +248,7 @@ func checkAllStorageAvailableSpace() {
 		s := &Storage{Path: providerConfig.MainStoragePath, Index: 0}
 		s.findOrTouchCombinePath()
 		sl = append(sl, s)
+		storageSlice = sl
 	}
 	// TODO  Available Space less than 1G will not to store.
 }

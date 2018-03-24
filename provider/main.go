@@ -25,70 +25,75 @@ const home_config_folder = ".spo-nebula-provider"
 func main() {
 	usr, err := user.Current()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Get OS current user failed: %s", err)
 	}
 
 	daemonCommand := flag.NewFlagSet("daemon", flag.ExitOnError)
-	daemonConfigDir := daemonCommand.String("configDir", usr.HomeDir+string(os.PathSeparator)+home_config_folder, "config director")
+	daemonConfigDirFlag := daemonCommand.String("configDir", usr.HomeDir+string(os.PathSeparator)+home_config_folder, "config director")
+	listenFlag := daemonCommand.String("listen", ":6666", "listen address and port, eg: 111.111.111.111:6666 or :6666")
 
 	registerCommand := flag.NewFlagSet("register", flag.ExitOnError)
-	registerConfigDir := registerCommand.String("configDir", usr.HomeDir+string(os.PathSeparator)+home_config_folder, "config director")
-	walletAddressFlag := registerCommand.String("walletAddress", "", "wallet address to accept earnings")
+	registerConfigDirFlag := registerCommand.String("configDir", usr.HomeDir+string(os.PathSeparator)+home_config_folder, "config director")
+	walletAddressFlag := registerCommand.String("walletAddress", "", "SPO wallet address to accept earnings")
 	billEmailFlag := registerCommand.String("billEmail", "", "email where send bill to")
-	availabilityFlag := registerCommand.String("availability", "", "promise availability: 98%, 99%, 99.9%")
+	availabilityFlag := registerCommand.String("availability", "", "promise availability, must more than 98%, eg: 98%, 99%, 99.9%")
 	upBandwidthFlag := registerCommand.Uint("upBandwidth", 0, "upload bandwidth, unit: Mbps, eg: 100, 20, 8, 4")
 	downBandwidthFlag := registerCommand.Uint("downBandwidth", 0, "download bandwidth, unit: Mbps, eg: 100, 20")
 	mainStoragePathFlag := registerCommand.String("mainStoragePath", "", "main storage path")
 	mainStorageVolumeFlag := registerCommand.String("mainStorageVolume", "", "main storage volume size, unit TB or GB, eg: 2TB or 500GB")
-	extraStorageFlag := registerCommand.String("extraStorage", "", "extra storage, format:path1:volume1;path2:volume2, eg: /mnt/sde1:1T;/mnt/sdf1:800G;/mnt/sdg1:500G")
+	extraStorageFlag := registerCommand.String("extraStorage", "", "extra storage, format:path1:volume1,path2:volume2, eg: /mnt/sde1:1TB,/mnt/sdf1:800GB,/mnt/sdg1:500GB")
 
 	addStorageCommand := flag.NewFlagSet("addStorage", flag.ExitOnError)
-	addStorageConfigDir := addStorageCommand.String("configDir", usr.HomeDir+string(os.PathSeparator)+home_config_folder, "config director")
+	addStorageConfigDirFlag := addStorageCommand.String("configDir", usr.HomeDir+string(os.PathSeparator)+home_config_folder, "config director")
 	pathFlag := addStorageCommand.String("path", "", "add storage path")
-	volumeFlag := addStorageCommand.String("volume", "", "add storage volume size, unit T or G, eg: 2T or 500G")
+	volumeFlag := addStorageCommand.String("volume", "", "add storage volume size, unit TB or GB, eg: 2TB or 500GB")
 	if len(os.Args) == 1 {
 		fmt.Printf("usage: %s <command> [<args>]\n", os.Args[0])
 		fmt.Println("The most commonly used commands are: ")
-		fmt.Println(" daemon [-configDir]")
-		fmt.Println(" register [-configDir] -billEmail")
-		fmt.Println(" addStorage [-configDir] -path storage-path -volume storage-volume")
+		fmt.Println(" daemon [-configDir config-dir] [-listen listen-address-and-port]")
+		daemonCommand.PrintDefaults()
+		fmt.Println(" register [-configDir config-dir] -walletAddress wallet-address -billEmail bill-email -downBandwidth down-bandwidth -upBandwidth up-bandwidth -availability availability-percentage -mainStoragePath storage-path -mainStorageVolume storage-volume -extraStorage extra-storage-string")
+		registerCommand.PrintDefaults()
+		fmt.Println(" addStorage [-configDir config-dir] -path storage-path -volume storage-volume")
+		addStorageCommand.PrintDefaults()
+
 		return
 	}
 
 	switch os.Args[1] {
 	case "daemon":
 		daemonCommand.Parse(os.Args[2:])
-		daemon(*daemonConfigDir)
+		daemon(*daemonConfigDirFlag, *listenFlag)
 	case "register":
 		registerCommand.Parse(os.Args[2:])
-		register(*registerConfigDir, *walletAddressFlag, *billEmailFlag, *availabilityFlag,
+		register(*registerConfigDirFlag, *walletAddressFlag, *billEmailFlag, *availabilityFlag,
 			*upBandwidthFlag, *downBandwidthFlag, *mainStoragePathFlag, *mainStorageVolumeFlag, *extraStorageFlag)
 	case "addStorage":
 		addStorageCommand.Parse(os.Args[2:])
-		addStorage(*addStorageConfigDir, *pathFlag, *volumeFlag)
+		addStorage(*addStorageConfigDirFlag, *pathFlag, *volumeFlag)
 	default:
 		fmt.Printf("%q is not valid command.\n", os.Args[1])
 		os.Exit(2)
 	}
 }
 
-func daemon(configDir string) {
+func daemon(configDir string, listen string) {
 	err := config.LoadConfig(configDir)
 	if err != nil {
 		if err == config.NoConfErr {
-			fmt.Printf("Config file is not ready, please run \"%s register\" first\n", os.Args[0])
+			fmt.Printf("Config file is not ready, please run \"%s register\" to register first\n", os.Args[0])
 			return
 		} else if err == config.ConfVerifyErr {
-			fmt.Println("Config file error, can not start.")
+			fmt.Println("Config file wrong, can not start daemon.")
 			return
 		}
-		log.Fatalf("failed to LoadConfig: %v", err)
+		log.Fatalf("failed to load config: %s, can not start daemon", err)
 	}
 	config.StartAutoCheck()
 	defer config.StopAutoCheck()
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", 6666))
+	lis, err := net.Listen("tcp", listen)
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		log.Fatalf("failed to listen: %s, error: %s", listen, err)
 	}
 	grpcServer := grpc.NewServer()
 	providerServer := server.NewProviderServer()
@@ -130,6 +135,7 @@ func register(configDir string, walletAddress string, billEmail string,
 		fmt.Printf("availability: %s is not valid:%s\n", availability, err)
 		os.Exit(9)
 	}
+	availFloat = availFloat / 100
 	if availFloat < 0.98 {
 		fmt.Println("availability must more than 98%.")
 		os.Exit(10)
@@ -172,6 +178,7 @@ func register(configDir string, walletAddress string, billEmail string,
 		fmt.Printf("mainStorageVolume: %s is not valid\n", origMainStorageVolume)
 		os.Exit(16)
 	}
+	// TODO support extra storage
 	// TODO call Tracker provider register api
 	doRegister(configDir, walletAddress, billEmail, availFloat, upBandwidthBps, downBandwidthBps, mainStoragePath, mainStorageVolumeByte)
 }
