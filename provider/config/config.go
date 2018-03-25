@@ -196,7 +196,7 @@ func (self *Storage) findOrTouchCombinePathFormIdx(i uint32) {
 		if err != nil && os.IsNotExist(err) {
 			self.CurrCombineIdx = i
 			self.CurrCombinePath = filePath
-			self.CurrCombineSubPath = slash + folder + slash + filename
+			self.CurrCombineSubPath = slash + combine_folder + slash + folder + slash + filename
 			if err = self.touchCombineFile(folderPath, filePath); err != nil {
 				if errTimes > 10 {
 					panic(err)
@@ -209,7 +209,7 @@ func (self *Storage) findOrTouchCombinePathFormIdx(i uint32) {
 		if fileInfo != nil && fileInfo.Size() < max_combine_file_size {
 			self.CurrCombineIdx = i
 			self.CurrCombinePath = filePath
-			self.CurrCombineSubPath = slash + folder + slash + filename
+			self.CurrCombineSubPath = slash + combine_folder + slash + folder + slash + filename
 			break
 		}
 	}
@@ -230,7 +230,7 @@ func (self *Storage) touchCombineFile(folderPath string, filePath string) error 
 
 func (self *Storage) CurrCombineSize() uint32 {
 	fileInfo, err := os.Stat(self.CurrCombinePath)
-	if err == nil {
+	if err != nil {
 		log.Fatalf("Stat file: %s failed: %s", self.CurrCombinePath, err)
 	}
 	return uint32(fileInfo.Size())

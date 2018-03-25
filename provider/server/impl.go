@@ -80,7 +80,7 @@ func initStorage(path string, index int) {
 
 func NewProviderServer() *ProviderServer {
 	conf := config.GetProviderConfig()
-	if os.Getenv("TEST_MODE") == "1" {
+	if os.Getenv("NEBULA_TEST_MODE") == "1" {
 		skip_check_auth = true
 	}
 	initAllStorage(conf)
@@ -406,20 +406,19 @@ func (self *ProviderServer) saveFile(key []byte, fileSize uint64, tmpFilePath st
 		sub2 := util_num.FixLength((val>>config.ModFactorExp)&(config.ModFactor-1), 4)
 		subPath := slash + sub1 + slash + sub2 + slash + filename + filename_suffix
 		path := []byte(subPath)
-		pathSlice := make([]byte, 0, len(path)+1)
-		fmt.Println(storage.Index)
+		pathSlice := make([]byte, len(path)+1)
 		pathSlice[0] = 128 | storage.Index
 		for idx, v := range path {
 			pathSlice[idx+1] = v
 		}
-		fullPath := storage.Path + sep + sub1 + sep + sub2 + sep + filename + filename_suffix
-		_, err := os.Stat(fullPath)
-		if err != nil && os.IsNotExist(err) {
-			if err = os.MkdirAll(fullPath, 0700); err != nil {
+		fullFolder := storage.Path + sep + sub1 + sep + sub2
+		fullPath := fullFolder + sep + filename + filename_suffix
+		if !util_file.Exists(fullFolder) {
+			if err := os.MkdirAll(fullFolder, 0700); err != nil {
 				return err
 			}
 		}
-		err = os.Rename(tmpFilePath, fullPath)
+		err := os.Rename(tmpFilePath, fullPath)
 		if err != nil {
 			return err
 		}
@@ -438,7 +437,7 @@ func (self *ProviderServer) saveSmallFile(key []byte, fileSize uint32, tmpFilePa
 	defer storage.SmallFileMutex.Unlock()
 	subPath := storage.CurrCombineSubPath
 	path := []byte(subPath)
-	pathSlice := make([]byte, 0, len(path)+9)
+	pathSlice := make([]byte, len(path)+9)
 	pathSlice[0] = storage.Index
 	currCombineSize := storage.CurrCombineSize()
 	util_bytes.FillUint32(pathSlice, 1, currCombineSize)
@@ -484,7 +483,7 @@ func (self *ProviderServer) querySubPath(key []byte) (subPath string, bigFile bo
 		return "", false, 0, 0, 0
 	}
 	bigFile = bytes[0]&128 == 128
-	storageIdx = bytes[0] & 128
+	storageIdx = bytes[0] & 127
 	if bigFile {
 		return string(bytes[1:]), bigFile, storageIdx, 0, 0
 	}
