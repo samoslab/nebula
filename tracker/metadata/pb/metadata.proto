@@ -1,0 +1,44 @@
+syntax = "proto3";
+package metadata.pb;
+
+service MatadataService {
+
+    rpc UploadFilePrepare(UploadFilePrepareReq) returns (UploadFilePrepareResp){}
+
+    rpc UploadFileDone(UploadFileDoneReq) returns (UploadFileDoneResp){}
+
+    // rpc RetrieveFile()
+
+}
+
+message UploadFilePrepareReq {
+    uint32 version =1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    string filePath=4;//file parent path in net disk
+    bytes fileHash=5;
+    uint64 fileSize=6;
+    string fileName=7;
+    uint64 fileModTime=8;
+    bytes fileData=9;//file content if file size less than or equal 8k
+    bytes sign=10;
+}
+
+message UploadFilePrepareResp{
+    bool done=1;// true if file exists
+}
+
+message UploadFileDoneReq{
+
+}
+
+message UploadFileDoneResp{
+    
+}
+
+
+
+
+
+
+
