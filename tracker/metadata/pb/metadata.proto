@@ -5,7 +5,7 @@ service MatadataService {
 
     rpc CheckFileExist(CheckFileExistReq)returns(CheckFileExistResp){}
 
-    rpc UploadFilePrepare(UploadFilePrepareReq) returns (UploadFilePrepareResp){}
+    rpc UploadFilePrepare(UploadFilePrepareReq) returns (UploadFilePrepareResp){}// only use for Erasure Code store type
 
     rpc UploadFileDone(UploadFileDoneReq) returns (UploadFileDoneResp){}
 
@@ -34,11 +34,21 @@ message CheckFileExistResp{
     int32 dataPieceCount=3;  // 0 if not ErasureCode
     int32 verifyPieceCount=4; // 0 if not ErasureCode
     int32 replicaCount=5;  // 0 if not MultiReplica
+    repeated ReplicaProvider provider=6;// if use MultiReplica, size is more than replicaCount
 }
 
 enum FileStoreType{
     ErasureCode=0;
     MultiReplica=1;
+}
+
+message ReplicaProvider{
+    bytes nodeId=1;
+    string server=2;
+    uint32 port=3;
+    uint64 timestamp=4;
+    string ticket=5;
+    bytes auth=6;
 }
 
 message UploadFilePrepareReq{
@@ -47,25 +57,25 @@ message UploadFilePrepareReq{
     uint64 timestamp=3;
     bytes fileHash=4;
     uint64 fileSize=5;
-    repeated PieceInfo pieceInfo=6;
+    repeated PieceHashAndSize piece=6;
     bytes sign=7;
 }
 
-message PieceInfo{
+message PieceHashAndSize{
     bytes hash=1;
     uint32 size=2;
 }
 
 message UploadFilePrepareResp{
-    repeated ProviderInfo provider=1;
+    repeated ErasureCodeProvider provider=1;
 }
 
-message ProviderInfo{
+message ErasureCodeProvider{
     bytes nodeId=1;
     string server=2;
     uint32 port=3;
     uint64 timestamp=4;
-    repeated PieceHashAuth hashAuth=5;
+    repeated PieceHashAuth hashAuth=5;// part of provider have mutiple hashAuth,  They are standby provider for multiple piece.
 }
 
 message PieceHashAuth{
@@ -80,12 +90,12 @@ message UploadFileDoneReq{
     uint64 timestamp=3;
     bytes fileHash=4;
     uint64 fileSize=5;
-    repeated Partition partition=6;
+    repeated Partition partition=6;// size is one if use MultiReplica
     bytes sign=7;
 }
 
 message Partition{
-    repeated Block block=1;
+    repeated Block block=1;  //size is one if use MultiReplica
 }
 
 message Block{

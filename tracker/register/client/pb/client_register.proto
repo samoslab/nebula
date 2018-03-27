@@ -5,7 +5,7 @@ service ClientRegisterService {
 
     rpc GetPublicKey(GetPublicKeyReq) returns (PublicKeyResp){}
 
-	rpc Register(RegisterReq) returns (RegisterResp){}
+    rpc Register(RegisterReq) returns (RegisterResp){}
 
     rpc GetTrackerServer(GetTrackerServerReq)returns (GetTrackerServerResp){}
 }
@@ -19,7 +19,7 @@ message PublicKeyResp {
 
 message RegisterReq{
     uint32 version = 1;
-	bytes nodeId = 2;
+    bytes nodeId = 2;
     bytes publicKeyEnc = 3;
     bytes contactEmailEnc = 4;
 
