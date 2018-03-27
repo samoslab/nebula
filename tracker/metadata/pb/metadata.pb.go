@@ -8,10 +8,22 @@ It is generated from these files:
 	metadata.proto
 
 It has these top-level messages:
+	CheckFileExistReq
+	CheckFileExistResp
 	UploadFilePrepareReq
+	PieceInfo
 	UploadFilePrepareResp
+	ProviderInfo
+	PieceHashAuth
 	UploadFileDoneReq
+	Partition
+	Block
 	UploadFileDoneResp
+	ListFilesReq
+	ListFilesResp
+	FileOrFolder
+	RetrieveFileReq
+	RetrieveFileResp
 */
 package metadata_pb
 
@@ -35,7 +47,28 @@ var _ = math.Inf
 // proto package needs to be updated.
 const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
-type UploadFilePrepareReq struct {
+type FileStoreType int32
+
+const (
+	FileStoreType_ErasureCode  FileStoreType = 0
+	FileStoreType_MultiReplica FileStoreType = 1
+)
+
+var FileStoreType_name = map[int32]string{
+	0: "ErasureCode",
+	1: "MultiReplica",
+}
+var FileStoreType_value = map[string]int32{
+	"ErasureCode":  0,
+	"MultiReplica": 1,
+}
+
+func (x FileStoreType) String() string {
+	return proto.EnumName(FileStoreType_name, int32(x))
+}
+func (FileStoreType) EnumDescriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
+
+type CheckFileExistReq struct {
 	Version     uint32 `protobuf:"varint,1,opt,name=version" json:"version,omitempty"`
 	NodeId      []byte `protobuf:"bytes,2,opt,name=nodeId,proto3" json:"nodeId,omitempty"`
 	Timestamp   uint64 `protobuf:"varint,3,opt,name=timestamp" json:"timestamp,omitempty"`
@@ -48,10 +81,143 @@ type UploadFilePrepareReq struct {
 	Sign        []byte `protobuf:"bytes,10,opt,name=sign,proto3" json:"sign,omitempty"`
 }
 
+func (m *CheckFileExistReq) Reset()                    { *m = CheckFileExistReq{} }
+func (m *CheckFileExistReq) String() string            { return proto.CompactTextString(m) }
+func (*CheckFileExistReq) ProtoMessage()               {}
+func (*CheckFileExistReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
+
+func (m *CheckFileExistReq) GetVersion() uint32 {
+	if m != nil {
+		return m.Version
+	}
+	return 0
+}
+
+func (m *CheckFileExistReq) GetNodeId() []byte {
+	if m != nil {
+		return m.NodeId
+	}
+	return nil
+}
+
+func (m *CheckFileExistReq) GetTimestamp() uint64 {
+	if m != nil {
+		return m.Timestamp
+	}
+	return 0
+}
+
+func (m *CheckFileExistReq) GetFilePath() string {
+	if m != nil {
+		return m.FilePath
+	}
+	return ""
+}
+
+func (m *CheckFileExistReq) GetFileHash() []byte {
+	if m != nil {
+		return m.FileHash
+	}
+	return nil
+}
+
+func (m *CheckFileExistReq) GetFileSize() uint64 {
+	if m != nil {
+		return m.FileSize
+	}
+	return 0
+}
+
+func (m *CheckFileExistReq) GetFileName() string {
+	if m != nil {
+		return m.FileName
+	}
+	return ""
+}
+
+func (m *CheckFileExistReq) GetFileModTime() uint64 {
+	if m != nil {
+		return m.FileModTime
+	}
+	return 0
+}
+
+func (m *CheckFileExistReq) GetFileData() []byte {
+	if m != nil {
+		return m.FileData
+	}
+	return nil
+}
+
+func (m *CheckFileExistReq) GetSign() []byte {
+	if m != nil {
+		return m.Sign
+	}
+	return nil
+}
+
+type CheckFileExistResp struct {
+	Done             bool          `protobuf:"varint,1,opt,name=done" json:"done,omitempty"`
+	StoreType        FileStoreType `protobuf:"varint,2,opt,name=storeType,enum=metadata.pb.FileStoreType" json:"storeType,omitempty"`
+	DataPieceCount   int32         `protobuf:"varint,3,opt,name=dataPieceCount" json:"dataPieceCount,omitempty"`
+	VerifyPieceCount int32         `protobuf:"varint,4,opt,name=verifyPieceCount" json:"verifyPieceCount,omitempty"`
+	ReplicaCount     int32         `protobuf:"varint,5,opt,name=replicaCount" json:"replicaCount,omitempty"`
+}
+
+func (m *CheckFileExistResp) Reset()                    { *m = CheckFileExistResp{} }
+func (m *CheckFileExistResp) String() string            { return proto.CompactTextString(m) }
+func (*CheckFileExistResp) ProtoMessage()               {}
+func (*CheckFileExistResp) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
+
+func (m *CheckFileExistResp) GetDone() bool {
+	if m != nil {
+		return m.Done
+	}
+	return false
+}
+
+func (m *CheckFileExistResp) GetStoreType() FileStoreType {
+	if m != nil {
+		return m.StoreType
+	}
+	return FileStoreType_ErasureCode
+}
+
+func (m *CheckFileExistResp) GetDataPieceCount() int32 {
+	if m != nil {
+		return m.DataPieceCount
+	}
+	return 0
+}
+
+func (m *CheckFileExistResp) GetVerifyPieceCount() int32 {
+	if m != nil {
+		return m.VerifyPieceCount
+	}
+	return 0
+}
+
+func (m *CheckFileExistResp) GetReplicaCount() int32 {
+	if m != nil {
+		return m.ReplicaCount
+	}
+	return 0
+}
+
+type UploadFilePrepareReq struct {
+	Version   uint32       `protobuf:"varint,1,opt,name=version" json:"version,omitempty"`
+	NodeId    []byte       `protobuf:"bytes,2,opt,name=nodeId,proto3" json:"nodeId,omitempty"`
+	Timestamp uint64       `protobuf:"varint,3,opt,name=timestamp" json:"timestamp,omitempty"`
+	FileHash  []byte       `protobuf:"bytes,4,opt,name=fileHash,proto3" json:"fileHash,omitempty"`
+	FileSize  uint64       `protobuf:"varint,5,opt,name=fileSize" json:"fileSize,omitempty"`
+	PieceInfo []*PieceInfo `protobuf:"bytes,6,rep,name=pieceInfo" json:"pieceInfo,omitempty"`
+	Sign      []byte       `protobuf:"bytes,7,opt,name=sign,proto3" json:"sign,omitempty"`
+}
+
 func (m *UploadFilePrepareReq) Reset()                    { *m = UploadFilePrepareReq{} }
 func (m *UploadFilePrepareReq) String() string            { return proto.CompactTextString(m) }
 func (*UploadFilePrepareReq) ProtoMessage()               {}
-func (*UploadFilePrepareReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{0} }
+func (*UploadFilePrepareReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{2} }
 
 func (m *UploadFilePrepareReq) GetVersion() uint32 {
 	if m != nil {
@@ -74,13 +240,6 @@ func (m *UploadFilePrepareReq) GetTimestamp() uint64 {
 	return 0
 }
 
-func (m *UploadFilePrepareReq) GetFilePath() string {
-	if m != nil {
-		return m.FilePath
-	}
-	return ""
-}
-
 func (m *UploadFilePrepareReq) GetFileHash() []byte {
 	if m != nil {
 		return m.FileHash
@@ -95,23 +254,9 @@ func (m *UploadFilePrepareReq) GetFileSize() uint64 {
 	return 0
 }
 
-func (m *UploadFilePrepareReq) GetFileName() string {
+func (m *UploadFilePrepareReq) GetPieceInfo() []*PieceInfo {
 	if m != nil {
-		return m.FileName
-	}
-	return ""
-}
-
-func (m *UploadFilePrepareReq) GetFileModTime() uint64 {
-	if m != nil {
-		return m.FileModTime
-	}
-	return 0
-}
-
-func (m *UploadFilePrepareReq) GetFileData() []byte {
-	if m != nil {
-		return m.FileData
+		return m.PieceInfo
 	}
 	return nil
 }
@@ -123,43 +268,480 @@ func (m *UploadFilePrepareReq) GetSign() []byte {
 	return nil
 }
 
+type PieceInfo struct {
+	Hash []byte `protobuf:"bytes,1,opt,name=hash,proto3" json:"hash,omitempty"`
+	Size uint32 `protobuf:"varint,2,opt,name=size" json:"size,omitempty"`
+}
+
+func (m *PieceInfo) Reset()                    { *m = PieceInfo{} }
+func (m *PieceInfo) String() string            { return proto.CompactTextString(m) }
+func (*PieceInfo) ProtoMessage()               {}
+func (*PieceInfo) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{3} }
+
+func (m *PieceInfo) GetHash() []byte {
+	if m != nil {
+		return m.Hash
+	}
+	return nil
+}
+
+func (m *PieceInfo) GetSize() uint32 {
+	if m != nil {
+		return m.Size
+	}
+	return 0
+}
+
 type UploadFilePrepareResp struct {
-	Done bool `protobuf:"varint,1,opt,name=done" json:"done,omitempty"`
+	Provider []*ProviderInfo `protobuf:"bytes,1,rep,name=provider" json:"provider,omitempty"`
 }
 
 func (m *UploadFilePrepareResp) Reset()                    { *m = UploadFilePrepareResp{} }
 func (m *UploadFilePrepareResp) String() string            { return proto.CompactTextString(m) }
 func (*UploadFilePrepareResp) ProtoMessage()               {}
-func (*UploadFilePrepareResp) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{1} }
+func (*UploadFilePrepareResp) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{4} }
 
-func (m *UploadFilePrepareResp) GetDone() bool {
+func (m *UploadFilePrepareResp) GetProvider() []*ProviderInfo {
+	if m != nil {
+		return m.Provider
+	}
+	return nil
+}
+
+type ProviderInfo struct {
+	NodeId    []byte           `protobuf:"bytes,1,opt,name=nodeId,proto3" json:"nodeId,omitempty"`
+	Server    string           `protobuf:"bytes,2,opt,name=server" json:"server,omitempty"`
+	Port      uint32           `protobuf:"varint,3,opt,name=port" json:"port,omitempty"`
+	Timestamp uint64           `protobuf:"varint,4,opt,name=timestamp" json:"timestamp,omitempty"`
+	HashAuth  []*PieceHashAuth `protobuf:"bytes,5,rep,name=hashAuth" json:"hashAuth,omitempty"`
+}
+
+func (m *ProviderInfo) Reset()                    { *m = ProviderInfo{} }
+func (m *ProviderInfo) String() string            { return proto.CompactTextString(m) }
+func (*ProviderInfo) ProtoMessage()               {}
+func (*ProviderInfo) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{5} }
+
+func (m *ProviderInfo) GetNodeId() []byte {
+	if m != nil {
+		return m.NodeId
+	}
+	return nil
+}
+
+func (m *ProviderInfo) GetServer() string {
+	if m != nil {
+		return m.Server
+	}
+	return ""
+}
+
+func (m *ProviderInfo) GetPort() uint32 {
+	if m != nil {
+		return m.Port
+	}
+	return 0
+}
+
+func (m *ProviderInfo) GetTimestamp() uint64 {
+	if m != nil {
+		return m.Timestamp
+	}
+	return 0
+}
+
+func (m *ProviderInfo) GetHashAuth() []*PieceHashAuth {
+	if m != nil {
+		return m.HashAuth
+	}
+	return nil
+}
+
+type PieceHashAuth struct {
+	Hash   []byte `protobuf:"bytes,1,opt,name=hash,proto3" json:"hash,omitempty"`
+	Ticket string `protobuf:"bytes,2,opt,name=ticket" json:"ticket,omitempty"`
+	Auth   []byte `protobuf:"bytes,3,opt,name=auth,proto3" json:"auth,omitempty"`
+}
+
+func (m *PieceHashAuth) Reset()                    { *m = PieceHashAuth{} }
+func (m *PieceHashAuth) String() string            { return proto.CompactTextString(m) }
+func (*PieceHashAuth) ProtoMessage()               {}
+func (*PieceHashAuth) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{6} }
+
+func (m *PieceHashAuth) GetHash() []byte {
+	if m != nil {
+		return m.Hash
+	}
+	return nil
+}
+
+func (m *PieceHashAuth) GetTicket() string {
+	if m != nil {
+		return m.Ticket
+	}
+	return ""
+}
+
+func (m *PieceHashAuth) GetAuth() []byte {
+	if m != nil {
+		return m.Auth
+	}
+	return nil
+}
+
+type UploadFileDoneReq struct {
+	Version   uint32       `protobuf:"varint,1,opt,name=version" json:"version,omitempty"`
+	NodeId    []byte       `protobuf:"bytes,2,opt,name=nodeId,proto3" json:"nodeId,omitempty"`
+	Timestamp uint64       `protobuf:"varint,3,opt,name=timestamp" json:"timestamp,omitempty"`
+	FileHash  []byte       `protobuf:"bytes,4,opt,name=fileHash,proto3" json:"fileHash,omitempty"`
+	FileSize  uint64       `protobuf:"varint,5,opt,name=fileSize" json:"fileSize,omitempty"`
+	Partition []*Partition `protobuf:"bytes,6,rep,name=partition" json:"partition,omitempty"`
+	Sign      []byte       `protobuf:"bytes,7,opt,name=sign,proto3" json:"sign,omitempty"`
+}
+
+func (m *UploadFileDoneReq) Reset()                    { *m = UploadFileDoneReq{} }
+func (m *UploadFileDoneReq) String() string            { return proto.CompactTextString(m) }
+func (*UploadFileDoneReq) ProtoMessage()               {}
+func (*UploadFileDoneReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{7} }
+
+func (m *UploadFileDoneReq) GetVersion() uint32 {
+	if m != nil {
+		return m.Version
+	}
+	return 0
+}
+
+func (m *UploadFileDoneReq) GetNodeId() []byte {
+	if m != nil {
+		return m.NodeId
+	}
+	return nil
+}
+
+func (m *UploadFileDoneReq) GetTimestamp() uint64 {
+	if m != nil {
+		return m.Timestamp
+	}
+	return 0
+}
+
+func (m *UploadFileDoneReq) GetFileHash() []byte {
+	if m != nil {
+		return m.FileHash
+	}
+	return nil
+}
+
+func (m *UploadFileDoneReq) GetFileSize() uint64 {
+	if m != nil {
+		return m.FileSize
+	}
+	return 0
+}
+
+func (m *UploadFileDoneReq) GetPartition() []*Partition {
+	if m != nil {
+		return m.Partition
+	}
+	return nil
+}
+
+func (m *UploadFileDoneReq) GetSign() []byte {
+	if m != nil {
+		return m.Sign
+	}
+	return nil
+}
+
+type Partition struct {
+	Block []*Block `protobuf:"bytes,1,rep,name=block" json:"block,omitempty"`
+}
+
+func (m *Partition) Reset()                    { *m = Partition{} }
+func (m *Partition) String() string            { return proto.CompactTextString(m) }
+func (*Partition) ProtoMessage()               {}
+func (*Partition) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{8} }
+
+func (m *Partition) GetBlock() []*Block {
+	if m != nil {
+		return m.Block
+	}
+	return nil
+}
+
+type Block struct {
+	Hash        []byte   `protobuf:"bytes,1,opt,name=hash,proto3" json:"hash,omitempty"`
+	Size        uint32   `protobuf:"varint,2,opt,name=size" json:"size,omitempty"`
+	BlockSeq    uint32   `protobuf:"varint,3,opt,name=blockSeq" json:"blockSeq,omitempty"`
+	Checksum    bool     `protobuf:"varint,4,opt,name=checksum" json:"checksum,omitempty"`
+	StoreNodeId [][]byte `protobuf:"bytes,5,rep,name=storeNodeId,proto3" json:"storeNodeId,omitempty"`
+}
+
+func (m *Block) Reset()                    { *m = Block{} }
+func (m *Block) String() string            { return proto.CompactTextString(m) }
+func (*Block) ProtoMessage()               {}
+func (*Block) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{9} }
+
+func (m *Block) GetHash() []byte {
+	if m != nil {
+		return m.Hash
+	}
+	return nil
+}
+
+func (m *Block) GetSize() uint32 {
+	if m != nil {
+		return m.Size
+	}
+	return 0
+}
+
+func (m *Block) GetBlockSeq() uint32 {
+	if m != nil {
+		return m.BlockSeq
+	}
+	return 0
+}
+
+func (m *Block) GetChecksum() bool {
+	if m != nil {
+		return m.Checksum
+	}
+	return false
+}
+
+func (m *Block) GetStoreNodeId() [][]byte {
+	if m != nil {
+		return m.StoreNodeId
+	}
+	return nil
+}
+
+type UploadFileDoneResp struct {
+	Done bool `protobuf:"varint,1,opt,name=done" json:"done,omitempty"`
+}
+
+func (m *UploadFileDoneResp) Reset()                    { *m = UploadFileDoneResp{} }
+func (m *UploadFileDoneResp) String() string            { return proto.CompactTextString(m) }
+func (*UploadFileDoneResp) ProtoMessage()               {}
+func (*UploadFileDoneResp) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{10} }
+
+func (m *UploadFileDoneResp) GetDone() bool {
 	if m != nil {
 		return m.Done
 	}
 	return false
 }
 
-type UploadFileDoneReq struct {
+type ListFilesReq struct {
+	Version   uint32 `protobuf:"varint,1,opt,name=version" json:"version,omitempty"`
+	NodeId    []byte `protobuf:"bytes,2,opt,name=nodeId,proto3" json:"nodeId,omitempty"`
+	Timestamp uint64 `protobuf:"varint,3,opt,name=timestamp" json:"timestamp,omitempty"`
+	Path      string `protobuf:"bytes,4,opt,name=path" json:"path,omitempty"`
+	Sign      []byte `protobuf:"bytes,5,opt,name=sign,proto3" json:"sign,omitempty"`
 }
 
-func (m *UploadFileDoneReq) Reset()                    { *m = UploadFileDoneReq{} }
-func (m *UploadFileDoneReq) String() string            { return proto.CompactTextString(m) }
-func (*UploadFileDoneReq) ProtoMessage()               {}
-func (*UploadFileDoneReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{2} }
+func (m *ListFilesReq) Reset()                    { *m = ListFilesReq{} }
+func (m *ListFilesReq) String() string            { return proto.CompactTextString(m) }
+func (*ListFilesReq) ProtoMessage()               {}
+func (*ListFilesReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{11} }
 
-type UploadFileDoneResp struct {
+func (m *ListFilesReq) GetVersion() uint32 {
+	if m != nil {
+		return m.Version
+	}
+	return 0
 }
 
-func (m *UploadFileDoneResp) Reset()                    { *m = UploadFileDoneResp{} }
-func (m *UploadFileDoneResp) String() string            { return proto.CompactTextString(m) }
-func (*UploadFileDoneResp) ProtoMessage()               {}
-func (*UploadFileDoneResp) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{3} }
+func (m *ListFilesReq) GetNodeId() []byte {
+	if m != nil {
+		return m.NodeId
+	}
+	return nil
+}
+
+func (m *ListFilesReq) GetTimestamp() uint64 {
+	if m != nil {
+		return m.Timestamp
+	}
+	return 0
+}
+
+func (m *ListFilesReq) GetPath() string {
+	if m != nil {
+		return m.Path
+	}
+	return ""
+}
+
+func (m *ListFilesReq) GetSign() []byte {
+	if m != nil {
+		return m.Sign
+	}
+	return nil
+}
+
+type ListFilesResp struct {
+	Fof []*FileOrFolder `protobuf:"bytes,1,rep,name=fof" json:"fof,omitempty"`
+}
+
+func (m *ListFilesResp) Reset()                    { *m = ListFilesResp{} }
+func (m *ListFilesResp) String() string            { return proto.CompactTextString(m) }
+func (*ListFilesResp) ProtoMessage()               {}
+func (*ListFilesResp) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{12} }
+
+func (m *ListFilesResp) GetFof() []*FileOrFolder {
+	if m != nil {
+		return m.Fof
+	}
+	return nil
+}
+
+type FileOrFolder struct {
+	Folder   bool   `protobuf:"varint,1,opt,name=folder" json:"folder,omitempty"`
+	Name     string `protobuf:"bytes,2,opt,name=name" json:"name,omitempty"`
+	ModTime  uint64 `protobuf:"varint,3,opt,name=modTime" json:"modTime,omitempty"`
+	FileHash []byte `protobuf:"bytes,4,opt,name=fileHash,proto3" json:"fileHash,omitempty"`
+	FileSize uint64 `protobuf:"varint,5,opt,name=fileSize" json:"fileSize,omitempty"`
+}
+
+func (m *FileOrFolder) Reset()                    { *m = FileOrFolder{} }
+func (m *FileOrFolder) String() string            { return proto.CompactTextString(m) }
+func (*FileOrFolder) ProtoMessage()               {}
+func (*FileOrFolder) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{13} }
+
+func (m *FileOrFolder) GetFolder() bool {
+	if m != nil {
+		return m.Folder
+	}
+	return false
+}
+
+func (m *FileOrFolder) GetName() string {
+	if m != nil {
+		return m.Name
+	}
+	return ""
+}
+
+func (m *FileOrFolder) GetModTime() uint64 {
+	if m != nil {
+		return m.ModTime
+	}
+	return 0
+}
+
+func (m *FileOrFolder) GetFileHash() []byte {
+	if m != nil {
+		return m.FileHash
+	}
+	return nil
+}
+
+func (m *FileOrFolder) GetFileSize() uint64 {
+	if m != nil {
+		return m.FileSize
+	}
+	return 0
+}
+
+type RetrieveFileReq struct {
+	Version   uint32 `protobuf:"varint,1,opt,name=version" json:"version,omitempty"`
+	NodeId    []byte `protobuf:"bytes,2,opt,name=nodeId,proto3" json:"nodeId,omitempty"`
+	Timestamp uint64 `protobuf:"varint,3,opt,name=timestamp" json:"timestamp,omitempty"`
+	FileHash  []byte `protobuf:"bytes,4,opt,name=fileHash,proto3" json:"fileHash,omitempty"`
+	FileSize  uint64 `protobuf:"varint,5,opt,name=fileSize" json:"fileSize,omitempty"`
+	Sign      []byte `protobuf:"bytes,6,opt,name=sign,proto3" json:"sign,omitempty"`
+}
+
+func (m *RetrieveFileReq) Reset()                    { *m = RetrieveFileReq{} }
+func (m *RetrieveFileReq) String() string            { return proto.CompactTextString(m) }
+func (*RetrieveFileReq) ProtoMessage()               {}
+func (*RetrieveFileReq) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{14} }
+
+func (m *RetrieveFileReq) GetVersion() uint32 {
+	if m != nil {
+		return m.Version
+	}
+	return 0
+}
+
+func (m *RetrieveFileReq) GetNodeId() []byte {
+	if m != nil {
+		return m.NodeId
+	}
+	return nil
+}
+
+func (m *RetrieveFileReq) GetTimestamp() uint64 {
+	if m != nil {
+		return m.Timestamp
+	}
+	return 0
+}
+
+func (m *RetrieveFileReq) GetFileHash() []byte {
+	if m != nil {
+		return m.FileHash
+	}
+	return nil
+}
+
+func (m *RetrieveFileReq) GetFileSize() uint64 {
+	if m != nil {
+		return m.FileSize
+	}
+	return 0
+}
+
+func (m *RetrieveFileReq) GetSign() []byte {
+	if m != nil {
+		return m.Sign
+	}
+	return nil
+}
+
+type RetrieveFileResp struct {
+	FileData  []byte       `protobuf:"bytes,1,opt,name=fileData,proto3" json:"fileData,omitempty"`
+	Partition []*Partition `protobuf:"bytes,6,rep,name=partition" json:"partition,omitempty"`
+}
+
+func (m *RetrieveFileResp) Reset()                    { *m = RetrieveFileResp{} }
+func (m *RetrieveFileResp) String() string            { return proto.CompactTextString(m) }
+func (*RetrieveFileResp) ProtoMessage()               {}
+func (*RetrieveFileResp) Descriptor() ([]byte, []int) { return fileDescriptor0, []int{15} }
+
+func (m *RetrieveFileResp) GetFileData() []byte {
+	if m != nil {
+		return m.FileData
+	}
+	return nil
+}
+
+func (m *RetrieveFileResp) GetPartition() []*Partition {
+	if m != nil {
+		return m.Partition
+	}
+	return nil
+}
 
 func init() {
+	proto.RegisterType((*CheckFileExistReq)(nil), "metadata.pb.CheckFileExistReq")
+	proto.RegisterType((*CheckFileExistResp)(nil), "metadata.pb.CheckFileExistResp")
 	proto.RegisterType((*UploadFilePrepareReq)(nil), "metadata.pb.UploadFilePrepareReq")
+	proto.RegisterType((*PieceInfo)(nil), "metadata.pb.PieceInfo")
 	proto.RegisterType((*UploadFilePrepareResp)(nil), "metadata.pb.UploadFilePrepareResp")
+	proto.RegisterType((*ProviderInfo)(nil), "metadata.pb.ProviderInfo")
+	proto.RegisterType((*PieceHashAuth)(nil), "metadata.pb.PieceHashAuth")
 	proto.RegisterType((*UploadFileDoneReq)(nil), "metadata.pb.UploadFileDoneReq")
+	proto.RegisterType((*Partition)(nil), "metadata.pb.Partition")
+	proto.RegisterType((*Block)(nil), "metadata.pb.Block")
 	proto.RegisterType((*UploadFileDoneResp)(nil), "metadata.pb.UploadFileDoneResp")
+	proto.RegisterType((*ListFilesReq)(nil), "metadata.pb.ListFilesReq")
+	proto.RegisterType((*ListFilesResp)(nil), "metadata.pb.ListFilesResp")
+	proto.RegisterType((*FileOrFolder)(nil), "metadata.pb.FileOrFolder")
+	proto.RegisterType((*RetrieveFileReq)(nil), "metadata.pb.RetrieveFileReq")
+	proto.RegisterType((*RetrieveFileResp)(nil), "metadata.pb.RetrieveFileResp")
+	proto.RegisterEnum("metadata.pb.FileStoreType", FileStoreType_name, FileStoreType_value)
 }
 
 // Reference imports to suppress errors if they are not otherwise used.
@@ -173,8 +755,11 @@ const _ = grpc.SupportPackageIsVersion4
 // Client API for MatadataService service
 
 type MatadataServiceClient interface {
+	CheckFileExist(ctx context.Context, in *CheckFileExistReq, opts ...grpc.CallOption) (*CheckFileExistResp, error)
 	UploadFilePrepare(ctx context.Context, in *UploadFilePrepareReq, opts ...grpc.CallOption) (*UploadFilePrepareResp, error)
 	UploadFileDone(ctx context.Context, in *UploadFileDoneReq, opts ...grpc.CallOption) (*UploadFileDoneResp, error)
+	ListFiles(ctx context.Context, in *ListFilesReq, opts ...grpc.CallOption) (*ListFilesResp, error)
+	RetrieveFile(ctx context.Context, in *RetrieveFileReq, opts ...grpc.CallOption) (*RetrieveFileResp, error)
 }
 
 type matadataServiceClient struct {
@@ -183,6 +768,15 @@ type matadataServiceClient struct {
 
 func NewMatadataServiceClient(cc *grpc.ClientConn) MatadataServiceClient {
 	return &matadataServiceClient{cc}
+}
+
+func (c *matadataServiceClient) CheckFileExist(ctx context.Context, in *CheckFileExistReq, opts ...grpc.CallOption) (*CheckFileExistResp, error) {
+	out := new(CheckFileExistResp)
+	err := grpc.Invoke(ctx, "/metadata.pb.MatadataService/CheckFileExist", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *matadataServiceClient) UploadFilePrepare(ctx context.Context, in *UploadFilePrepareReq, opts ...grpc.CallOption) (*UploadFilePrepareResp, error) {
@@ -203,15 +797,54 @@ func (c *matadataServiceClient) UploadFileDone(ctx context.Context, in *UploadFi
 	return out, nil
 }
 
+func (c *matadataServiceClient) ListFiles(ctx context.Context, in *ListFilesReq, opts ...grpc.CallOption) (*ListFilesResp, error) {
+	out := new(ListFilesResp)
+	err := grpc.Invoke(ctx, "/metadata.pb.MatadataService/ListFiles", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *matadataServiceClient) RetrieveFile(ctx context.Context, in *RetrieveFileReq, opts ...grpc.CallOption) (*RetrieveFileResp, error) {
+	out := new(RetrieveFileResp)
+	err := grpc.Invoke(ctx, "/metadata.pb.MatadataService/RetrieveFile", in, out, c.cc, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // Server API for MatadataService service
 
 type MatadataServiceServer interface {
+	CheckFileExist(context.Context, *CheckFileExistReq) (*CheckFileExistResp, error)
 	UploadFilePrepare(context.Context, *UploadFilePrepareReq) (*UploadFilePrepareResp, error)
 	UploadFileDone(context.Context, *UploadFileDoneReq) (*UploadFileDoneResp, error)
+	ListFiles(context.Context, *ListFilesReq) (*ListFilesResp, error)
+	RetrieveFile(context.Context, *RetrieveFileReq) (*RetrieveFileResp, error)
 }
 
 func RegisterMatadataServiceServer(s *grpc.Server, srv MatadataServiceServer) {
 	s.RegisterService(&_MatadataService_serviceDesc, srv)
+}
+
+func _MatadataService_CheckFileExist_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckFileExistReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MatadataServiceServer).CheckFileExist(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/metadata.pb.MatadataService/CheckFileExist",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MatadataServiceServer).CheckFileExist(ctx, req.(*CheckFileExistReq))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _MatadataService_UploadFilePrepare_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -250,10 +883,50 @@ func _MatadataService_UploadFileDone_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _MatadataService_ListFiles_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListFilesReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MatadataServiceServer).ListFiles(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/metadata.pb.MatadataService/ListFiles",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MatadataServiceServer).ListFiles(ctx, req.(*ListFilesReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MatadataService_RetrieveFile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RetrieveFileReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MatadataServiceServer).RetrieveFile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/metadata.pb.MatadataService/RetrieveFile",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MatadataServiceServer).RetrieveFile(ctx, req.(*RetrieveFileReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 var _MatadataService_serviceDesc = grpc.ServiceDesc{
 	ServiceName: "metadata.pb.MatadataService",
 	HandlerType: (*MatadataServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "CheckFileExist",
+			Handler:    _MatadataService_CheckFileExist_Handler,
+		},
 		{
 			MethodName: "UploadFilePrepare",
 			Handler:    _MatadataService_UploadFilePrepare_Handler,
@@ -261,6 +934,14 @@ var _MatadataService_serviceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UploadFileDone",
 			Handler:    _MatadataService_UploadFileDone_Handler,
+		},
+		{
+			MethodName: "ListFiles",
+			Handler:    _MatadataService_ListFiles_Handler,
+		},
+		{
+			MethodName: "RetrieveFile",
+			Handler:    _MatadataService_RetrieveFile_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
@@ -270,26 +951,61 @@ var _MatadataService_serviceDesc = grpc.ServiceDesc{
 func init() { proto.RegisterFile("metadata.proto", fileDescriptor0) }
 
 var fileDescriptor0 = []byte{
-	// 321 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0x84, 0x92, 0xcf, 0x4e, 0xfb, 0x30,
-	0x0c, 0xc7, 0x7f, 0xdd, 0x6f, 0xec, 0x8f, 0x07, 0x43, 0x98, 0x81, 0xa2, 0x09, 0x41, 0xe9, 0xa9,
-	0x12, 0xd2, 0x0e, 0xf0, 0x0a, 0x13, 0x82, 0xc3, 0x10, 0xea, 0xe0, 0xc6, 0xc5, 0xa3, 0x86, 0x45,
-	0x5a, 0x9b, 0xd0, 0x44, 0x3b, 0xf0, 0x44, 0x3c, 0x08, 0x0f, 0x86, 0x12, 0xd6, 0xb5, 0xa0, 0x01,
-	0x37, 0x7f, 0x6c, 0x7f, 0xbf, 0x8e, 0xec, 0x40, 0x3f, 0x63, 0x4b, 0x29, 0x59, 0x1a, 0xe9, 0x42,
-	0x59, 0x85, 0xbd, 0x8a, 0x67, 0xd1, 0x5b, 0x03, 0x06, 0xf7, 0x7a, 0xa1, 0x28, 0xbd, 0x94, 0x0b,
-	0xbe, 0x2d, 0x58, 0x53, 0xc1, 0x09, 0xbf, 0xa0, 0x80, 0xf6, 0x92, 0x0b, 0x23, 0x55, 0x2e, 0x82,
-	0x30, 0x88, 0x77, 0x92, 0x12, 0xf1, 0x10, 0x5a, 0xb9, 0x4a, 0xf9, 0x3a, 0x15, 0x8d, 0x30, 0x88,
-	0xb7, 0x93, 0x15, 0xe1, 0x11, 0x74, 0xad, 0xcc, 0xd8, 0x58, 0xca, 0xb4, 0xf8, 0x1f, 0x06, 0x71,
-	0x33, 0xa9, 0x12, 0x38, 0x84, 0xce, 0x93, 0x9b, 0x40, 0x76, 0x2e, 0x9a, 0x61, 0x10, 0x77, 0x93,
-	0x35, 0x97, 0xb5, 0x2b, 0x32, 0x73, 0xb1, 0xe5, 0x3d, 0xd7, 0x5c, 0xd6, 0xa6, 0xf2, 0x95, 0x45,
-	0xcb, 0x9b, 0xae, 0xb9, 0xac, 0xdd, 0x50, 0xc6, 0xa2, 0x5d, 0x79, 0x3a, 0xc6, 0x10, 0x7a, 0x2e,
-	0x9e, 0xa8, 0xf4, 0x4e, 0x66, 0x2c, 0x3a, 0x5e, 0x5a, 0x4f, 0x95, 0xea, 0x31, 0x59, 0x12, 0xdd,
-	0x6a, 0xaa, 0x63, 0x44, 0x68, 0x1a, 0xf9, 0x9c, 0x0b, 0xf0, 0x79, 0x1f, 0x47, 0x67, 0x70, 0xb0,
-	0x61, 0x53, 0x46, 0xbb, 0xe6, 0x54, 0xe5, 0xec, 0xf7, 0xd4, 0x49, 0x7c, 0x1c, 0xed, 0xc3, 0x5e,
-	0xd5, 0x3c, 0x56, 0xb9, 0xdb, 0x69, 0x34, 0x00, 0xfc, 0x9e, 0x34, 0xfa, 0xfc, 0x3d, 0x80, 0xdd,
-	0x09, 0x7d, 0x9e, 0x64, 0xca, 0xc5, 0x52, 0x3e, 0x32, 0x3e, 0xd4, 0xe5, 0xab, 0x59, 0x78, 0x3a,
-	0xaa, 0x5d, 0x6e, 0xb4, 0xe9, 0x6a, 0xc3, 0xe8, 0xaf, 0x16, 0xa3, 0xa3, 0x7f, 0x38, 0x85, 0xfe,
-	0xd7, 0x77, 0xe0, 0xf1, 0x0f, 0xba, 0xd5, 0xcb, 0x87, 0x27, 0xbf, 0xd6, 0x9d, 0xe9, 0xac, 0xe5,
-	0x7f, 0xd7, 0xc5, 0x47, 0x00, 0x00, 0x00, 0xff, 0xff, 0xe2, 0x43, 0x0b, 0x3d, 0x6f, 0x02, 0x00,
-	0x00,
+	// 882 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xcc, 0x56, 0xcd, 0x8e, 0x1b, 0x45,
+	0x10, 0xde, 0x8e, 0x7f, 0xd6, 0x53, 0x6b, 0x7b, 0x9d, 0x16, 0xac, 0x06, 0x2b, 0x80, 0x99, 0x03,
+	0xb2, 0x82, 0xb4, 0x87, 0x0d, 0x41, 0x1c, 0xb8, 0xc0, 0x6e, 0xa2, 0x44, 0x62, 0x37, 0x56, 0x3b,
+	0xdc, 0xb8, 0xcc, 0x7a, 0xca, 0xb8, 0xb5, 0xb6, 0x7b, 0xd2, 0xd3, 0xb6, 0x48, 0x1e, 0x00, 0x09,
+	0x89, 0xd7, 0x40, 0xe2, 0x02, 0x0f, 0xc4, 0x1d, 0x89, 0xc7, 0x40, 0xd5, 0xf3, 0xdb, 0x63, 0xb3,
+	0xa0, 0x48, 0x91, 0xf6, 0x56, 0x3f, 0x5f, 0xd7, 0x54, 0x7f, 0x55, 0xd5, 0x35, 0xd0, 0x5f, 0xa1,
+	0x09, 0xa3, 0xd0, 0x84, 0xa7, 0xb1, 0x56, 0x46, 0xf1, 0xa3, 0x52, 0xbf, 0x0e, 0x7e, 0xbd, 0x07,
+	0xf7, 0xcf, 0x17, 0x38, 0xbb, 0x79, 0x2a, 0x97, 0xf8, 0xe4, 0x47, 0x99, 0x18, 0x81, 0xaf, 0xb8,
+	0x0f, 0x87, 0x5b, 0xd4, 0x89, 0x54, 0x6b, 0x9f, 0x8d, 0xd8, 0xb8, 0x27, 0x72, 0x95, 0x9f, 0x40,
+	0x7b, 0xad, 0x22, 0x7c, 0x1e, 0xf9, 0xf7, 0x46, 0x6c, 0xdc, 0x15, 0x99, 0xc6, 0x1f, 0x80, 0x67,
+	0xe4, 0x0a, 0x13, 0x13, 0xae, 0x62, 0xbf, 0x31, 0x62, 0xe3, 0xa6, 0x28, 0x0d, 0x7c, 0x08, 0x9d,
+	0xb9, 0x5c, 0xe2, 0x24, 0x34, 0x0b, 0xbf, 0x39, 0x62, 0x63, 0x4f, 0x14, 0x7a, 0xee, 0x7b, 0x16,
+	0x26, 0x0b, 0xbf, 0x65, 0x63, 0x16, 0x7a, 0xee, 0x9b, 0xca, 0x37, 0xe8, 0xb7, 0x6d, 0xd0, 0x42,
+	0xcf, 0x7d, 0x57, 0xe1, 0x0a, 0xfd, 0xc3, 0x32, 0x26, 0xe9, 0x7c, 0x04, 0x47, 0x24, 0x5f, 0xaa,
+	0xe8, 0xa5, 0x5c, 0xa1, 0xdf, 0xb1, 0x47, 0xab, 0xa6, 0xfc, 0xf4, 0x45, 0x68, 0x42, 0xdf, 0x2b,
+	0xbf, 0x4a, 0x3a, 0xe7, 0xd0, 0x4c, 0xe4, 0x0f, 0x6b, 0x1f, 0xac, 0xdd, 0xca, 0xc1, 0x9f, 0x0c,
+	0x78, 0x9d, 0xa7, 0x24, 0x26, 0x68, 0xa4, 0xd6, 0x68, 0x59, 0xea, 0x08, 0x2b, 0xf3, 0x2f, 0xc1,
+	0x4b, 0x8c, 0xd2, 0xf8, 0xf2, 0x75, 0x8c, 0x96, 0xa5, 0xfe, 0xd9, 0xf0, 0xb4, 0xc2, 0xf9, 0x29,
+	0x85, 0x98, 0xe6, 0x08, 0x51, 0x82, 0xf9, 0xa7, 0xd0, 0x27, 0xcc, 0x44, 0xe2, 0x0c, 0xcf, 0xd5,
+	0x66, 0x6d, 0x2c, 0x93, 0x2d, 0x51, 0xb3, 0xf2, 0x87, 0x30, 0xd8, 0xa2, 0x96, 0xf3, 0xd7, 0x15,
+	0x64, 0xd3, 0x22, 0x77, 0xec, 0x3c, 0x80, 0xae, 0xc6, 0x78, 0x29, 0x67, 0x61, 0x8a, 0x6b, 0x59,
+	0x9c, 0x63, 0x0b, 0xfe, 0x66, 0xf0, 0xde, 0x77, 0xf1, 0x52, 0x85, 0x11, 0xa5, 0x36, 0xd1, 0x18,
+	0x87, 0x1a, 0xdf, 0x61, 0x1f, 0xd8, 0x5a, 0x37, 0x6f, 0xa9, 0x75, 0xab, 0x56, 0xeb, 0xcf, 0xc1,
+	0x8b, 0xe9, 0x4a, 0xcf, 0xd7, 0x73, 0xe5, 0xb7, 0x47, 0x8d, 0xf1, 0xd1, 0xd9, 0x89, 0x43, 0xe9,
+	0x24, 0xf7, 0x8a, 0x12, 0x58, 0xd4, 0xf1, 0xb0, 0x52, 0xc7, 0x47, 0xe0, 0x4d, 0xaa, 0x80, 0x05,
+	0xa5, 0xc2, 0x52, 0x00, 0xc9, 0xe9, 0xa1, 0x37, 0x69, 0xe1, 0x7a, 0xc2, 0xca, 0xc1, 0x15, 0xbc,
+	0xbf, 0x87, 0x9e, 0x24, 0xe6, 0x8f, 0xa1, 0x13, 0x6b, 0xb5, 0x95, 0x11, 0x6a, 0x9f, 0xd9, 0xb4,
+	0x3e, 0x70, 0xd3, 0xca, 0x9c, 0x36, 0xb3, 0x02, 0x1a, 0xfc, 0xc6, 0xa0, 0x5b, 0x75, 0x55, 0xd8,
+	0x64, 0x0e, 0x9b, 0x27, 0xd0, 0x4e, 0x50, 0x6f, 0x51, 0xdb, 0x74, 0x3c, 0x91, 0x69, 0x94, 0x64,
+	0xac, 0x74, 0xda, 0x1e, 0x3d, 0x61, 0x65, 0x97, 0xf9, 0x66, 0x9d, 0xf9, 0x2f, 0xa0, 0x43, 0xd7,
+	0xfb, 0x7a, 0x63, 0x68, 0xca, 0x28, 0xd3, 0xe1, 0x2e, 0x81, 0xcf, 0x32, 0x84, 0x28, 0xb0, 0xc1,
+	0x0b, 0xe8, 0x39, 0xae, 0xbd, 0x9c, 0x9d, 0x40, 0xdb, 0xc8, 0xd9, 0x0d, 0x9a, 0x3c, 0xcd, 0x54,
+	0x23, 0x6c, 0x48, 0x1f, 0x6c, 0xa4, 0x58, 0x92, 0x83, 0xbf, 0x18, 0xdc, 0x2f, 0xc9, 0xbc, 0x50,
+	0xeb, 0x3b, 0xd7, 0x68, 0xa1, 0x36, 0xd2, 0x50, 0x26, 0x7b, 0x1b, 0x2d, 0xf7, 0x8a, 0x12, 0xb8,
+	0xb7, 0xd1, 0x1e, 0x83, 0x57, 0x60, 0xf9, 0x18, 0x5a, 0xd7, 0x4b, 0x35, 0xbb, 0xc9, 0x9a, 0x84,
+	0x3b, 0x21, 0xbf, 0x21, 0x8f, 0x48, 0x01, 0xc1, 0xcf, 0x0c, 0x5a, 0xd6, 0xf0, 0x7f, 0x9b, 0x93,
+	0xae, 0x63, 0x8f, 0x4e, 0xf1, 0x55, 0xd6, 0x0f, 0x85, 0x4e, 0xbe, 0x19, 0x3d, 0x5a, 0xc9, 0x66,
+	0x65, 0x69, 0xe8, 0x88, 0x42, 0xa7, 0x37, 0xd2, 0xbe, 0x3c, 0x57, 0x29, 0xbb, 0xd4, 0x14, 0x5d,
+	0x51, 0x35, 0x05, 0x63, 0xe0, 0xf5, 0x4a, 0xed, 0x7f, 0xf2, 0x82, 0x9f, 0x18, 0x74, 0xbf, 0x95,
+	0x89, 0x21, 0x60, 0xf2, 0x2e, 0xea, 0x49, 0x0d, 0x5f, 0x2e, 0x0f, 0x2b, 0x17, 0xac, 0xb7, 0x2a,
+	0xac, 0x7f, 0x05, 0xbd, 0x4a, 0x1e, 0x49, 0xcc, 0x3f, 0x83, 0xc6, 0x5c, 0xcd, 0xf7, 0x0e, 0x27,
+	0x81, 0x5e, 0xe8, 0xa7, 0x6a, 0x19, 0xa1, 0x16, 0x84, 0x0a, 0x7e, 0x61, 0xd0, 0xad, 0x5a, 0x29,
+	0xd9, 0xb9, 0x95, 0xb2, 0xdb, 0x66, 0x1a, 0x7d, 0x7a, 0x4d, 0x7b, 0x27, 0x6d, 0x77, 0x2b, 0xd3,
+	0x95, 0x57, 0xd9, 0xbe, 0x49, 0xd3, 0xcf, 0xd5, 0xb7, 0x6d, 0xc6, 0xe0, 0x77, 0x06, 0xc7, 0x02,
+	0x8d, 0x96, 0xb8, 0x45, 0x4a, 0xeb, 0x2e, 0x0d, 0x4a, 0x4e, 0x7e, 0xbb, 0x42, 0x7e, 0x04, 0x03,
+	0x37, 0xdd, 0x24, 0x76, 0xf6, 0x2c, 0xab, 0xed, 0xd9, 0xb7, 0x1a, 0xb6, 0x87, 0x67, 0xd0, 0x73,
+	0x16, 0x28, 0x3f, 0x86, 0xa3, 0x27, 0x3a, 0x4c, 0x36, 0x1a, 0xcf, 0x55, 0x84, 0x83, 0x03, 0x3e,
+	0x80, 0xee, 0xe5, 0x66, 0x69, 0xa4, 0x48, 0x77, 0xdc, 0x80, 0x9d, 0xfd, 0xd1, 0x80, 0xe3, 0xcb,
+	0x30, 0x0d, 0x3c, 0x45, 0xbd, 0x95, 0x33, 0xe4, 0x53, 0xe8, 0xbb, 0x0b, 0x9d, 0x7f, 0xe4, 0x7c,
+	0x7c, 0xe7, 0xaf, 0x68, 0xf8, 0xf1, 0xad, 0xfe, 0x24, 0x0e, 0x0e, 0xf8, 0xf7, 0xd5, 0xc7, 0x2d,
+	0xdb, 0x14, 0xfc, 0x13, 0xe7, 0xdc, 0xbe, 0x45, 0x3b, 0x0c, 0xfe, 0x0b, 0x62, 0xa3, 0x4f, 0xa1,
+	0xef, 0x0e, 0x64, 0x2d, 0xe5, 0x9d, 0x77, 0xb5, 0x96, 0xf2, 0xee, 0x34, 0x07, 0x07, 0xfc, 0x02,
+	0xbc, 0x62, 0x64, 0xb8, 0x3b, 0x21, 0xd5, 0x91, 0x1e, 0x0e, 0xff, 0xcd, 0x65, 0xa3, 0x5c, 0x42,
+	0xb7, 0x5a, 0x7b, 0xfe, 0xc0, 0x41, 0xd7, 0xba, 0x78, 0xf8, 0xe1, 0x2d, 0x5e, 0x0a, 0x77, 0xdd,
+	0xb6, 0xbf, 0xaa, 0x8f, 0xfe, 0x09, 0x00, 0x00, 0xff, 0xff, 0x69, 0xf8, 0x55, 0x49, 0xbc, 0x0a,
+	0x00, 0x00,
 }

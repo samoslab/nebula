@@ -3,15 +3,19 @@ package metadata.pb;
 
 service MatadataService {
 
+    rpc CheckFileExist(CheckFileExistReq)returns(CheckFileExistResp){}
+
     rpc UploadFilePrepare(UploadFilePrepareReq) returns (UploadFilePrepareResp){}
 
     rpc UploadFileDone(UploadFileDoneReq) returns (UploadFileDoneResp){}
 
-    // rpc RetrieveFile()
+    rpc ListFiles(ListFilesReq) returns (ListFilesResp){}
+
+    rpc RetrieveFile(RetrieveFileReq) returns (RetrieveFileResp){}
 
 }
 
-message UploadFilePrepareReq {
+message CheckFileExistReq {
     uint32 version =1;
     bytes nodeId=2;
     uint64 timestamp=3;
@@ -24,21 +28,110 @@ message UploadFilePrepareReq {
     bytes sign=10;
 }
 
+message CheckFileExistResp{
+    bool done=1;// true if file exists or save tiny file success
+    FileStoreType storeType=2; // suggest store type, ErasureCode or MultiReplica
+    int32 dataPieceCount=3;  // 0 if not ErasureCode
+    int32 verifyPieceCount=4; // 0 if not ErasureCode
+    int32 replicaCount=5;  // 0 if not MultiReplica
+}
+
+enum FileStoreType{
+    ErasureCode=0;
+    MultiReplica=1;
+}
+
+message UploadFilePrepareReq{
+    uint32 version =1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    bytes fileHash=4;
+    uint64 fileSize=5;
+    repeated PieceInfo pieceInfo=6;
+    bytes sign=7;
+}
+
+message PieceInfo{
+    bytes hash=1;
+    uint32 size=2;
+}
+
 message UploadFilePrepareResp{
-    bool done=1;// true if file exists
+    repeated ProviderInfo provider=1;
+}
+
+message ProviderInfo{
+    bytes nodeId=1;
+    string server=2;
+    uint32 port=3;
+    uint64 timestamp=4;
+    repeated PieceHashAuth hashAuth=5;
+}
+
+message PieceHashAuth{
+    bytes hash=1;
+    string ticket=2;
+    bytes auth=3;
 }
 
 message UploadFileDoneReq{
+    uint32 version =1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    bytes fileHash=4;
+    uint64 fileSize=5;
+    repeated Partition partition=6;
+    bytes sign=7;
+}
+
+message Partition{
+    repeated Block block=1;
+}
+
+message Block{
+    bytes hash=1;
+    uint32 size=2;
+    uint32 blockSeq=3;
+    bool checksum=4;
+    repeated bytes storeNodeId=5;
 
 }
 
 message UploadFileDoneResp{
-    
+    bool done=1;
 }
 
+message ListFilesReq{
+    uint32 version =1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    string path=4;// nil if top level
+    bytes sign=5;
+}
 
+message ListFilesResp{
+    repeated FileOrFolder fof=1;
+}
 
+message FileOrFolder{
+    bool folder=1;
+    string name=2;
+    uint64 modTime=3;
+    bytes fileHash=4;//nil if folder
+    uint64 fileSize=5;//0 if folder
+}
 
+message RetrieveFileReq{
+    uint32 version =1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    bytes fileHash=4;
+    uint64 fileSize=5;
+    bytes sign=6;
+}
 
-
+message RetrieveFileResp{
+    bytes fileData=1;// not nil if tiny file
+    repeated Partition partition=6;// nil if tiny file
+}
 
