@@ -90,10 +90,14 @@ message UploadFileDoneReq{
     uint32 version =1;
     bytes nodeId=2;
     uint64 timestamp=3;
-    bytes fileHash=4;
-    uint64 fileSize=5;
-    repeated Partition partition=6;// size is one if use MultiReplica
-    bytes sign=7;
+    string filePath=4;//file parent path in net disk
+    bytes fileHash=5;
+    uint64 fileSize=6;
+    string fileName=7;
+    uint64 fileModTime=8;
+    repeated Partition partition=9;// size is one if use MultiReplica
+    bool interactive=10;//if false, will auto add suffix timestamp when exists same name file 
+    bytes sign=11;
 }
 
 message Partition{
@@ -106,11 +110,11 @@ message Block{
     uint32 blockSeq=3;
     bool checksum=4;
     repeated bytes storeNodeId=5;
-
 }
 
 message UploadFileDoneResp{
-    bool done=1;
+    uint32 code = 1;//0:success, 1: failed
+    string errMsg=2;
 }
 
 message ListFilesReq{
