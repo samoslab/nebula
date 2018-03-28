@@ -23,4 +23,9 @@ _testmain.go
 *.exe
 *.test
 *.prof
-
+#vendor/
+*.DS_Store
+*~
+*.log
+*.swp
+*.out
