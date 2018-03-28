@@ -25,16 +25,18 @@ message CheckFileExistReq {
     string fileName=7;
     uint64 fileModTime=8;
     bytes fileData=9;//file content if file size less than or equal 8k
-    bytes sign=10;
+    bool interactive=10;//if false, will auto add suffix timestamp when exists same name file
+    bytes sign=11;
 }
 
 message CheckFileExistResp{
-    bool done=1;// true if file exists or save tiny file success
-    FileStoreType storeType=2; // suggest store type, ErasureCode or MultiReplica
-    int32 dataPieceCount=3;  // 0 if not ErasureCode
-    int32 verifyPieceCount=4; // 0 if not ErasureCode
-    int32 replicaCount=5;  // 0 if not MultiReplica
-    repeated ReplicaProvider provider=6;// if use MultiReplica, size is more than replicaCount
+    uint32 code = 1;//0:if file exists or save tiny file success, 1: exist same name file, ...
+    string errMsg=2;
+    FileStoreType storeType=3; // suggest store type, ErasureCode or MultiReplica
+    int32 dataPieceCount=4;  // 0 if not ErasureCode
+    int32 verifyPieceCount=5; // 0 if not ErasureCode
+    int32 replicaCount=6;  // 0 if not MultiReplica
+    repeated ReplicaProvider provider=7;// if use MultiReplica, size is more than replicaCount
 }
 
 enum FileStoreType{

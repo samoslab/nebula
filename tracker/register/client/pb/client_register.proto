@@ -7,6 +7,8 @@ service ClientRegisterService {
 
     rpc Register(RegisterReq) returns (RegisterResp){}
 
+    rpc VerifyContactEmail(VerifyContactEmailReq) returns (VerifyContactEmailResp){}
+
     rpc GetTrackerServer(GetTrackerServerReq)returns (GetTrackerServerResp){}
 }
 message GetPublicKeyReq {
@@ -26,6 +28,18 @@ message RegisterReq{
 }
 
 message RegisterResp{
+    uint32 code = 1;//0:success, other value: failed
+    string errMsg=2;
+}
+
+message VerifyContactEmailReq{
+    uint32 version = 1;
+    bytes nodeId = 2;
+    string verifyCode=3;
+    bytes sign = 4;
+}
+
+message VerifyContactEmailResp{
     uint32 code = 1;//0:success, other value: failed
     string errMsg=2;
 }

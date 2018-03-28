@@ -20,14 +20,15 @@ message CollectReq{
 message ActionLog{
     uint32 type=1;// 1:Store, no need to collect action log for success store; 2:Retrieve
     bytes oppositeNodeId=2;
-    bool success=3;
-    bytes fileHash=4;
-    uint64 fileSize=5;
-    bytes blockHash=6;
-    uint32 blockSize=7;
-    uint64 beginTime=8;
-    uint64 endTime=9;
-    uint32 transportSize=10;
-    string info=11;// error info
-    bytes sign=12;
+    string ticket=3;
+    bool success=4;
+    bytes fileHash=5;
+    uint64 fileSize=6;
+    bytes blockHash=7;
+    uint32 blockSize=8;
+    uint64 beginTime=9;
+    uint64 endTime=10;
+    uint32 transportSize=11;
+    string info=12;// error info
+    bytes sign=13;
 }
