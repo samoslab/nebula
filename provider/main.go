@@ -14,9 +14,9 @@ import (
 
 	"github.com/skycoin/skycoin/src/cipher"
 	"github.com/spolabs/nebula/provider/config"
+	"github.com/spolabs/nebula/provider/impl"
 	"github.com/spolabs/nebula/provider/node"
 	pb "github.com/spolabs/nebula/provider/pb"
-	"github.com/spolabs/nebula/provider/server"
 	"google.golang.org/grpc"
 )
 
@@ -96,7 +96,7 @@ func daemon(configDir string, listen string) {
 		log.Fatalf("failed to listen: %s, error: %s", listen, err)
 	}
 	grpcServer := grpc.NewServer()
-	providerServer := server.NewProviderServer()
+	providerServer := impl.NewProviderServer()
 	defer providerServer.Close()
 	pb.RegisterProviderServiceServer(grpcServer, providerServer)
 	grpcServer.Serve(lis)

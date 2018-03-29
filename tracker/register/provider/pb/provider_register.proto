@@ -3,7 +3,7 @@ package register_provider_pb;
 
 service ProviderRegisterService {
 
-    rpc GetPublicKey(GetPublicKeyReq) returns (PublicKeyResp){}
+    rpc GetPublicKey(GetPublicKeyReq) returns (GetPublicKeyResp){}
 
     rpc Register(RegisterReq) returns (RegisterResp){}
 
@@ -16,7 +16,7 @@ message GetPublicKeyReq {
     uint32 version =1;
 }
 
-message PublicKeyResp {
+message GetPublicKeyResp {
     bytes publicKey=1;
 }
 

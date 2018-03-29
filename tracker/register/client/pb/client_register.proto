@@ -3,7 +3,7 @@ package register.client.pb;
 
 service ClientRegisterService {
 
-    rpc GetPublicKey(GetPublicKeyReq) returns (PublicKeyResp){}
+    rpc GetPublicKey(GetPublicKeyReq) returns (GetPublicKeyResp){}
 
     rpc Register(RegisterReq) returns (RegisterResp){}
 
@@ -15,7 +15,7 @@ message GetPublicKeyReq {
     uint32 version =1;
 }
 
-message PublicKeyResp {
+message GetPublicKeyResp {
     bytes publicKey=1;
 }
 
