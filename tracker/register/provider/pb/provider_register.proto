@@ -8,6 +8,8 @@ service ProviderRegisterService {
     rpc Register(RegisterReq) returns (RegisterResp){}
 
     rpc VerifyBillEmail(VerifyBillEmailReq) returns (VerifyBillEmailResp){}
+
+    rpc ResendVerifyCode(ResendVerifyCodeReq) returns (ResendVerifyCodeResp){}
     
     rpc GetTrackerServer(GetTrackerServerReq)returns (GetTrackerServerResp){}
 
@@ -55,6 +57,17 @@ message VerifyBillEmailReq{
 message VerifyBillEmailResp{
     uint32 code = 1;//0:success, other value: failed
     string errMsg=2;
+}
+
+message ResendVerifyCodeReq{
+    uint32 version=1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    bytes sign = 4;
+}
+
+message ResendVerifyCodeResp{
+    bool success=1;
 }
 
 message GetTrackerServerReq{

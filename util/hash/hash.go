@@ -62,3 +62,9 @@ func Sha1FilePiece(filePath string, start uint32, size uint32) ([]byte, error) {
 	}
 	return hash.Sum(nil)[:20], nil
 }
+
+func Sha1(data []byte) []byte {
+	h := sha1.New()
+	h.Write(data)
+	return h.Sum(nil)
+}

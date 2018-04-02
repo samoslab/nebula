@@ -3,6 +3,8 @@ package metadata.pb;
 
 service MatadataService {
 
+    rpc MkFolder(MkFolderReq)returns(MkFolderResp){}
+
     rpc CheckFileExist(CheckFileExistReq)returns(CheckFileExistResp){}
 
     rpc UploadFilePrepare(UploadFilePrepareReq) returns (UploadFilePrepareResp){}// only use for Erasure Code store type
@@ -13,6 +15,21 @@ service MatadataService {
 
     rpc RetrieveFile(RetrieveFileReq) returns (RetrieveFileResp){}
 
+}
+
+message MkFolderReq{
+    uint32 version =1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    string path=4;//parent path in net disk
+    repeated string folder=5;
+    bool interactive=6;
+    bytes sign=7;
+}
+
+message MkFolderResp{
+    uint32 code = 1;//0:success, 1: failed
+    string errMsg=2;  
 }
 
 message CheckFileExistReq {
