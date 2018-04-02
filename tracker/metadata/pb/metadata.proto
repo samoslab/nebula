@@ -47,7 +47,7 @@ message CheckFileExistReq {
 }
 
 message CheckFileExistResp{
-    uint32 code = 1;//0:if file exists or save tiny file success, 1: exist same name file, ...
+    uint32 code = 1;//0:if file exists or save tiny file success; 1: please read storeType to go step 2 or step 3; 2 and more than 2 are kinds of errors
     string errMsg=2;
     FileStoreType storeType=3; // suggest store type, ErasureCode or MultiReplica
     int32 dataPieceCount=4;  // 0 if not ErasureCode
