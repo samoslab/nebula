@@ -8,6 +8,7 @@ import (
 	"time"
 
 	pb "github.com/spolabs/nebula/provider/pb"
+	util_hash "github.com/spolabs/nebula/util/hash"
 	"golang.org/x/net/context"
 )
 
@@ -19,12 +20,13 @@ func Ping(client pb.ProviderServiceClient) error {
 	_, err := client.Ping(ctx, &pb.PingReq{})
 	return err
 }
-func updateStoreReqAuth(obj *pb.StoreReq) *pb.StoreReq {
+func UpdateStoreReqAuth(obj *pb.StoreReq) *pb.StoreReq {
 	// TODO
 	obj.Auth = []byte("mock-auth")
 	return obj
 }
-func Store(client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, key []byte, fileSize uint64) error {
+
+func StorePiece(client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, key []byte, fileSize uint64) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		fmt.Printf("open file failed: %s", err.Error())
@@ -50,7 +52,7 @@ func Store(client pb.ProviderServiceClient, filePath string, auth []byte, ticket
 		}
 		if first {
 			first = false
-			if err := stream.Send(updateStoreReqAuth(&pb.StoreReq{Data: buf[:bytesRead], Ticket: ticket, Key: key, FileSize: fileSize, Timestamp: uint64(time.Now().Unix())})); err != nil {
+			if err := stream.Send(UpdateStoreReqAuth(&pb.StoreReq{Data: buf[:bytesRead], Ticket: ticket, Key: key, FileSize: fileSize, Timestamp: uint64(time.Now().Unix())})); err != nil {
 				fmt.Printf("RPC Send StoreReq failed: %s", err.Error())
 				return err
 			}
@@ -62,6 +64,48 @@ func Store(client pb.ProviderServiceClient, filePath string, auth []byte, ticket
 		}
 		if bytesRead < stream_data_size {
 			break
+		}
+	}
+	storeResp, err := stream.CloseAndRecv()
+	if err != nil {
+		fmt.Printf("RPC CloseAndRecv failed: %s", err.Error())
+		return err
+	}
+	if !storeResp.Success {
+		fmt.Println("RPC return false")
+		return errors.New("RPC return false")
+	}
+	return nil
+}
+
+func Store(client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, key []byte, fileSize uint64, first bool) error {
+	file, err := os.Open(filePath)
+	if err != nil {
+		fmt.Printf("open file failed: %s", err.Error())
+		return err
+	}
+	defer file.Close()
+	stream, err := client.Store(context.Background())
+	if err != nil {
+		fmt.Printf("RPC Store failed: %s", err.Error())
+		return err
+	}
+	defer stream.CloseSend()
+	buf, err := util_hash.GetFileData(filePath)
+	if err != nil {
+		fmt.Printf("get file data error %v", err)
+		return err
+	}
+
+	if first {
+		if err := stream.Send(UpdateStoreReqAuth(&pb.StoreReq{Data: buf, Ticket: ticket, Key: key, FileSize: fileSize, Timestamp: uint64(time.Now().Unix())})); err != nil {
+			fmt.Printf("RPC Send StoreReq failed: %s", err.Error())
+			return err
+		}
+	} else {
+		if err := stream.Send(&pb.StoreReq{Data: buf}); err != nil {
+			fmt.Printf("RPC Send StoreReq failed: %s", err.Error())
+			return nil
 		}
 	}
 	storeResp, err := stream.CloseAndRecv()

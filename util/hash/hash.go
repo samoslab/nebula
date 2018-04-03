@@ -4,8 +4,18 @@ import (
 	"crypto/sha1"
 	"errors"
 	"io"
+	"io/ioutil"
 	"os"
 )
+
+func GetFileData(filePath string) ([]byte, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+	return ioutil.ReadAll(file)
+}
 
 //Sha1File calculate file sha1 hash, filePath must be exist
 func Sha1File(filePath string) ([]byte, error) {
