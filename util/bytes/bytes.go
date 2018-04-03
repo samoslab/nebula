@@ -47,6 +47,18 @@ func FromUint64(val uint64) []byte {
 	return b
 }
 
+func FromUint32(val uint32) []byte {
+	b := make([]byte, 4)
+	for i := 3; i >= 0; i-- {
+		b[i] = byte(val & 255)
+		val = val >> 8
+		if val == 0 {
+			break
+		}
+	}
+	return b
+}
+
 func ToUint32(b []byte, startIdx int) uint32 {
 	return uint32(b[startIdx+3]) | uint32(b[startIdx+2])<<8 | uint32(b[startIdx+1])<<16 | uint32(b[startIdx])<<24
 }

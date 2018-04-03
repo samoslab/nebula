@@ -23,8 +23,7 @@ message MkFolderReq{
     uint64 timestamp=3;
     string path=4;//parent path in net disk
     repeated string folder=5;
-    bool interactive=6;
-    bytes sign=7;
+    bytes sign=6;
 }
 
 message MkFolderResp{
@@ -43,7 +42,8 @@ message CheckFileExistReq {
     uint64 fileModTime=8;
     bytes fileData=9;//file content if file size less than or equal 8k
     bool interactive=10;//if false, will auto add suffix timestamp when exists same name file
-    bytes sign=11;
+    bool newVersion=11;
+    bytes sign=12;
 }
 
 message CheckFileExistResp{
@@ -114,7 +114,8 @@ message UploadFileDoneReq{
     uint64 fileModTime=8;
     repeated Partition partition=9;// size is one if use MultiReplica
     bool interactive=10;//if false, will auto add suffix timestamp when exists same name file 
-    bytes sign=11;
+    bool newVersion=11;
+    bytes sign=12;
 }
 
 message Partition{
@@ -139,11 +140,24 @@ message ListFilesReq{
     bytes nodeId=2;
     uint64 timestamp=3;
     string path=4;// nil if top level
-    bytes sign=5;
+    uint32 pageSize=5;//can not more than 2000
+    uint32 pageNum=6;// 1-based
+    SortType sortType=7;
+    bool ascOrder=8;
+    bytes sign=9;
+}
+
+enum SortType{
+    Name=0;
+    ModTime=1;
+    Size=2;
 }
 
 message ListFilesResp{
-    repeated FileOrFolder fof=1;
+    uint32 code = 1;//0:success, 1: failed
+    string errMsg=2;
+    uint32 totalRecord=3;
+    repeated FileOrFolder fof=4;
 }
 
 message FileOrFolder{
@@ -164,7 +178,9 @@ message RetrieveFileReq{
 }
 
 message RetrieveFileResp{
-    bytes fileData=1;// not nil if tiny file
-    repeated Partition partition=6;// nil if tiny file
+    uint32 code = 1;//0:success, 1: failed
+    string errMsg=2;
+    bytes fileData=3;// not nil if tiny file
+    repeated Partition partition=4;// nil if tiny file
 }
 
