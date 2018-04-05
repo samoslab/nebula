@@ -22,11 +22,11 @@ import (
 type ClientManager struct {
 	mclient mpb.MatadataServiceClient
 	NodeId  []byte
-	tempDir string
+	TempDir string
 	log     *logrus.Logger
 }
 
-func NewClientManager() (*ClientManager, error) {
+func NewClientManager(log *logrus.Logger) (*ClientManager, error) {
 	c := &ClientManager{}
 	conn1, err := grpc.Dial("127.0.0.1:8080", grpc.WithInsecure())
 	if err != nil {
@@ -36,6 +36,7 @@ func NewClientManager() (*ClientManager, error) {
 	defer conn1.Close()
 
 	c.mclient = mpb.NewMatadataServiceClient(conn1)
+	c.log = log
 	return c, nil
 }
 
@@ -95,7 +96,7 @@ func (c *ClientManager) UploadFile(filename string) error {
 		ufpr.Piece = make([]*mpb.PieceHashAndSize, rsp.GetDataPieceCount()+rsp.GetVerifyPieceCount())
 		// Split file and hash
 		// todo delete temp file
-		fileSlices, err := rsEncoder(c.tempDir, req.FileName, int(rsp.GetDataPieceCount()), int(rsp.GetVerifyPieceCount()))
+		fileSlices, err := rsEncoder(c.TempDir, req.FileName, int(rsp.GetDataPieceCount()), int(rsp.GetVerifyPieceCount()))
 		if err != nil {
 			log.Errorf("reed se error %v", err)
 			return err
@@ -113,7 +114,11 @@ func (c *ClientManager) UploadFile(filename string) error {
 			log.Errorf("UploadFilePrepare error %v", err)
 			return err
 		}
-		return c.UploadFileBatchByErasure(ufpr, ufprsp, fileSlices)
+		partition, err := c.UploadFileBatchByErasure(ufpr, ufprsp, fileSlices)
+		if err != nil {
+			return err
+		}
+		return c.UploadFileDone(ufpr, partition)
 	} else if rsp.StoreType == mpb.FileStoreType_MultiReplica {
 		return c.UploadFileByMultiReplica(req, rsp)
 	} else {
@@ -124,27 +129,37 @@ func (c *ClientManager) UploadFile(filename string) error {
 	return nil
 }
 
-func (c *ClientManager) UploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, rsp *mpb.UploadFilePrepareResp, hashFiles []HashFile) error {
+func (c *ClientManager) UploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, rsp *mpb.UploadFilePrepareResp, hashFiles []HashFile) (*mpb.Partition, error) {
+	partition := &mpb.Partition{}
 	providers, err := c.PingProvider(rsp.GetProvider())
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for i, pro := range providers {
 		if i == 0 {
-			c.UploadFileToErasureProvider(pro, hashFiles[i], true)
+			block, err := c.UploadFileToErasureProvider(pro, hashFiles[i], true)
+			if err != nil {
+				return nil, err
+			}
+			partition.Block = append(partition.Block, block)
 		} else {
-			c.UploadFileToErasureProvider(pro, hashFiles[i], false)
+			block, err := c.UploadFileToErasureProvider(pro, hashFiles[i], false)
+			if err != nil {
+				return nil, err
+			}
+			partition.Block = append(partition.Block, block)
 		}
 	}
-	return nil
+	return partition, nil
 }
 
-func (c *ClientManager) UploadFileToErasureProvider(pro *mpb.ErasureCodeProvider, fileInfo HashFile, first bool) error {
+func (c *ClientManager) UploadFileToErasureProvider(pro *mpb.ErasureCodeProvider, fileInfo HashFile, first bool) (*mpb.Block, error) {
+	block := &mpb.Block{}
 	conn, err := grpc.Dial(pro.GetServer(), grpc.WithInsecure())
 	if err != nil {
 		fmt.Printf("RPC Dial failed: %s", err.Error())
-		return err
+		return nil, err
 	}
 	defer conn.Close()
 	pclient := pb.NewProviderServiceClient(conn)
@@ -153,9 +168,16 @@ func (c *ClientManager) UploadFileToErasureProvider(pro *mpb.ErasureCodeProvider
 	err = client.Store(pclient, fileInfo.FileName, ha.GetAuth(), ha.GetTicket(), fileInfo.FileHash, uint64(fileInfo.FileSize), first)
 	if err != nil {
 		fmt.Println(err)
+		return nil, err
 	}
+	block.Hash = fileInfo.FileHash
+	block.Size = uint32(fileInfo.FileSize)
+	block.BlockSeq = uint32(fileInfo.SliceIndex)
+	block.Checksum = true
+	block.StoreNodeId = [][]byte{}
+	block.StoreNodeId = append(block.StoreNodeId, []byte(pro.GetNodeId()))
 
-	return nil
+	return block, nil
 }
 
 func (c *ClientManager) UploadFileToReplicaProvider(pro *mpb.ReplicaProvider, fileInfo HashFile) error {
@@ -183,14 +205,14 @@ func (c *ClientManager) UploadFileByMultiReplica(req *mpb.CheckFileExistReq, rsp
 	fileInfo.FileSize = int64(req.FileSize)
 	fileInfo.FileHash = req.FileHash
 	fileInfo.SliceIndex = 0
-	for i, pro := range rsp.GetProvider() {
+	for _, pro := range rsp.GetProvider() {
 		c.UploadFileToReplicaProvider(pro, fileInfo)
 	}
 
 	return nil
 }
 
-func (c *ClientManager) UploadFileDone(req *mpb.UploadFilePrepareReq) error {
+func (c *ClientManager) UploadFileDone(req *mpb.UploadFilePrepareReq, partition *mpb.Partition) error {
 	ufdr := &mpb.UploadFileDoneReq{}
 	ufdr.Version = 1
 	ufdr.NodeId = req.GetNodeId()
@@ -199,7 +221,7 @@ func (c *ClientManager) UploadFileDone(req *mpb.UploadFilePrepareReq) error {
 	//Todo
 	//ufdr.Sign =
 	ufdr.Timestamp = uint64(time.Now().UTC().Unix())
-	//ufdr.Partition =
+	ufdr.Partition = append(ufdr.Partition, partition)
 	ctx := context.Background()
 	ufdrsp, err := c.mclient.UploadFileDone(ctx, ufdr)
 	if err != nil {
