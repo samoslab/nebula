@@ -3,11 +3,13 @@ package register.client.pb;
 
 service ClientRegisterService {
 
-    rpc GetPublicKey(GetPublicKeyReq) returns (PublicKeyResp){}
+    rpc GetPublicKey(GetPublicKeyReq) returns (GetPublicKeyResp){}
 
     rpc Register(RegisterReq) returns (RegisterResp){}
 
     rpc VerifyContactEmail(VerifyContactEmailReq) returns (VerifyContactEmailResp){}
+
+    rpc ResendVerifyCode(ResendVerifyCodeReq) returns (ResendVerifyCodeResp){}
 
     rpc GetTrackerServer(GetTrackerServerReq)returns (GetTrackerServerResp){}
 }
@@ -15,7 +17,7 @@ message GetPublicKeyReq {
     uint32 version =1;
 }
 
-message PublicKeyResp {
+message GetPublicKeyResp {
     bytes publicKey=1;
 }
 
@@ -35,13 +37,25 @@ message RegisterResp{
 message VerifyContactEmailReq{
     uint32 version = 1;
     bytes nodeId = 2;
-    string verifyCode=3;
-    bytes sign = 4;
+    uint64 timestamp=3;
+    string verifyCode=4;
+    bytes sign = 5;
 }
 
 message VerifyContactEmailResp{
     uint32 code = 1;//0:success, other value: failed
     string errMsg=2;
+}
+
+message ResendVerifyCodeReq{
+    uint32 version=1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    bytes sign = 4;
+}
+
+message ResendVerifyCodeResp{
+    bool success=1;
 }
 
 message GetTrackerServerReq{

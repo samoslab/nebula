@@ -13,7 +13,9 @@ message CollectResp{
 
 message CollectReq{
     bytes nodeId=1;
-    repeated ActionLog actionLog=2;
+    uint64 timestamp=2;
+    repeated ActionLog actionLog=3;
+    bytes sign=4;
 }
 
 message ActionLog{
@@ -26,5 +28,4 @@ message ActionLog{
     uint64 endTime=7;
     uint32 transportSize=8;
     string info=9;// error info
-    bytes sign=10;
 }

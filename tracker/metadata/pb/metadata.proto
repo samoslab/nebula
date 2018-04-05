@@ -3,6 +3,8 @@ package metadata.pb;
 
 service MatadataService {
 
+    rpc MkFolder(MkFolderReq)returns(MkFolderResp){}
+
     rpc CheckFileExist(CheckFileExistReq)returns(CheckFileExistResp){}
 
     rpc UploadFilePrepare(UploadFilePrepareReq) returns (UploadFilePrepareResp){}// only use for Erasure Code store type
@@ -13,6 +15,20 @@ service MatadataService {
 
     rpc RetrieveFile(RetrieveFileReq) returns (RetrieveFileResp){}
 
+}
+
+message MkFolderReq{
+    uint32 version =1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    string path=4;//parent path in net disk
+    repeated string folder=5;
+    bytes sign=6;
+}
+
+message MkFolderResp{
+    uint32 code = 1;//0:success, 1: failed
+    string errMsg=2;  
 }
 
 message CheckFileExistReq {
@@ -26,11 +42,12 @@ message CheckFileExistReq {
     uint64 fileModTime=8;
     bytes fileData=9;//file content if file size less than or equal 8k
     bool interactive=10;//if false, will auto add suffix timestamp when exists same name file
-    bytes sign=11;
+    bool newVersion=11;
+    bytes sign=12;
 }
 
 message CheckFileExistResp{
-    uint32 code = 1;//0:if file exists or save tiny file success, 1: exist same name file, ...
+    uint32 code = 1;//0:if file exists or save tiny file success; 1: please read storeType to go step 2 or step 3; 2 and more than 2 are kinds of errors
     string errMsg=2;
     FileStoreType storeType=3; // suggest store type, ErasureCode or MultiReplica
     int32 dataPieceCount=4;  // 0 if not ErasureCode
@@ -90,10 +107,15 @@ message UploadFileDoneReq{
     uint32 version =1;
     bytes nodeId=2;
     uint64 timestamp=3;
-    bytes fileHash=4;
-    uint64 fileSize=5;
-    repeated Partition partition=6;// size is one if use MultiReplica
-    bytes sign=7;
+    string filePath=4;//file parent path in net disk
+    bytes fileHash=5;
+    uint64 fileSize=6;
+    string fileName=7;
+    uint64 fileModTime=8;
+    repeated Partition partition=9;// size is one if use MultiReplica
+    bool interactive=10;//if false, will auto add suffix timestamp when exists same name file 
+    bool newVersion=11;
+    bytes sign=12;
 }
 
 message Partition{
@@ -106,11 +128,11 @@ message Block{
     uint32 blockSeq=3;
     bool checksum=4;
     repeated bytes storeNodeId=5;
-
 }
 
 message UploadFileDoneResp{
-    bool done=1;
+    uint32 code = 1;//0:success, 1: failed
+    string errMsg=2;
 }
 
 message ListFilesReq{
@@ -118,11 +140,24 @@ message ListFilesReq{
     bytes nodeId=2;
     uint64 timestamp=3;
     string path=4;// nil if top level
-    bytes sign=5;
+    uint32 pageSize=5;//can not more than 2000
+    uint32 pageNum=6;// 1-based
+    SortType sortType=7;
+    bool ascOrder=8;
+    bytes sign=9;
+}
+
+enum SortType{
+    Name=0;
+    ModTime=1;
+    Size=2;
 }
 
 message ListFilesResp{
-    repeated FileOrFolder fof=1;
+    uint32 code = 1;//0:success, 1: failed
+    string errMsg=2;
+    uint32 totalRecord=3;
+    repeated FileOrFolder fof=4;
 }
 
 message FileOrFolder{
@@ -143,7 +178,9 @@ message RetrieveFileReq{
 }
 
 message RetrieveFileResp{
-    bytes fileData=1;// not nil if tiny file
-    repeated Partition partition=6;// nil if tiny file
+    uint32 code = 1;//0:success, 1: failed
+    string errMsg=2;
+    bytes fileData=3;// not nil if tiny file
+    repeated Partition partition=4;// nil if tiny file
 }
 
