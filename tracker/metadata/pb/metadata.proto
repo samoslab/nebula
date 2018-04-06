@@ -15,6 +15,8 @@ service MatadataService {
 
     rpc RetrieveFile(RetrieveFileReq) returns (RetrieveFileResp){}
 
+    rpc Remove(RemoveReq) returns (RemoveResp){}
+
 }
 
 message MkFolderReq{
@@ -181,6 +183,40 @@ message RetrieveFileResp{
     uint32 code = 1;//0:success, 1: failed
     string errMsg=2;
     bytes fileData=3;// not nil if tiny file
-    repeated Partition partition=4;// nil if tiny file
+    repeated RetrievePartition partition=4;// nil if tiny file
+    uint64 timestamp=5;// for provider auth check
 }
 
+message RetrievePartition{
+    repeated RetrieveBlock block=1; 
+}
+
+message RetrieveBlock{
+    bytes hash=1;
+    uint32 size=2;
+    uint32 blockSeq=3;
+    bool checksum=4;
+    repeated RetrieveNode storeNode=5;
+}
+
+message RetrieveNode{
+    bytes nodeId=1;
+    string server=2;
+    uint32 port=3;
+    string ticket=4;
+    bytes auth=5;
+}
+
+message RemoveReq{
+    uint32 version =1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    string path=4;
+    bool recursive=5;
+    bytes sign=6;
+}
+
+message RemoveResp{
+    uint32 code = 1;//0:success, 1: failed
+    string errMsg=2;
+}

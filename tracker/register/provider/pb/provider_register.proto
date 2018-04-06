@@ -24,22 +24,22 @@ message GetPublicKeyResp {
 
 message RegisterReq{
     uint32 version =1;
-    bytes auth = 2;
-    bytes nodeIdEnc = 3;
-    bytes publicKeyEnc = 4;
-    bytes encryptKeyEnc = 5;
-    bytes walletAddressEnc=6;
-    bytes billEmailEnc=7;
-    uint64 mainStorageVolume=8;
-    uint64 upBandwidth=9;
-    uint64 downBandwidth=10;
-    uint64 testUpBandwidth=11;
-    uint64 testDownBandwidth=12;
-    float availability=13;
-    uint32 port=14;
-    bytes ipEnc=15;
-    bytes dynamicDomain=16;
-    repeated uint64 extraStorageVolume=17;
+    bytes nodeIdEnc = 2;
+    bytes publicKeyEnc = 3;
+    bytes encryptKeyEnc = 4;
+    bytes walletAddressEnc=5;
+    bytes billEmailEnc=6;
+    uint64 mainStorageVolume=7;
+    uint64 upBandwidth=8;
+    uint64 downBandwidth=9;
+    uint64 testUpBandwidth=10;
+    uint64 testDownBandwidth=11;
+    float availability=12;
+    uint32 port=13;
+    bytes ipEnc=14;
+    bytes dynamicDomainEnc=15;
+    repeated uint64 extraStorageVolume=16;
+    bytes sign=17;
 }
 
 message RegisterResp{
@@ -50,8 +50,9 @@ message RegisterResp{
 message VerifyBillEmailReq{
     uint32 version = 1;
     bytes nodeId = 2;
-    string verifyCode=3;
-    bytes sign = 4;
+    uint64 timestamp=3;
+    string verifyCode=4;
+    bytes sign = 5;
 }
 
 message VerifyBillEmailResp{

@@ -1,6 +1,9 @@
 package main
 
 import (
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/hex"
 	"flag"
 	"fmt"
@@ -17,6 +20,8 @@ import (
 	"github.com/spolabs/nebula/provider/impl"
 	"github.com/spolabs/nebula/provider/node"
 	pb "github.com/spolabs/nebula/provider/pb"
+	client "github.com/spolabs/nebula/provider/register_client"
+	trp_pb "github.com/spolabs/nebula/tracker/register/provider/pb"
 	"google.golang.org/grpc"
 )
 
@@ -96,7 +101,7 @@ func daemon(configDir string, listen string) {
 		log.Fatalf("failed to listen: %s, error: %s", listen, err)
 	}
 	grpcServer := grpc.NewServer()
-	providerServer := impl.NewProviderServer()
+	providerServer := impl.NewProviderService()
 	defer providerServer.Close()
 	pb.RegisterProviderServiceServer(grpcServer, providerServer)
 	grpcServer.Serve(lis)
@@ -180,7 +185,34 @@ func register(configDir string, walletAddress string, billEmail string,
 	}
 	// TODO support extra storage
 	// TODO call Tracker provider register api
+	conn, err := grpc.Dial("127.0.0.1:6677", grpc.WithInsecure())
+	if err != nil {
+		fmt.Printf("RPC Dial failed: %s", err.Error())
+		return
+	}
+	defer conn.Close()
+	prsc := trp_pb.NewProviderRegisterServiceClient(conn)
+	pubKeyBytes, err := client.GetPublicKey(prsc)
+	if err != nil {
+		fmt.Printf("GetPublicKey failed: %s", err.Error())
+		return
+	}
+	pubKey, err := x509.ParsePKCS1PublicKey(pubKeyBytes)
+	if err != nil {
+		fmt.Printf("Parse PublicKey failed: %s", err.Error())
+		return
+	}
+	//code, errMsg, err := client.Register(prsc, nodeIdEnc)
+
 	doRegister(configDir, walletAddress, billEmail, availFloat, upBandwidthBps, downBandwidthBps, mainStoragePath, mainStorageVolumeByte)
+}
+
+func encrypt(pubKey *rsa.PublicKey, data []byte) []byte {
+	res, err := rsa.EncryptPKCS1v15(rand.Reader, pubKey, data)
+	if err != nil {
+		log.Fatalf("public key encrypt error: " + err.Error())
+	}
+	return res
 }
 
 func doRegister(configDir string, walletAddress string, billEmail string,
