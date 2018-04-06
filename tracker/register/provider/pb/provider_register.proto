@@ -37,7 +37,7 @@ message RegisterReq{
     float availability=12;
     uint32 port=13;
     bytes ipEnc=14;
-    bytes dynamicDomain=15;
+    bytes dynamicDomainEnc=15;
     repeated uint64 extraStorageVolume=16;
     bytes sign=17;
 }

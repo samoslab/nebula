@@ -36,7 +36,7 @@ var skip_check_auth = false
 const sep = string(os.PathSeparator)
 const timestamp_expired = 60
 
-type ProviderServer struct {
+type ProviderService struct {
 	Node       *node.Node
 	ProviderDb *bolt.DB
 }
@@ -78,13 +78,13 @@ func initStorage(path string, index int) {
 	}
 }
 
-func NewProviderServer() *ProviderServer {
+func NewProviderService() *ProviderService {
 	conf := config.GetProviderConfig()
 	if os.Getenv("NEBULA_TEST_MODE") == "1" {
 		skip_check_auth = true
 	}
 	initAllStorage(conf)
-	ps := &ProviderServer{}
+	ps := &ProviderService{}
 	ps.Node = node.LoadFormConfig()
 	dbPath := conf.MainStoragePath + sep + sys_folder + sep + "provider.db"
 	exists := util_file.Exists(dbPath)
@@ -106,11 +106,11 @@ func NewProviderServer() *ProviderServer {
 	return ps
 }
 
-func (self *ProviderServer) Close() {
+func (self *ProviderService) Close() {
 	self.ProviderDb.Close()
 }
 
-func (self *ProviderServer) checkAuth(method string, auth []byte, key []byte, fileSize uint64, timestamp uint64) error {
+func (self *ProviderService) checkAuth(method string, auth []byte, key []byte, fileSize uint64, timestamp uint64) error {
 	if skip_check_auth {
 		return nil
 	}
@@ -132,11 +132,11 @@ func (self *ProviderServer) checkAuth(method string, auth []byte, key []byte, fi
 	return errors.New("auth verify failed")
 }
 
-func (self *ProviderServer) Ping(ctx context.Context, req *pb.PingReq) (*pb.PingResp, error) {
+func (self *ProviderService) Ping(ctx context.Context, req *pb.PingReq) (*pb.PingResp, error) {
 	return &pb.PingResp{}, nil
 }
 
-func (self *ProviderServer) Store(stream pb.ProviderService_StoreServer) error {
+func (self *ProviderService) Store(stream pb.ProviderService_StoreServer) error {
 	first := true
 	var ticket string
 	var file *os.File
@@ -215,7 +215,7 @@ func (self *ProviderServer) Store(stream pb.ProviderService_StoreServer) error {
 	return nil
 }
 
-func (self *ProviderServer) Retrieve(req *pb.RetrieveReq, stream pb.ProviderService_RetrieveServer) error {
+func (self *ProviderService) Retrieve(req *pb.RetrieveReq, stream pb.ProviderService_RetrieveServer) error {
 	if err := self.checkAuth("Retrieve", req.Auth, req.Key, req.FileSize, req.Timestamp); err != nil {
 		return err
 	}
@@ -314,7 +314,7 @@ func sendFileToStream(path string, file *os.File, stream pb.ProviderService_Retr
 	return nil
 }
 
-func (self *ProviderServer) GetFragment(ctx context.Context, req *pb.GetFragmentReq) (*pb.GetFragmentResp, error) {
+func (self *ProviderService) GetFragment(ctx context.Context, req *pb.GetFragmentReq) (*pb.GetFragmentResp, error) {
 	if len(req.Positions) == 0 || req.Size == 0 {
 		return nil, errors.New("invalid req")
 	}
@@ -398,7 +398,7 @@ func getAbsPathOfSubPath(subPath string, storageIdx int) (string, error) {
 	return parent + strings.Replace(subPath, slash, sep, -1), nil
 }
 
-func (self *ProviderServer) saveFile(key []byte, fileSize uint64, tmpFilePath string, storage *config.Storage) error {
+func (self *ProviderService) saveFile(key []byte, fileSize uint64, tmpFilePath string, storage *config.Storage) error {
 	filename := hex.EncodeToString(key)
 	if fileSize > max_combine_file_size {
 		val := util_bytes.ToUint32(key, len(key)-4)
@@ -432,7 +432,7 @@ func (self *ProviderServer) saveFile(key []byte, fileSize uint64, tmpFilePath st
 	}
 	return nil
 }
-func (self *ProviderServer) saveSmallFile(key []byte, fileSize uint32, tmpFilePath string, storage *config.Storage) error {
+func (self *ProviderService) saveSmallFile(key []byte, fileSize uint32, tmpFilePath string, storage *config.Storage) error {
 	storage.SmallFileMutex.Lock()
 	defer storage.SmallFileMutex.Unlock()
 	subPath := storage.CurrCombineSubPath
@@ -466,7 +466,7 @@ func logPath(subPath string, bigFile bool, storageIdx byte, position uint32, siz
 const max_combine_file_size = 1048576 //1M
 var path_bucket = []byte("path")
 
-func (self *ProviderServer) queryByKey(key []byte) []byte {
+func (self *ProviderService) queryByKey(key []byte) []byte {
 	var res []byte
 	self.ProviderDb.View(func(tx *bolt.Tx) error {
 		b := tx.Bucket(path_bucket)
@@ -477,7 +477,7 @@ func (self *ProviderServer) queryByKey(key []byte) []byte {
 	return res
 }
 
-func (self *ProviderServer) querySubPath(key []byte) (subPath string, bigFile bool, storageIdx byte, position uint32, size uint32) {
+func (self *ProviderService) querySubPath(key []byte) (subPath string, bigFile bool, storageIdx byte, position uint32, size uint32) {
 	bytes := self.queryByKey(key)
 	if bytes == nil {
 		return "", false, 0, 0, 0
@@ -490,7 +490,7 @@ func (self *ProviderServer) querySubPath(key []byte) (subPath string, bigFile bo
 	return string(bytes[9:]), bigFile, storageIdx, util_bytes.ToUint32(bytes, 1), util_bytes.ToUint32(bytes, 5)
 }
 
-func (self *ProviderServer) savePath(key []byte, pathSlice []byte) error {
+func (self *ProviderService) savePath(key []byte, pathSlice []byte) error {
 	var err error
 	self.ProviderDb.Update(func(tx *bolt.Tx) error {
 		b := tx.Bucket(path_bucket)
