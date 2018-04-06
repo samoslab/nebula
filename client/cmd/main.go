@@ -21,6 +21,7 @@ import (
 	regpb "github.com/spolabs/nebula/tracker/register/client/pb"
 )
 
+// NewLogger create logger instance
 func NewLogger(logFilename string, debug bool) (*logrus.Logger, error) {
 	log := logrus.New()
 	log.Out = os.Stdout
@@ -84,6 +85,36 @@ func doRegister(registClient regpb.ClientRegisterServiceClient, cfg *config.Clie
 	return rsp, nil
 }
 
+// RegisterClient register client info to tracker
+func RegisterClient(log *logrus.Logger, configDir, trackerServer string) error {
+	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
+	if err != nil {
+		log.Fatalf("RPC Dial failed: %s", err.Error())
+		return err
+	}
+	defer conn.Close()
+
+	registerClient := regpb.NewClientRegisterServiceClient(conn)
+
+	no := node.NewNode(10)
+	cc := config.ClientConfig{}
+	cc.PublicKey = no.PublicKeyStr()
+	cc.PrivateKey = no.PrivateKeyStr()
+	cc.NodeId = no.NodeIdStr()
+	config.CreateClientConfig(configDir, &cc)
+
+	//clientConfig := config.GetClientConfig()
+	rsp, err := doRegister(registerClient, &cc)
+	if err != nil {
+		log.Infof("register error %v", err)
+		return err
+	}
+
+	log.Infof("rsp: %+v\n", rsp)
+	log.Infof("register success")
+	return nil
+}
+
 func main() {
 	usr, err := user.Current()
 	if err != nil {
@@ -105,47 +136,24 @@ func main() {
 	}
 	log.Infof("config dir %s", *configDirOpt)
 	log.Infof("tracker server %s", *trackerServer)
-	conn, err := grpc.Dial(*trackerServer, grpc.WithInsecure())
-	if err != nil {
-		log.Fatalf("RPC Dial failed: %s", err.Error())
-		return
-	}
-	defer conn.Close()
-
-	registerClient := regpb.NewClientRegisterServiceClient(conn)
-
 	if *regAction == "yes" {
-		no := node.NewNode(10)
-		cc := config.ClientConfig{}
-		cc.PublicKey = no.PublicKeyStr()
-		cc.PrivateKey = no.PrivateKeyStr()
-		cc.NodeId = no.NodeIdStr()
-		config.CreateClientConfig(*configDirOpt, &cc)
-
-		clientConfig := config.GetClientConfig()
-		rsp, err := doRegister(registerClient, clientConfig)
-		if err != nil {
-			log.Fatalf("register error %v", err)
-		}
-
-		log.Infof("rsp: %+v\n", rsp)
-		log.Infof("register success")
+		RegisterClient(log, *configDirOpt, *trackerServer)
 		return
 	}
 
 	err = config.LoadConfig(*configDirOpt)
 	if err != nil {
-		if err == config.NoConfErr {
+		if err == config.ErrNoConf {
 			fmt.Printf("Config file is not ready, please run \"%s register\" to register first\n", os.Args[0])
 			return
-		} else if err == config.ConfVerifyErr {
+		} else if err == config.ErrConfVerify {
 			fmt.Println("Config file wrong, can not start daemon.")
 			return
 		}
 	}
 
 	clientConfig := config.GetClientConfig()
-	cm, err := daemon.NewClientManager(log, clientConfig)
+	cm, err := daemon.NewClientManager(log, *trackerServer, clientConfig)
 	if err != nil {
 		return
 	}
