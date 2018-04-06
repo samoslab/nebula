@@ -17,7 +17,7 @@ func TestCheckAuth(t *testing.T) {
 		t.Error(err)
 	}
 	no := &node.Node{PubKeyBytes: bytes}
-	ps := &ProviderServer{Node: no}
+	ps := &ProviderService{Node: no}
 	method := "Store"
 	key, _ := hex.DecodeString("c925852911756e6d4b14b425188f5cf67d1d3cfc")
 	fileSize := uint64(1293847)

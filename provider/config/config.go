@@ -127,7 +127,7 @@ func GetProviderConfig() *ProviderConfig {
 	return providerConfig
 }
 
-func CreateProviderConfig(configDir string, pc *ProviderConfig) {
+func CreateProviderConfig(configDir string, pc *ProviderConfig) string {
 	if !util_file.Exists(configDir) {
 		if err := os.MkdirAll(configDir, 0700); err != nil {
 			log.Fatalf("mkdir config folder %s failed:%s", configDir, err)
@@ -138,6 +138,7 @@ func CreateProviderConfig(configDir string, pc *ProviderConfig) {
 		log.Fatalf("config file is adready exsits:%s", configDir)
 	}
 	saveProviderConfig(path, pc)
+	return path
 }
 
 func saveProviderConfig(configPath string, pc *ProviderConfig) error {
