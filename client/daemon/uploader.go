@@ -1,4 +1,4 @@
-package client
+package daemon
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 
 	"github.com/klauspost/reedsolomon"
 	"github.com/sirupsen/logrus"
+	"github.com/spolabs/nebula/client/config"
 	client "github.com/spolabs/nebula/client/provider_client"
 	pb "github.com/spolabs/nebula/provider/pb"
 	mpb "github.com/spolabs/nebula/tracker/metadata/pb"
@@ -24,9 +25,10 @@ type ClientManager struct {
 	NodeId  []byte
 	TempDir string
 	log     *logrus.Logger
+	cfg     *config.ClientConfig
 }
 
-func NewClientManager(log *logrus.Logger) (*ClientManager, error) {
+func NewClientManager(log *logrus.Logger, cfg *config.ClientConfig) (*ClientManager, error) {
 	c := &ClientManager{}
 	conn1, err := grpc.Dial("127.0.0.1:8080", grpc.WithInsecure())
 	if err != nil {
@@ -37,6 +39,9 @@ func NewClientManager(log *logrus.Logger) (*ClientManager, error) {
 
 	c.mclient = mpb.NewMatadataServiceClient(conn1)
 	c.log = log
+	c.TempDir = cfg.TempDir
+	c.NodeId = []byte(cfg.NodeId)
+	c.cfg = cfg
 	return c, nil
 }
 
@@ -227,7 +232,7 @@ func (c *ClientManager) UploadFileDone(req *mpb.UploadFilePrepareReq, partition 
 	if err != nil {
 		return err
 	}
-	fmt.Printf("done: %d\n", ufdrsp.GetDone())
+	fmt.Printf("done: %d\n", ufdrsp.GetCode())
 	return nil
 }
 
