@@ -78,8 +78,12 @@ message UploadFilePrepareReq{
     uint64 timestamp=3;
     bytes fileHash=4;
     uint64 fileSize=5;
-    repeated PieceHashAndSize piece=6;
+    repeated SplitPartition partition=6;
     bytes sign=7;
+}
+
+message SplitPartition{
+    repeated PieceHashAndSize piece=1;
 }
 
 message PieceHashAndSize{
@@ -87,22 +91,32 @@ message PieceHashAndSize{
     uint32 size=2;
 }
 
-message UploadFilePrepareResp{
-    repeated ErasureCodeProvider provider=1;
-}
-
 message ErasureCodeProvider{
     bytes nodeId=1;
     string server=2;
     uint32 port=3;
-    uint64 timestamp=4;
-    repeated PieceHashAuth hashAuth=5;// part of provider have mutiple hashAuth,  They are standby provider for multiple piece.
+    bool spare=4;
+}
+message UploadFilePrepareResp{
+    map<uint32, ErasureCodeProvider> provider = 1;
+    repeated PartitionAuth partitionAuth=2;
+    uint64 timestamp=3;
+}
+
+message PartitionAuth{
+    repeated BlockAuth blockAuth=1;
+}
+
+message BlockAuth{
+    uint32 id=1; // ref UploadFilePrepareResp provider map key
+    repeated PieceHashAuth hashAuth=2;// spare provider have mutiple PieceHashAuth,  They are standby provider for multiple piece.
 }
 
 message PieceHashAuth{
     bytes hash=1;
-    string ticket=2;
-    bytes auth=3;
+    uint32 size=2;
+    string ticket=3;
+    bytes auth=4;
 }
 
 message UploadFileDoneReq{
@@ -114,17 +128,17 @@ message UploadFileDoneReq{
     uint64 fileSize=6;
     string fileName=7;
     uint64 fileModTime=8;
-    repeated Partition partition=9;// size is one if use MultiReplica
+    repeated StorePartition partition=9;// size is one if use MultiReplica
     bool interactive=10;//if false, will auto add suffix timestamp when exists same name file 
     bool newVersion=11;
     bytes sign=12;
 }
 
-message Partition{
-    repeated Block block=1;  //size is one if use MultiReplica
+message StorePartition{
+    repeated StoreBlock block=1;  //size is one if use MultiReplica
 }
 
-message Block{
+message StoreBlock{
     bytes hash=1;
     uint32 size=2;
     uint32 blockSeq=3;
