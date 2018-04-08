@@ -38,7 +38,7 @@ func main() {
 func GetPublicKeyForProvider(client pbp.ProviderRegisterServiceClient) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	resp, err := client.GetPublicKey(ctx, &pbp.Empty{})
+	resp, err := client.GetPublicKey(ctx, &pbp.GetPublicKeyReq{})
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func GetPublicKeyForProvider(client pbp.ProviderRegisterServiceClient) ([]byte, 
 func GetPublicKeyForClient(client pbc.ClientRegisterServiceClient) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	resp, err := client.GetPublicKey(ctx, &pbc.Empty{})
+	resp, err := client.GetPublicKey(ctx, &pbc.GetPublicKeyReq{})
 	if err != nil {
 		return nil, err
 	}

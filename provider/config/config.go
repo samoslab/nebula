@@ -73,7 +73,7 @@ func verifyConfig(pc *ProviderConfig) error {
 }
 
 func StartAutoCheck() {
-	cronRunner := cron.New()
+	cronRunner = cron.New()
 	cronRunner.AddFunc("0,15,30,45 * * * * *", checkAndReload)
 	cronRunner.AddFunc("7 */3 * * * *", checkAllStorageAvailableSpace)
 	cronRunner.Start()

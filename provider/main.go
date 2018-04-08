@@ -252,7 +252,7 @@ func register(configDir string, trackerServer string, walletAddress string, bill
 		fmt.Println("mainStorageVolume is required.")
 		os.Exit(13)
 	}
-	if port < 0 || port > 65535 {
+	if port < 1 || port > 65535 {
 		fmt.Println("port must between 1 to 65535.")
 		os.Exit(14)
 	}
