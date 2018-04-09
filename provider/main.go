@@ -13,7 +13,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/skycoin/skycoin/src/cipher"
 	"github.com/samoslab/nebula/provider/config"
 	"github.com/samoslab/nebula/provider/impl"
 	"github.com/samoslab/nebula/provider/node"
@@ -21,6 +20,8 @@ import (
 	client "github.com/samoslab/nebula/provider/register_client"
 	trp_pb "github.com/samoslab/nebula/tracker/register/provider/pb"
 	util_rsa "github.com/samoslab/nebula/util/rsa"
+	"github.com/skycoin/skycoin/src/cipher"
+	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
@@ -41,6 +42,7 @@ func main() {
 	registerCommand := flag.NewFlagSet("register", flag.ExitOnError)
 	registerConfigDirFlag := registerCommand.String("configDir", usr.HomeDir+string(os.PathSeparator)+home_config_folder, "config director")
 	registerTrackerServerFlag := registerCommand.String("trackerServer", "127.0.0.1:6677", "tracker server address, eg: 127.0.0.1:6677")
+	registerListenFlag := registerCommand.String("listen", ":6666", "listen address and port, eg: 111.111.111.111:6666 or :6666")
 	walletAddressFlag := registerCommand.String("walletAddress", "", "SPO wallet address to accept earnings")
 	billEmailFlag := registerCommand.String("billEmail", "", "email where send bill to")
 	availabilityFlag := registerCommand.String("availability", "", "promise availability, must more than 98%, eg: 98%, 99%, 99.9%")
@@ -70,7 +72,7 @@ func main() {
 	if len(os.Args) == 1 {
 		fmt.Printf("usage: %s <command> [<args>]\n", os.Args[0])
 		fmt.Println("The most commonly used commands are: ")
-		fmt.Println(" register [-configDir config-dir] [-trackerServer tracker-server-and-port] [-host outer-host] [-dynamicDomain dynamic-domain] [-port outer-port] -walletAddress wallet-address -billEmail bill-email -downBandwidth down-bandwidth -upBandwidth up-bandwidth -availability availability-percentage -mainStoragePath storage-path -mainStorageVolume storage-volume -extraStorage extra-storage-string")
+		fmt.Println(" register [-configDir config-dir] [-trackerServer tracker-server-and-port] [-listen listen-address-and-port] [-host outer-host] [-dynamicDomain dynamic-domain] [-port outer-port] -walletAddress wallet-address -billEmail bill-email -downBandwidth down-bandwidth -upBandwidth up-bandwidth -availability availability-percentage -mainStoragePath storage-path -mainStorageVolume storage-volume -extraStorage extra-storage-string")
 		registerCommand.PrintDefaults()
 		fmt.Println(" verifyEmail [-configDir config-dir] [-trackerServer tracker-server-and-port] -verifyCode verify-code")
 		verifyEmailCommand.PrintDefaults()
@@ -89,7 +91,7 @@ func main() {
 		daemon(*daemonConfigDirFlag, *daemonTrackerServerFlag, *listenFlag)
 	case "register":
 		registerCommand.Parse(os.Args[2:])
-		register(*registerConfigDirFlag, *registerTrackerServerFlag, *walletAddressFlag, *billEmailFlag, *availabilityFlag,
+		register(*registerConfigDirFlag, *registerTrackerServerFlag, *registerListenFlag, *walletAddressFlag, *billEmailFlag, *availabilityFlag,
 			*upBandwidthFlag, *downBandwidthFlag, *portFlag, *hostFlag, *dynamicDomainFlag, *mainStoragePathFlag, *mainStorageVolumeFlag, *extraStorageFlag)
 	case "addStorage":
 		addStorageCommand.Parse(os.Args[2:])
@@ -200,7 +202,7 @@ func daemon(configDir string, trackerServer string, listen string) {
 	grpcServer.Serve(lis)
 }
 
-func register(configDir string, trackerServer string, walletAddress string, billEmail string,
+func register(configDir string, trackerServer string, listen string, walletAddress string, billEmail string,
 	availability string, upBandwidth uint, downBandwidth uint, port uint, host string, dynamicDomain string,
 	mainStoragePath string, mainStorageVolume string, extraStorageFlag string) {
 	err := config.LoadConfig(configDir)
@@ -289,7 +291,7 @@ func register(configDir string, trackerServer string, walletAddress string, bill
 	// TODO speed test
 	testUpBandwidthBps := upBandwidthBps
 	testDownBandwidthBps := downBandwidthBps
-	doRegister(configDir, trackerServer, walletAddress, billEmail, availFloat, upBandwidthBps, downBandwidthBps, testUpBandwidthBps, testDownBandwidthBps, uint32(port), host, dynamicDomain, mainStoragePath, mainStorageVolumeByte, nil)
+	doRegister(configDir, trackerServer, listen, walletAddress, billEmail, availFloat, upBandwidthBps, downBandwidthBps, testUpBandwidthBps, testDownBandwidthBps, uint32(port), host, dynamicDomain, mainStoragePath, mainStorageVolumeByte, nil)
 }
 
 func encrypt(pubKey *rsa.PublicKey, data []byte) []byte {
@@ -301,7 +303,7 @@ func encrypt(pubKey *rsa.PublicKey, data []byte) []byte {
 	return res
 }
 
-func doRegister(configDir string, trackerServer string, walletAddress string, billEmail string,
+func doRegister(configDir string, trackerServer string, listen string, walletAddress string, billEmail string,
 	availability float64, upBandwidth uint64, downBandwidth uint64,
 	testUpBandwidth uint64, testDownBandwidth uint64, port uint32, host string,
 	dynamicDomain string, mainStoragePath string, mainStorageVolume uint64, extraStorage map[string]uint64) {
@@ -333,6 +335,9 @@ func doRegister(configDir string, trackerServer string, walletAddress string, bi
 		fmt.Println("not specify host and dynamic domain, will use: " + clientIp)
 		host = clientIp
 	}
+	grpcServer := grpc.NewServer()
+	go startPingServer(listen, grpcServer)
+	defer grpcServer.GracefulStop()
 	code, errMsg, err := client.Register(prsc, encrypt(pubKey, no.NodeId),
 		encrypt(pubKey, no.PubKeyBytes), encrypt(pubKey, no.EncryptKey["0"]), encrypt(pubKey, []byte(pc.WalletAddress)),
 		encrypt(pubKey, []byte(pc.BillEmail)), mainStorageVolume, upBandwidth, downBandwidth,
@@ -349,6 +354,32 @@ func doRegister(configDir string, trackerServer string, walletAddress string, bi
 	fmt.Println("Register success, please recieve verify code email to verify bill email and backup your config file: " + path)
 }
 
+func startPingServer(listen string, grpcServer *grpc.Server) {
+	lis, err := net.Listen("tcp", listen)
+	if err != nil {
+		fmt.Printf("failed to listen: %s, error: %s\n", listen, err.Error())
+		return
+	}
+	pb.RegisterProviderServiceServer(grpcServer, &pingProviderService{})
+	grpcServer.Serve(lis)
+}
+
+type pingProviderService struct {
+}
+
+func (self *pingProviderService) Ping(ctx context.Context, req *pb.PingReq) (*pb.PingResp, error) {
+	return &pb.PingResp{}, nil
+}
+
+func (self *pingProviderService) Store(stream pb.ProviderService_StoreServer) error {
+	return nil
+}
+func (self *pingProviderService) Retrieve(req *pb.RetrieveReq, stream pb.ProviderService_RetrieveServer) error {
+	return nil
+}
+func (self *pingProviderService) GetFragment(ctx context.Context, req *pb.GetFragmentReq) (*pb.GetFragmentResp, error) {
+	return nil, nil
+}
 func addStorage(configDir string, trackerServer string, path string, volume string) {
 	fmt.Printf("addStorage path:%s, volume:%s\n", path, volume)
 	//TODO
