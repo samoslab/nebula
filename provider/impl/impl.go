@@ -1,8 +1,6 @@
 package impl
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -34,7 +32,6 @@ const slash = "/"
 var skip_check_auth = false
 
 const sep = string(os.PathSeparator)
-const timestamp_expired = 900
 
 type ProviderService struct {
 	Node       *node.Node
@@ -110,29 +107,6 @@ func (self *ProviderService) Close() {
 	self.ProviderDb.Close()
 }
 
-func (self *ProviderService) checkAuth(method string, auth []byte, key []byte, fileSize uint64, timestamp uint64, ticket string) error {
-	if skip_check_auth {
-		return nil
-	}
-	if len(key) < 4 {
-		return errors.New("empty key")
-	}
-	nowTs := uint64(time.Now().Unix())
-	if nowTs-timestamp > timestamp_expired {
-		return errors.New("auth info expired")
-	}
-	hash := hmac.New(sha256.New, self.Node.PubKeyBytes)
-	hash.Write([]byte(method))
-	hash.Write(key)
-	hash.Write(util_bytes.FromUint64(fileSize))
-	hash.Write(util_bytes.FromUint64(timestamp))
-	hash.Write([]byte(ticket))
-	if util_bytes.SameBytes(auth, hash.Sum(nil)) {
-		return nil
-	}
-	return errors.New("auth verify failed")
-}
-
 func (self *ProviderService) Ping(ctx context.Context, req *pb.PingReq) (*pb.PingResp, error) {
 	return &pb.PingResp{}, nil
 }
@@ -159,9 +133,11 @@ func (self *ProviderService) Store(stream pb.ProviderService_StoreServer) error 
 			ticket = req.Ticket
 			key = req.Key
 			fileSize = req.FileSize
-			if err = self.checkAuth("Store", req.Auth, req.Key, req.FileSize, req.Timestamp, ticket); err != nil {
-				log.Warnf("check auth failed: %s", err.Error())
-				return err
+			if !skip_check_auth {
+				if err = req.CheckAuth(self.Node.PubKeyBytes); err != nil {
+					log.Warnf("check auth failed: %s", err.Error())
+					return err
+				}
 			}
 			filename := hex.EncodeToString(req.Key)
 			if self.queryByKey(req.Key) != nil {
@@ -217,8 +193,10 @@ func (self *ProviderService) Store(stream pb.ProviderService_StoreServer) error 
 }
 
 func (self *ProviderService) Retrieve(req *pb.RetrieveReq, stream pb.ProviderService_RetrieveServer) error {
-	if err := self.checkAuth("Retrieve", req.Auth, req.Key, req.FileSize, req.Timestamp, req.Ticket); err != nil {
-		return err
+	if !skip_check_auth {
+		if err := req.CheckAuth(self.Node.PubKeyBytes); err != nil {
+			return err
+		}
 	}
 	subPath, bigFile, storageIdx, position, fileSize := self.querySubPath(req.Key)
 	if subPath == "" {
@@ -324,9 +302,11 @@ func (self *ProviderService) GetFragment(ctx context.Context, req *pb.GetFragmen
 			return nil, errors.New("posisiton out of bounds, Posistion " + strconv.Itoa(i) + ": " + strconv.Itoa(int(b)))
 		}
 	}
-	if err := self.checkAuth("GetFragment", req.Auth, req.Key, uint64(req.Size), req.Timestamp, ""); err != nil {
-		log.Warnf("check auth failed: %s", err.Error())
-		return nil, err
+	if !skip_check_auth {
+		if err := req.CheckAuth(self.Node.PubKeyBytes); err != nil {
+			log.Warnf("check auth failed: %s", err.Error())
+			return nil, err
+		}
 	}
 	subPath, bigFile, storageIdx, position, size := self.querySubPath(req.Key)
 	if subPath == "" {
