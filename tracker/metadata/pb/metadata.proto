@@ -67,7 +67,7 @@ message ReplicaProvider{
     bytes nodeId=1;
     string server=2;
     uint32 port=3;
-    uint64 timestamp=4;
+    uint64 timestamp=4;// use as req timestamp argument to call provider api
     string ticket=5;
     bytes auth=6;
 }
@@ -91,25 +91,21 @@ message PieceHashAndSize{
     uint32 size=2;
 }
 
-message ErasureCodeProvider{
+message UploadFilePrepareResp{
+    repeated ErasureCodePartition partition=1;
+}
+
+message ErasureCodePartition{
+    repeated BlockProviderAuth providerAuth=1;
+    uint64 timestamp=2;// use as req timestamp argument to call provider api 
+}
+
+message BlockProviderAuth{
     bytes nodeId=1;
     string server=2;
     uint32 port=3;
-    bool spare=4;
-}
-message UploadFilePrepareResp{
-    map<uint32, ErasureCodeProvider> provider = 1;
-    repeated PartitionAuth partitionAuth=2;
-    uint64 timestamp=3;
-}
-
-message PartitionAuth{
-    repeated BlockAuth blockAuth=1;
-}
-
-message BlockAuth{
-    uint32 id=1; // ref UploadFilePrepareResp provider map key
-    repeated PieceHashAuth hashAuth=2;// spare provider have mutiple PieceHashAuth,  They are standby provider for multiple piece.
+    bool spare=4;// true will  have mutiple PieceHashAuth, false have single PieceHashAuth
+    repeated PieceHashAuth hashAuth=5;// spare provider have mutiple PieceHashAuth,  They are standby provider for multiple piece.
 }
 
 message PieceHashAuth{
@@ -198,7 +194,7 @@ message RetrieveFileResp{
     string errMsg=2;
     bytes fileData=3;// not nil if tiny file
     repeated RetrievePartition partition=4;// nil if tiny file
-    uint64 timestamp=5;// for provider auth check
+    uint64 timestamp=5;// // use as req timestamp argument to call provider api 
 }
 
 message RetrievePartition{
