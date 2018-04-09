@@ -9,41 +9,42 @@ import (
 	util_bytes "github.com/spolabs/nebula/util/bytes"
 )
 
-func (req *MkFolderReq) hash() []byte {
+func (self *MkFolderReq) hash() []byte {
 	hasher := sha256.New()
-	hasher.Write(req.NodeId)
-	hasher.Write(util_bytes.FromUint64(req.Timestamp))
-	hasher.Write([]byte(req.Path))
-	for _, f := range req.Folder {
+	hasher.Write(self.NodeId)
+	hasher.Write(util_bytes.FromUint64(self.Timestamp))
+	hasher.Write([]byte(self.Path))
+	for _, f := range self.Folder {
 		hasher.Write([]byte(f))
 	}
 	return hasher.Sum(nil)
 }
 
-func (req *MkFolderReq) SignReq(priKey *rsa.PrivateKey) ([]byte, error) {
-	return rsa.SignPKCS1v15(rand.Reader, priKey, crypto.SHA256, req.hash())
+func (self *MkFolderReq) SignReq(priKey *rsa.PrivateKey) (err error) {
+	self.Sign, err = rsa.SignPKCS1v15(rand.Reader, priKey, crypto.SHA256, self.hash())
+	return
 }
 
-func (req *MkFolderReq) VerifySign(pubKey *rsa.PublicKey) error {
-	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, req.hash(), req.Sign)
+func (self *MkFolderReq) VerifySign(pubKey *rsa.PublicKey) error {
+	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, self.hash(), self.Sign)
 }
 
-func (req *CheckFileExistReq) hash() []byte {
+func (self *CheckFileExistReq) hash() []byte {
 	hasher := sha256.New()
-	hasher.Write(req.NodeId)
-	hasher.Write(util_bytes.FromUint64(req.Timestamp))
-	hasher.Write([]byte(req.FilePath))
-	hasher.Write(req.FileHash)
-	hasher.Write(util_bytes.FromUint64(req.FileSize))
-	hasher.Write([]byte(req.FileName))
-	hasher.Write(util_bytes.FromUint64(req.FileModTime))
-	hasher.Write(req.FileData)
-	if req.Interactive {
+	hasher.Write(self.NodeId)
+	hasher.Write(util_bytes.FromUint64(self.Timestamp))
+	hasher.Write([]byte(self.FilePath))
+	hasher.Write(self.FileHash)
+	hasher.Write(util_bytes.FromUint64(self.FileSize))
+	hasher.Write([]byte(self.FileName))
+	hasher.Write(util_bytes.FromUint64(self.FileModTime))
+	hasher.Write(self.FileData)
+	if self.Interactive {
 		hasher.Write([]byte{1})
 	} else {
 		hasher.Write([]byte{0})
 	}
-	if req.NewVersion {
+	if self.NewVersion {
 		hasher.Write([]byte{1})
 	} else {
 		hasher.Write([]byte{0})
@@ -51,21 +52,22 @@ func (req *CheckFileExistReq) hash() []byte {
 	return hasher.Sum(nil)
 }
 
-func (req *CheckFileExistReq) SignReq(priKey *rsa.PrivateKey) ([]byte, error) {
-	return rsa.SignPKCS1v15(rand.Reader, priKey, crypto.SHA256, req.hash())
+func (self *CheckFileExistReq) SignReq(priKey *rsa.PrivateKey) (err error) {
+	self.Sign, err = rsa.SignPKCS1v15(rand.Reader, priKey, crypto.SHA256, self.hash())
+	return
 }
 
-func (req *CheckFileExistReq) VerifySign(pubKey *rsa.PublicKey) error {
-	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, req.hash(), req.Sign)
+func (self *CheckFileExistReq) VerifySign(pubKey *rsa.PublicKey) error {
+	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, self.hash(), self.Sign)
 }
 
-func (req *UploadFilePrepareReq) hash() []byte {
+func (self *UploadFilePrepareReq) hash() []byte {
 	hasher := sha256.New()
-	hasher.Write(req.NodeId)
-	hasher.Write(util_bytes.FromUint64(req.Timestamp))
-	hasher.Write(req.FileHash)
-	hasher.Write(util_bytes.FromUint64(req.FileSize))
-	for _, p := range req.Partition {
+	hasher.Write(self.NodeId)
+	hasher.Write(util_bytes.FromUint64(self.Timestamp))
+	hasher.Write(self.FileHash)
+	hasher.Write(util_bytes.FromUint64(self.FileSize))
+	for _, p := range self.Partition {
 		for _, pi := range p.Piece {
 			hasher.Write(pi.Hash)
 			hasher.Write(util_bytes.FromUint32(pi.Size))
@@ -74,24 +76,25 @@ func (req *UploadFilePrepareReq) hash() []byte {
 	return hasher.Sum(nil)
 }
 
-func (req *UploadFilePrepareReq) SignReq(priKey *rsa.PrivateKey) ([]byte, error) {
-	return rsa.SignPKCS1v15(rand.Reader, priKey, crypto.SHA256, req.hash())
+func (self *UploadFilePrepareReq) SignReq(priKey *rsa.PrivateKey) (err error) {
+	self.Sign, err = rsa.SignPKCS1v15(rand.Reader, priKey, crypto.SHA256, self.hash())
+	return
 }
 
-func (req *UploadFilePrepareReq) VerifySign(pubKey *rsa.PublicKey) error {
-	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, req.hash(), req.Sign)
+func (self *UploadFilePrepareReq) VerifySign(pubKey *rsa.PublicKey) error {
+	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, self.hash(), self.Sign)
 }
 
-func (req *UploadFileDoneReq) hash() []byte {
+func (self *UploadFileDoneReq) hash() []byte {
 	hasher := sha256.New()
-	hasher.Write(req.NodeId)
-	hasher.Write(util_bytes.FromUint64(req.Timestamp))
-	hasher.Write([]byte(req.FilePath))
-	hasher.Write(req.FileHash)
-	hasher.Write(util_bytes.FromUint64(req.FileSize))
-	hasher.Write([]byte(req.FileName))
-	hasher.Write(util_bytes.FromUint64(req.FileModTime))
-	for _, p := range req.Partition {
+	hasher.Write(self.NodeId)
+	hasher.Write(util_bytes.FromUint64(self.Timestamp))
+	hasher.Write([]byte(self.FilePath))
+	hasher.Write(self.FileHash)
+	hasher.Write(util_bytes.FromUint64(self.FileSize))
+	hasher.Write([]byte(self.FileName))
+	hasher.Write(util_bytes.FromUint64(self.FileModTime))
+	for _, p := range self.Partition {
 		for _, b := range p.Block {
 			hasher.Write(b.Hash)
 			hasher.Write(util_bytes.FromUint32(b.Size))
@@ -106,12 +109,12 @@ func (req *UploadFileDoneReq) hash() []byte {
 			}
 		}
 	}
-	if req.Interactive {
+	if self.Interactive {
 		hasher.Write([]byte{1})
 	} else {
 		hasher.Write([]byte{0})
 	}
-	if req.NewVersion {
+	if self.NewVersion {
 		hasher.Write([]byte{1})
 	} else {
 		hasher.Write([]byte{0})
@@ -119,23 +122,24 @@ func (req *UploadFileDoneReq) hash() []byte {
 	return hasher.Sum(nil)
 }
 
-func (req *UploadFileDoneReq) SignReq(priKey *rsa.PrivateKey) ([]byte, error) {
-	return rsa.SignPKCS1v15(rand.Reader, priKey, crypto.SHA256, req.hash())
+func (self *UploadFileDoneReq) SignReq(priKey *rsa.PrivateKey) (err error) {
+	self.Sign, err = rsa.SignPKCS1v15(rand.Reader, priKey, crypto.SHA256, self.hash())
+	return
 }
 
-func (req *UploadFileDoneReq) VerifySign(pubKey *rsa.PublicKey) error {
-	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, req.hash(), req.Sign)
+func (self *UploadFileDoneReq) VerifySign(pubKey *rsa.PublicKey) error {
+	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, self.hash(), self.Sign)
 }
 
-func (req *ListFilesReq) hash() []byte {
+func (self *ListFilesReq) hash() []byte {
 	hasher := sha256.New()
-	hasher.Write(req.NodeId)
-	hasher.Write(util_bytes.FromUint64(req.Timestamp))
-	hasher.Write([]byte(req.Path))
-	hasher.Write(util_bytes.FromUint32(req.PageSize))
-	hasher.Write(util_bytes.FromUint32(req.PageNum))
-	hasher.Write([]byte(req.SortType.String()))
-	if req.AscOrder {
+	hasher.Write(self.NodeId)
+	hasher.Write(util_bytes.FromUint64(self.Timestamp))
+	hasher.Write([]byte(self.Path))
+	hasher.Write(util_bytes.FromUint32(self.PageSize))
+	hasher.Write(util_bytes.FromUint32(self.PageNum))
+	hasher.Write([]byte(self.SortType.String()))
+	if self.AscOrder {
 		hasher.Write([]byte{1})
 	} else {
 		hasher.Write([]byte{0})
@@ -143,37 +147,39 @@ func (req *ListFilesReq) hash() []byte {
 	return hasher.Sum(nil)
 }
 
-func (req *ListFilesReq) SignReq(priKey *rsa.PrivateKey) ([]byte, error) {
-	return rsa.SignPKCS1v15(rand.Reader, priKey, crypto.SHA256, req.hash())
+func (self *ListFilesReq) SignReq(priKey *rsa.PrivateKey) (err error) {
+	self.Sign, err = rsa.SignPKCS1v15(rand.Reader, priKey, crypto.SHA256, self.hash())
+	return
 }
 
-func (req *ListFilesReq) VerifySign(pubKey *rsa.PublicKey) error {
-	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, req.hash(), req.Sign)
+func (self *ListFilesReq) VerifySign(pubKey *rsa.PublicKey) error {
+	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, self.hash(), self.Sign)
 }
 
-func (req *RetrieveFileReq) hash() []byte {
+func (self *RetrieveFileReq) hash() []byte {
 	hasher := sha256.New()
-	hasher.Write(req.NodeId)
-	hasher.Write(util_bytes.FromUint64(req.Timestamp))
-	hasher.Write(req.FileHash)
-	hasher.Write(util_bytes.FromUint64(req.FileSize))
+	hasher.Write(self.NodeId)
+	hasher.Write(util_bytes.FromUint64(self.Timestamp))
+	hasher.Write(self.FileHash)
+	hasher.Write(util_bytes.FromUint64(self.FileSize))
 	return hasher.Sum(nil)
 }
 
-func (req *RetrieveFileReq) SignReq(priKey *rsa.PrivateKey) ([]byte, error) {
-	return rsa.SignPKCS1v15(rand.Reader, priKey, crypto.SHA256, req.hash())
+func (self *RetrieveFileReq) SignReq(priKey *rsa.PrivateKey) (err error) {
+	self.Sign, err = rsa.SignPKCS1v15(rand.Reader, priKey, crypto.SHA256, self.hash())
+	return
 }
 
-func (req *RetrieveFileReq) VerifySign(pubKey *rsa.PublicKey) error {
-	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, req.hash(), req.Sign)
+func (self *RetrieveFileReq) VerifySign(pubKey *rsa.PublicKey) error {
+	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, self.hash(), self.Sign)
 }
 
-func (req *RemoveReq) hash() []byte {
+func (self *RemoveReq) hash() []byte {
 	hasher := sha256.New()
-	hasher.Write(req.NodeId)
-	hasher.Write(util_bytes.FromUint64(req.Timestamp))
-	hasher.Write([]byte(req.Path))
-	if req.Recursive {
+	hasher.Write(self.NodeId)
+	hasher.Write(util_bytes.FromUint64(self.Timestamp))
+	hasher.Write([]byte(self.Path))
+	if self.Recursive {
 		hasher.Write([]byte{1})
 	} else {
 		hasher.Write([]byte{0})
@@ -181,10 +187,11 @@ func (req *RemoveReq) hash() []byte {
 	return hasher.Sum(nil)
 }
 
-func (req *RemoveReq) SignReq(priKey *rsa.PrivateKey) ([]byte, error) {
-	return rsa.SignPKCS1v15(rand.Reader, priKey, crypto.SHA256, req.hash())
+func (self *RemoveReq) SignReq(priKey *rsa.PrivateKey) (err error) {
+	self.Sign, err = rsa.SignPKCS1v15(rand.Reader, priKey, crypto.SHA256, self.hash())
+	return
 }
 
-func (req *RemoveReq) VerifySign(pubKey *rsa.PublicKey) error {
-	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, req.hash(), req.Sign)
+func (self *RemoveReq) VerifySign(pubKey *rsa.PublicKey) error {
+	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, self.hash(), self.Sign)
 }
