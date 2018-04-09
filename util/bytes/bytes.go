@@ -1,29 +1,30 @@
 package bytes
 
-func SameBytes(b1 []byte, b2 []byte) bool {
-	if b1 == nil {
-		if b2 == nil {
-			return true
-		} else {
-			return false
-		}
-	} else {
-		if b2 == nil {
-			return false
-		} else {
-			if len(b1) != len(b2) {
-				return false
-			} else {
-				for idx, v1 := range b1 {
-					if v1 != b2[idx] {
-						return false
-					}
-				}
-				return true
-			}
-		}
-	}
-}
+//bytes.Equal
+// func SameBytes(b1 []byte, b2 []byte) bool {
+// 	if b1 == nil {
+// 		if b2 == nil {
+// 			return true
+// 		} else {
+// 			return false
+// 		}
+// 	} else {
+// 		if b2 == nil {
+// 			return false
+// 		} else {
+// 			if len(b1) != len(b2) {
+// 				return false
+// 			} else {
+// 				for idx, v1 := range b1 {
+// 					if v1 != b2[idx] {
+// 						return false
+// 					}
+// 				}
+// 				return true
+// 			}
+// 		}
+// 	}
+// }
 
 func FillUint32(b []byte, startIdx int, val uint32) {
 	for i := 3; i >= 0; i-- {

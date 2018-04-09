@@ -136,7 +136,7 @@ message StorePartition{
 
 message StoreBlock{
     bytes hash=1;
-    uint32 size=2;
+    uint64 size=2;
     uint32 blockSeq=3;
     bool checksum=4;
     repeated bytes storeNodeId=5;
@@ -203,7 +203,7 @@ message RetrievePartition{
 
 message RetrieveBlock{
     bytes hash=1;
-    uint32 size=2;
+    uint64 size=2;
     uint32 blockSeq=3;
     bool checksum=4;
     repeated RetrieveNode storeNode=5;

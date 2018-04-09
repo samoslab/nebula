@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
-	"math"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -25,33 +24,6 @@ func GetPublicKey(client pb.ProviderRegisterServiceClient) (pubKey []byte, ip st
 	return resp.PublicKey, resp.Ip, nil
 }
 
-func signRegisterReq(req *pb.RegisterReq, priKey *rsa.PrivateKey) {
-	hasher := sha256.New()
-	hasher.Write(util_bytes.FromUint64(req.Timestamp))
-	hasher.Write(req.NodeIdEnc)
-	hasher.Write(req.PublicKeyEnc)
-	hasher.Write(req.EncryptKeyEnc)
-	hasher.Write(req.WalletAddressEnc)
-	hasher.Write(req.BillEmailEnc)
-	hasher.Write(util_bytes.FromUint64(req.MainStorageVolume))
-	hasher.Write(util_bytes.FromUint64(req.UpBandwidth))
-	hasher.Write(util_bytes.FromUint64(req.DownBandwidth))
-	hasher.Write(util_bytes.FromUint64(req.TestUpBandwidth))
-	hasher.Write(util_bytes.FromUint64(req.TestDownBandwidth))
-	hasher.Write(util_bytes.FromUint64(math.Float64bits(req.Availability)))
-	hasher.Write(util_bytes.FromUint32(req.Port))
-	hasher.Write(req.HostEnc)
-	hasher.Write(req.DynamicDomainEnc)
-	for _, val := range req.ExtraStorageVolume {
-		hasher.Write(util_bytes.FromUint64(val))
-	}
-	sign, err := rsa.SignPKCS1v15(rand.Reader, priKey, crypto.SHA256, hasher.Sum(nil))
-	if err != nil {
-		log.Fatal("sign Register error: " + err.Error())
-	}
-	req.Sign = sign
-}
-
 func Register(client pb.ProviderRegisterServiceClient, nodeIdEnc []byte, publicKeyEnc []byte,
 	encryptKeyEnc []byte, walletAddressEnc []byte, billEmailEnc []byte, mainStorageVolume uint64,
 	upBandwidth uint64, downBandwidth uint64, testUpBandwidth uint64, testDownBandwidth uint64,
@@ -59,7 +31,8 @@ func Register(client pb.ProviderRegisterServiceClient, nodeIdEnc []byte, publicK
 	extraStorageVolume []uint64, priKey *rsa.PrivateKey) (code uint32, errMsg string, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	req := &pb.RegisterReq{NodeIdEnc: nodeIdEnc,
+	req := &pb.RegisterReq{Timestamp: uint64(time.Now().Unix()),
+		NodeIdEnc:          nodeIdEnc,
 		PublicKeyEnc:       publicKeyEnc,
 		EncryptKeyEnc:      encryptKeyEnc,
 		WalletAddressEnc:   walletAddressEnc,
@@ -74,10 +47,10 @@ func Register(client pb.ProviderRegisterServiceClient, nodeIdEnc []byte, publicK
 		HostEnc:            hostEnc,
 		DynamicDomainEnc:   dynamicDomainEnc,
 		ExtraStorageVolume: extraStorageVolume}
-	signRegisterReq(req, priKey)
+	req.SignReq(priKey)
 	resp, err := client.Register(ctx, req)
 	if err != nil {
-		return 0, "", err
+		return 1000, "", err
 	}
 	return resp.Code, resp.ErrMsg, nil
 }

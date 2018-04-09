@@ -56,10 +56,13 @@ func LoadFormConfig() *Node {
 
 	return &Node{NodeId: nodeId, PubKey: pubK, PriKey: priK, PubKeyBytes: pubKeyBytes, EncryptKey: m}
 }
+
+const RSA_KEY_BYTES = 256
+
 func NewNode(difficulty int) *Node {
 	n := &Node{}
 	for {
-		pk, err := rsa.GenerateKey(rand.Reader, 2048)
+		pk, err := rsa.GenerateKey(rand.Reader, 256*8)
 		if err != nil {
 			log.Fatalf("GenerateKey failed:%s", err.Error())
 		}

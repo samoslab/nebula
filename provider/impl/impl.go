@@ -1,6 +1,7 @@
 package impl
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -176,7 +177,7 @@ func (self *ProviderService) Store(stream pb.ProviderService_StoreServer) error 
 	if err != nil {
 		return err
 	}
-	if !util_bytes.SameBytes(hash, key) {
+	if !bytes.Equal(hash, key) {
 		return errors.New("hash verify failed")
 	}
 	if err := self.saveFile(key, fileSize, tempFilePath, storage); err != nil {
@@ -215,7 +216,7 @@ func (self *ProviderService) Retrieve(req *pb.RetrieveReq, stream pb.ProviderSer
 	if err != nil {
 		return err
 	}
-	if !util_bytes.SameBytes(hash, req.Key) {
+	if !bytes.Equal(hash, req.Key) {
 		return errors.New("hash verify failed")
 	}
 	file, err := os.Open(path)
@@ -325,7 +326,7 @@ func (self *ProviderService) GetFragment(ctx context.Context, req *pb.GetFragmen
 	if err != nil {
 		return nil, err
 	}
-	if !util_bytes.SameBytes(hash, req.Key) {
+	if !bytes.Equal(hash, req.Key) {
 		return nil, errors.New("hash verify failed")
 	}
 	var fileSize uint64

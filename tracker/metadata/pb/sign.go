@@ -97,7 +97,7 @@ func (self *UploadFileDoneReq) hash() []byte {
 	for _, p := range self.Partition {
 		for _, b := range p.Block {
 			hasher.Write(b.Hash)
-			hasher.Write(util_bytes.FromUint32(b.Size))
+			hasher.Write(util_bytes.FromUint64(b.Size))
 			hasher.Write(util_bytes.FromUint32(b.BlockSeq))
 			if b.Checksum {
 				hasher.Write([]byte{1})

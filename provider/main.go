@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/hex"
@@ -21,6 +20,7 @@ import (
 	pb "github.com/spolabs/nebula/provider/pb"
 	client "github.com/spolabs/nebula/provider/register_client"
 	trp_pb "github.com/spolabs/nebula/tracker/register/provider/pb"
+	util_rsa "github.com/spolabs/nebula/util/rsa"
 	"google.golang.org/grpc"
 )
 
@@ -203,6 +203,11 @@ func daemon(configDir string, trackerServer string, listen string) {
 func register(configDir string, trackerServer string, walletAddress string, billEmail string,
 	availability string, upBandwidth uint, downBandwidth uint, port uint, host string, dynamicDomain string,
 	mainStoragePath string, mainStorageVolume string, extraStorageFlag string) {
+	err := config.LoadConfig(configDir)
+	if err == nil {
+		fmt.Println("config file is adready exsits: " + configDir)
+		os.Exit(2)
+	}
 	if len(walletAddress) == 0 {
 		fmt.Println("walletAddress is required.")
 		os.Exit(3)
@@ -288,7 +293,7 @@ func register(configDir string, trackerServer string, walletAddress string, bill
 }
 
 func encrypt(pubKey *rsa.PublicKey, data []byte) []byte {
-	res, err := rsa.EncryptPKCS1v15(rand.Reader, pubKey, data)
+	res, err := util_rsa.EncryptLong(pubKey, data, node.RSA_KEY_BYTES)
 	if err != nil {
 		fmt.Println("public key encrypt error: " + err.Error())
 		os.Exit(16)
@@ -302,6 +307,7 @@ func doRegister(configDir string, trackerServer string, walletAddress string, bi
 	dynamicDomain string, mainStoragePath string, mainStorageVolume uint64, extraStorage map[string]uint64) {
 	no := node.NewNode(10)
 	pc := newProviderConfig(no, walletAddress, billEmail, availability, upBandwidth, downBandwidth, mainStoragePath, mainStorageVolume)
+	fmt.Println(trackerServer)
 	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
 	if err != nil {
 		fmt.Printf("RPC Dial failed: %s\n", err.Error())

@@ -1,6 +1,7 @@
 package provider_pb
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"errors"
@@ -28,7 +29,7 @@ func checkAuth(publicKeyBytes []byte, method string, key []byte, fileSize uint64
 	if uint64(time.Now().Unix())-timestamp > timestamp_expired {
 		return errors.New("auth expired")
 	}
-	if len(auth) > 0 && util_bytes.SameBytes(auth, genAuth(publicKeyBytes, method, key, fileSize, timestamp, ticket)) {
+	if len(auth) > 0 && bytes.Equal(auth, genAuth(publicKeyBytes, method, key, fileSize, timestamp, ticket)) {
 		return nil
 	}
 	return errors.New("auth verify failed")
