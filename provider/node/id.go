@@ -9,7 +9,7 @@ import (
 	"strconv"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/spolabs/nebula/provider/config"
+	"github.com/samoslab/nebula/provider/config"
 )
 
 type AesKey []byte // AesKey[0] is version, AesKey[1:] is real AES key

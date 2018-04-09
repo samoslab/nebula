@@ -9,9 +9,9 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/spolabs/nebula/provider/node"
-	pb "github.com/spolabs/nebula/tracker/register/provider/pb"
-	util_bytes "github.com/spolabs/nebula/util/bytes"
+	"github.com/samoslab/nebula/provider/node"
+	pb "github.com/samoslab/nebula/tracker/register/provider/pb"
+	util_bytes "github.com/samoslab/nebula/util/bytes"
 )
 
 func GetPublicKey(client pb.ProviderRegisterServiceClient) (pubKey []byte, ip string, err error) {

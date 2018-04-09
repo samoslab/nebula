@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	pbc "github.com/spolabs/nebula/tracker/register/client/pb"
-	pbp "github.com/spolabs/nebula/tracker/register/provider/pb"
+	pbc "github.com/samoslab/nebula/tracker/register/client/pb"
+	pbp "github.com/samoslab/nebula/tracker/register/provider/pb"
 	"google.golang.org/grpc"
 )
 

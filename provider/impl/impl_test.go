@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spolabs/nebula/provider/node"
-	util_bytes "github.com/spolabs/nebula/util/bytes"
+	"github.com/samoslab/nebula/provider/node"
+	util_bytes "github.com/samoslab/nebula/util/bytes"
 )
 
 func TestCheckAuth(t *testing.T) {

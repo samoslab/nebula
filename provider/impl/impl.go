@@ -15,13 +15,13 @@ import (
 	"github.com/boltdb/bolt"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"github.com/spolabs/nebula/provider/config"
-	"github.com/spolabs/nebula/provider/node"
-	pb "github.com/spolabs/nebula/provider/pb"
-	util_bytes "github.com/spolabs/nebula/util/bytes"
-	util_file "github.com/spolabs/nebula/util/file"
-	util_hash "github.com/spolabs/nebula/util/hash"
-	util_num "github.com/spolabs/nebula/util/num"
+	"github.com/samoslab/nebula/provider/config"
+	"github.com/samoslab/nebula/provider/node"
+	pb "github.com/samoslab/nebula/provider/pb"
+	util_bytes "github.com/samoslab/nebula/util/bytes"
+	util_file "github.com/samoslab/nebula/util/file"
+	util_hash "github.com/samoslab/nebula/util/hash"
+	util_num "github.com/samoslab/nebula/util/num"
 )
 
 const stream_data_size = 32 * 1024

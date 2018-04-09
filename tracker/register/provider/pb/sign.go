@@ -7,7 +7,7 @@ import (
 	"crypto/sha256"
 	"math"
 
-	util_bytes "github.com/spolabs/nebula/util/bytes"
+	util_bytes "github.com/samoslab/nebula/util/bytes"
 )
 
 func (self *RegisterReq) hash() []byte {

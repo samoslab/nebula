@@ -14,13 +14,13 @@ import (
 	"strings"
 
 	"github.com/skycoin/skycoin/src/cipher"
-	"github.com/spolabs/nebula/provider/config"
-	"github.com/spolabs/nebula/provider/impl"
-	"github.com/spolabs/nebula/provider/node"
-	pb "github.com/spolabs/nebula/provider/pb"
-	client "github.com/spolabs/nebula/provider/register_client"
-	trp_pb "github.com/spolabs/nebula/tracker/register/provider/pb"
-	util_rsa "github.com/spolabs/nebula/util/rsa"
+	"github.com/samoslab/nebula/provider/config"
+	"github.com/samoslab/nebula/provider/impl"
+	"github.com/samoslab/nebula/provider/node"
+	pb "github.com/samoslab/nebula/provider/pb"
+	client "github.com/samoslab/nebula/provider/register_client"
+	trp_pb "github.com/samoslab/nebula/tracker/register/provider/pb"
+	util_rsa "github.com/samoslab/nebula/util/rsa"
 	"google.golang.org/grpc"
 )
 

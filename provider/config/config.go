@@ -11,8 +11,8 @@ import (
 	"github.com/koding/multiconfig"
 	"github.com/robfig/cron"
 	log "github.com/sirupsen/logrus"
-	util_file "github.com/spolabs/nebula/util/file"
-	util_num "github.com/spolabs/nebula/util/num"
+	util_file "github.com/samoslab/nebula/util/file"
+	util_num "github.com/samoslab/nebula/util/num"
 )
 
 var NoConfErr = errors.New("not found config file")

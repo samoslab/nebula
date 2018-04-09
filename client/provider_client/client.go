@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	pb "github.com/spolabs/nebula/provider/pb"
-	util_hash "github.com/spolabs/nebula/util/hash"
+	pb "github.com/samoslab/nebula/provider/pb"
+	util_hash "github.com/samoslab/nebula/util/hash"
 	"golang.org/x/net/context"
 )
 

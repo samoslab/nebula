@@ -7,7 +7,7 @@ import (
 	"errors"
 	"time"
 
-	util_bytes "github.com/spolabs/nebula/util/bytes"
+	util_bytes "github.com/samoslab/nebula/util/bytes"
 )
 
 const timestamp_expired = 900

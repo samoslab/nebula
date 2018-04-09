@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	client "github.com/spolabs/nebula/client/provider_client"
-	pb "github.com/spolabs/nebula/provider/pb"
-	util_hash "github.com/spolabs/nebula/util/hash"
+	client "github.com/samoslab/nebula/client/provider_client"
+	pb "github.com/samoslab/nebula/provider/pb"
+	util_hash "github.com/samoslab/nebula/util/hash"
 	"google.golang.org/grpc"
 )
 

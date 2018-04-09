@@ -6,7 +6,7 @@ import (
 	"crypto/rsa"
 	"crypto/sha256"
 
-	util_bytes "github.com/spolabs/nebula/util/bytes"
+	util_bytes "github.com/samoslab/nebula/util/bytes"
 )
 
 func (self *VerifyContactEmailReq) hash() []byte {
