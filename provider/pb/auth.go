@@ -46,3 +46,15 @@ func (self *RetrieveReq) CheckAuth(publicKeyBytes []byte) error {
 func (self *GetFragmentReq) CheckAuth(publicKeyBytes []byte) error {
 	return checkAuth(publicKeyBytes, method_get_fragment, self.Key, uint64(self.Size), self.Timestamp, "", self.Auth)
 }
+
+func GenRetrieveAuth(publicKeyBytes []byte, hash []byte, size uint64, timestamp uint64, ticket string) []byte {
+	return genAuth(publicKeyBytes, method_retrieve, hash, size, timestamp, ticket)
+}
+
+func GenStoreAuth(publicKeyBytes []byte, hash []byte, size uint64, timestamp uint64, ticket string) []byte {
+	return genAuth(publicKeyBytes, method_store, hash, size, timestamp, ticket)
+}
+
+func GenGetFragmentAuth(publicKeyBytes []byte, hash []byte, size uint64, timestamp uint64) []byte {
+	return genAuth(publicKeyBytes, method_get_fragment, hash, size, timestamp, "")
+}
