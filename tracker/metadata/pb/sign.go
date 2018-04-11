@@ -13,7 +13,12 @@ func (self *MkFolderReq) hash() []byte {
 	hasher := sha256.New()
 	hasher.Write(self.NodeId)
 	hasher.Write(util_bytes.FromUint64(self.Timestamp))
-	hasher.Write([]byte(self.Path))
+	switch v := self.Parent.OneOfPath.(type) {
+	case *FilePath_Path:
+		hasher.Write([]byte(v.Path))
+	case *FilePath_Id:
+		hasher.Write(v.Id)
+	}
 	for _, f := range self.Folder {
 		hasher.Write([]byte(f))
 	}
@@ -33,7 +38,12 @@ func (self *CheckFileExistReq) hash() []byte {
 	hasher := sha256.New()
 	hasher.Write(self.NodeId)
 	hasher.Write(util_bytes.FromUint64(self.Timestamp))
-	hasher.Write([]byte(self.FilePath))
+	switch v := self.Parent.OneOfPath.(type) {
+	case *FilePath_Path:
+		hasher.Write([]byte(v.Path))
+	case *FilePath_Id:
+		hasher.Write(v.Id)
+	}
 	hasher.Write(self.FileHash)
 	hasher.Write(util_bytes.FromUint64(self.FileSize))
 	hasher.Write([]byte(self.FileName))
@@ -89,7 +99,12 @@ func (self *UploadFileDoneReq) hash() []byte {
 	hasher := sha256.New()
 	hasher.Write(self.NodeId)
 	hasher.Write(util_bytes.FromUint64(self.Timestamp))
-	hasher.Write([]byte(self.FilePath))
+	switch v := self.Parent.OneOfPath.(type) {
+	case *FilePath_Path:
+		hasher.Write([]byte(v.Path))
+	case *FilePath_Id:
+		hasher.Write(v.Id)
+	}
 	hasher.Write(self.FileHash)
 	hasher.Write(util_bytes.FromUint64(self.FileSize))
 	hasher.Write([]byte(self.FileName))
@@ -135,7 +150,12 @@ func (self *ListFilesReq) hash() []byte {
 	hasher := sha256.New()
 	hasher.Write(self.NodeId)
 	hasher.Write(util_bytes.FromUint64(self.Timestamp))
-	hasher.Write([]byte(self.Path))
+	switch v := self.Parent.OneOfPath.(type) {
+	case *FilePath_Path:
+		hasher.Write([]byte(v.Path))
+	case *FilePath_Id:
+		hasher.Write(v.Id)
+	}
 	hasher.Write(util_bytes.FromUint32(self.PageSize))
 	hasher.Write(util_bytes.FromUint32(self.PageNum))
 	hasher.Write([]byte(self.SortType.String()))
@@ -178,7 +198,12 @@ func (self *RemoveReq) hash() []byte {
 	hasher := sha256.New()
 	hasher.Write(self.NodeId)
 	hasher.Write(util_bytes.FromUint64(self.Timestamp))
-	hasher.Write([]byte(self.Path))
+	switch v := self.Target.OneOfPath.(type) {
+	case *FilePath_Path:
+		hasher.Write([]byte(v.Path))
+	case *FilePath_Id:
+		hasher.Write(v.Id)
+	}
 	if self.Recursive {
 		hasher.Write([]byte{1})
 	} else {
