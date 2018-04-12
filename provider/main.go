@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/prestonTao/upnp"
 	"github.com/samoslab/nebula/provider/config"
 	"github.com/samoslab/nebula/provider/impl"
 	"github.com/samoslab/nebula/provider/node"
@@ -190,6 +191,11 @@ func daemon(configDir string, trackerServer string, listen string) {
 	}
 	config.StartAutoCheck()
 	defer config.StopAutoCheck()
+	port, err := strconv.Atoi(strings.Split(listen, ":")[1])
+	if err != nil {
+		fmt.Println("listen addr or port error: " + err.Error())
+	}
+	portMapping(port)
 	lis, err := net.Listen("tcp", listen)
 	if err != nil {
 		fmt.Printf("failed to listen: %s, error: %s\n", listen, err.Error())
@@ -331,6 +337,13 @@ func doRegister(configDir string, trackerServer string, listen string, walletAdd
 	for _, v := range extraStorage {
 		extraStorageSlice = append(extraStorageSlice, v)
 	}
+	portMapping(int(port))
+	externalIp, err := externalIpAddr()
+	if err != nil {
+		fmt.Println("use upnp get outer ip failed: " + err.Error())
+	} else {
+		fmt.Println("use upnp get outer ip is: " + externalIp)
+	}
 	if host == "" && dynamicDomain == "" {
 		fmt.Println("not specify host and dynamic domain, will use: " + clientIp)
 		host = clientIp
@@ -406,4 +419,21 @@ func newProviderConfig(no *node.Node, walletAddress string, billEmail string,
 	}
 	pc.EncryptKey = m
 	return pc
+}
+
+func portMapping(port int) {
+	upnpMan := new(upnp.Upnp)
+	if err := upnpMan.AddPortMapping(port, port, "TCP"); err != nil {
+		fmt.Println("use upnp port mapping failed: " + err.Error())
+	} else {
+		fmt.Println("use upnp port mapping success.")
+	}
+}
+
+func externalIpAddr() (string, error) {
+	upnpMan := new(upnp.Upnp)
+	if err := upnpMan.ExternalIPAddr(); err != nil {
+		return "", err
+	}
+	return upnpMan.GatewayOutsideIP, nil
 }
