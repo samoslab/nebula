@@ -101,9 +101,12 @@ func RegisterClient(log *logrus.Logger, configDir, trackerServer string) error {
 	cc.PublicKey = no.PublicKeyStr()
 	cc.PrivateKey = no.PrivateKeyStr()
 	cc.NodeId = no.NodeIdStr()
-	config.CreateClientConfig(configDir, &cc)
+	err = config.SaveClientConfig(configDir, &cc)
+	if err != nil {
+		log.Infof("create config failed %v\n", err)
+		return err
+	}
 
-	//clientConfig := config.GetClientConfig()
 	rsp, err := doRegister(registerClient, &cc)
 	if err != nil {
 		log.Infof("register error %v", err)
@@ -141,7 +144,7 @@ func main() {
 		return
 	}
 
-	err = config.LoadConfig(*configDirOpt)
+	clientConfig, err := config.LoadConfig(*configDirOpt)
 	if err != nil {
 		if err == config.ErrNoConf {
 			fmt.Printf("Config file is not ready, please run \"%s register\" to register first\n", os.Args[0])
@@ -152,7 +155,6 @@ func main() {
 		}
 	}
 
-	clientConfig := config.GetClientConfig()
 	cm, err := daemon.NewClientManager(log, *trackerServer, clientConfig)
 	if err != nil {
 		return
