@@ -13,12 +13,12 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/samoslab/nebula/client/config"
+	"github.com/samoslab/nebula/client/daemon"
+	"github.com/samoslab/nebula/provider/node"
+	regpb "github.com/samoslab/nebula/tracker/register/client/pb"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
-	"github.com/spolabs/nebula/client/config"
-	"github.com/spolabs/nebula/client/daemon"
-	"github.com/spolabs/nebula/provider/node"
-	regpb "github.com/spolabs/nebula/tracker/register/client/pb"
 )
 
 // NewLogger create logger instance

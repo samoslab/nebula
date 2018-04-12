@@ -6,3 +6,8 @@ type HashFile struct {
 	FileHash   []byte
 	SliceIndex int
 }
+
+type MyPart struct {
+	Filename string
+	Pieces   []HashFile
+}
