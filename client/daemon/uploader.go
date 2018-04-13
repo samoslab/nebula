@@ -32,29 +32,43 @@ var (
 
 // ClientManager client manager
 type ClientManager struct {
-	mclient mpb.MatadataServiceClient
-	NodeId  []byte
-	TempDir string
-	log     *logrus.Logger
-	cfg     *config.ClientConfig
+	mclient    mpb.MatadataServiceClient
+	NodeId     []byte
+	TempDir    string
+	log        *logrus.Logger
+	cfg        *config.ClientConfig
+	serverConn *grpc.ClientConn
 }
 
 // NewClientManager create manager
 func NewClientManager(log *logrus.Logger, trackerServer string, cfg *config.ClientConfig) (*ClientManager, error) {
+	if trackerServer == "" {
+		return nil, errors.New("tracker server nil")
+	}
+	if cfg == nil {
+		return nil, errors.New("client config nil")
+	}
 	c := &ClientManager{}
 	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
 	if err != nil {
 		fmt.Printf("RPC Dial failed: %s", err.Error())
 		return nil, err
 	}
-	defer conn.Close()
+	fmt.Printf("tracker server %s\n", trackerServer)
+	//defer conn.Close()
+	c.serverConn = conn
 
 	c.mclient = mpb.NewMatadataServiceClient(conn)
 	c.log = log
 	c.TempDir = cfg.TempDir
-	c.NodeId = []byte(cfg.NodeId)
+	c.NodeId = cfg.Node.NodeId
 	c.cfg = cfg
 	return c, nil
+}
+
+// Shutdown shutdown tracker connection
+func (c *ClientManager) Shutdown() {
+	c.serverConn.Close()
 }
 
 // PingProvider ping provider
@@ -73,8 +87,10 @@ func (c *ClientManager) UploadFile(filename string) error {
 	if err != nil {
 		return err
 	}
+
+	fmt.Printf("rsp:%+v\n", rsp)
 	if rsp.GetCode() != 0 {
-		return nil
+		return fmt.Errorf("%s", rsp.GetErrMsg())
 	}
 	log.Info("upload file %s", filename)
 	// partition files if size > 256M
@@ -161,11 +177,28 @@ func (c *ClientManager) CheckFileExists(filename string) (*mpb.CheckFileExistReq
 		log.Errorf("stat file %s error %v", filename, err)
 		return nil, nil, err
 	}
+	dir, _ := filepath.Split(filename)
+	fmt.Printf("config:%+v\n", c.cfg)
 	ctx := context.Background()
 	req := &mpb.CheckFileExistReq{}
 	req.FileSize = uint64(fileInfo.Size())
+	req.Interactive = true
+	req.NewVersion = false
+	parent := &mpb.FilePath_Path{dir}
+	req.Parent = &mpb.FilePath{parent}
 	req.FileHash = hash
 	req.NodeId = c.NodeId
+	req.FileName = filename
+	req.Timestamp = uint64(time.Now().UTC().Unix())
+	mtime, err := GetFileModTime(filename)
+	if err != nil {
+		return nil, nil, err
+	}
+	req.FileModTime = uint64(mtime)
+	err = req.SignReq(c.cfg.Node.PriKey)
+	if err != nil {
+		return nil, nil, err
+	}
 	if fileInfo.Size() < ReplicaFileSize {
 		fileData, err := util_hash.GetFileData(filename)
 		if err != nil {
@@ -174,6 +207,7 @@ func (c *ClientManager) CheckFileExists(filename string) (*mpb.CheckFileExistReq
 		}
 		req.FileData = fileData
 	}
+	fmt.Printf("req:%v\n", req)
 	rsp, err := c.mclient.CheckFileExist(ctx, req)
 	return req, rsp, err
 }
@@ -291,16 +325,16 @@ func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitio
 	req.Parent = &mpb.FilePath{&mpb.FilePath_Path{"/folder1/folder2"}}
 	req.FileModTime = 1
 
-	var err error
-	req.Sign, err = SignatureMessage(c.cfg.PrivateKey, []byte(""))
+	rsaPrikey, err := x509.ParsePKCS1PrivateKey([]byte(c.cfg.PrivateKey))
+	if err != nil {
+		return err
+	}
+	err = req.SignReq(rsaPrikey)
 	if err != nil {
 		return err
 	}
 	req.Timestamp = uint64(time.Now().UTC().Unix())
 	req.Partition = partitions
-	//for _, partition := range partitions {
-	//req.Partition = append(req.Partition, partition)
-	//}
 	ctx := context.Background()
 	ufdrsp, err := c.mclient.UploadFileDone(ctx, req)
 	if err != nil {
@@ -319,8 +353,11 @@ func (c *ClientManager) ListFiles() (*mpb.ListFilesResp, error) {
 	req.PageNum = 1
 	req.SortType = mpb.SortType_Name
 	req.AscOrder = true
-	var err error
-	req.Sign, err = SignatureMessage(c.cfg.PrivateKey, []byte(""))
+	rsaPrikey, err := x509.ParsePKCS1PrivateKey([]byte(c.cfg.PrivateKey))
+	if err != nil {
+		return nil, err
+	}
+	err = req.SignReq(rsaPrikey)
 	if err != nil {
 		return nil, err
 	}
@@ -343,8 +380,11 @@ func (c *ClientManager) DownloadFile(fileInfo HashFile) error {
 	req.Timestamp = uint64(time.Now().UTC().Unix())
 	req.FileHash = []byte(fileInfo.FileHash)
 	req.FileSize = uint64(fileInfo.FileSize)
-	var err error
-	req.Sign, err = SignatureMessage(c.cfg.PrivateKey, []byte(""))
+	rsaPrikey, err := x509.ParsePKCS1PrivateKey([]byte(c.cfg.PrivateKey))
+	if err != nil {
+		return err
+	}
+	err = req.SignReq(rsaPrikey)
 	if err != nil {
 		return err
 	}
