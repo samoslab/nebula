@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/prestonTao/upnp"
 	"github.com/samoslab/nebula/provider/config"
 	"github.com/samoslab/nebula/provider/impl"
 	"github.com/samoslab/nebula/provider/node"
@@ -21,6 +22,7 @@ import (
 	trp_pb "github.com/samoslab/nebula/tracker/register/provider/pb"
 	util_rsa "github.com/samoslab/nebula/util/rsa"
 	"github.com/skycoin/skycoin/src/cipher"
+	"github.com/samoslab/nebula/provider/disk"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
@@ -190,6 +192,11 @@ func daemon(configDir string, trackerServer string, listen string) {
 	}
 	config.StartAutoCheck()
 	defer config.StopAutoCheck()
+	port, err := strconv.Atoi(strings.Split(listen, ":")[1])
+	if err != nil {
+		fmt.Println("listen addr or port error: " + err.Error())
+	}
+	portMapping(port)
 	lis, err := net.Listen("tcp", listen)
 	if err != nil {
 		fmt.Printf("failed to listen: %s, error: %s\n", listen, err.Error())
@@ -287,6 +294,19 @@ func register(configDir string, trackerServer string, listen string, walletAddre
 		fmt.Printf("mainStorageVolume: %s is not valid\n", origMainStorageVolume)
 		os.Exit(23)
 	}
+	total, free, err := disk.Space(mainStoragePath)
+	if err != nil {
+		fmt.Printf("read free space of path [%s] failed: %s\n", mainStoragePath, err.Error())
+		os.Exit(24)
+	}
+	if total < mainStorageVolumeByte {
+		fmt.Printf("path [%s] total space [%d] is less than %s\n", mainStoragePath, total, mainStorageVolume)
+		os.Exit(25)
+	}
+	if free < mainStorageVolumeByte {
+		fmt.Printf("path [%s] free space [%d] is less than %s\n", mainStoragePath, free, mainStorageVolume)
+		os.Exit(26)
+	}
 	// TODO support extra storage
 	// TODO speed test
 	testUpBandwidthBps := upBandwidthBps
@@ -309,7 +329,6 @@ func doRegister(configDir string, trackerServer string, listen string, walletAdd
 	dynamicDomain string, mainStoragePath string, mainStorageVolume uint64, extraStorage map[string]uint64) {
 	no := node.NewNode(10)
 	pc := newProviderConfig(no, walletAddress, billEmail, availability, upBandwidth, downBandwidth, mainStoragePath, mainStorageVolume)
-	fmt.Println(trackerServer)
 	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
 	if err != nil {
 		fmt.Printf("RPC Dial failed: %s\n", err.Error())
@@ -330,6 +349,13 @@ func doRegister(configDir string, trackerServer string, listen string, walletAdd
 	extraStorageSlice := make([]uint64, 0, len(extraStorage))
 	for _, v := range extraStorage {
 		extraStorageSlice = append(extraStorageSlice, v)
+	}
+	portMapping(int(port))
+	externalIp, err := externalIpAddr()
+	if err != nil {
+		fmt.Println("use upnp get outer ip failed: " + err.Error())
+	} else {
+		fmt.Println("use upnp get outer ip is: " + externalIp)
 	}
 	if host == "" && dynamicDomain == "" {
 		fmt.Println("not specify host and dynamic domain, will use: " + clientIp)
@@ -406,4 +432,21 @@ func newProviderConfig(no *node.Node, walletAddress string, billEmail string,
 	}
 	pc.EncryptKey = m
 	return pc
+}
+
+func portMapping(port int) {
+	upnpMan := new(upnp.Upnp)
+	if err := upnpMan.AddPortMapping(port, port, "TCP"); err != nil {
+		fmt.Println("use upnp port mapping failed: " + err.Error())
+	} else {
+		fmt.Println("use upnp port mapping success.")
+	}
+}
+
+func externalIpAddr() (string, error) {
+	upnpMan := new(upnp.Upnp)
+	if err := upnpMan.ExternalIPAddr(); err != nil {
+		return "", err
+	}
+	return upnpMan.GatewayOutsideIP, nil
 }
