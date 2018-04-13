@@ -22,7 +22,7 @@ import (
 	trp_pb "github.com/samoslab/nebula/tracker/register/provider/pb"
 	util_rsa "github.com/samoslab/nebula/util/rsa"
 	"github.com/skycoin/skycoin/src/cipher"
-	"github.com/spolabs/nebula/provider/disk"
+	"github.com/samoslab/nebula/provider/disk"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
