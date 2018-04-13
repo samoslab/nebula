@@ -22,6 +22,7 @@ import (
 	trp_pb "github.com/samoslab/nebula/tracker/register/provider/pb"
 	util_rsa "github.com/samoslab/nebula/util/rsa"
 	"github.com/skycoin/skycoin/src/cipher"
+	"github.com/spolabs/nebula/provider/disk"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
@@ -293,6 +294,19 @@ func register(configDir string, trackerServer string, listen string, walletAddre
 		fmt.Printf("mainStorageVolume: %s is not valid\n", origMainStorageVolume)
 		os.Exit(23)
 	}
+	total, free, err := disk.Space(mainStoragePath)
+	if err != nil {
+		fmt.Printf("read free space of path [%s] failed: %s\n", mainStoragePath, err.Error())
+		os.Exit(24)
+	}
+	if total < mainStorageVolumeByte {
+		fmt.Printf("path [%s] total space [%d] is less than %s\n", mainStoragePath, total, mainStorageVolume)
+		os.Exit(25)
+	}
+	if free < mainStorageVolumeByte {
+		fmt.Printf("path [%s] free space [%d] is less than %s\n", mainStoragePath, free, mainStorageVolume)
+		os.Exit(26)
+	}
 	// TODO support extra storage
 	// TODO speed test
 	testUpBandwidthBps := upBandwidthBps
@@ -315,7 +329,6 @@ func doRegister(configDir string, trackerServer string, listen string, walletAdd
 	dynamicDomain string, mainStoragePath string, mainStorageVolume uint64, extraStorage map[string]uint64) {
 	no := node.NewNode(10)
 	pc := newProviderConfig(no, walletAddress, billEmail, availability, upBandwidth, downBandwidth, mainStoragePath, mainStorageVolume)
-	fmt.Println(trackerServer)
 	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
 	if err != nil {
 		fmt.Printf("RPC Dial failed: %s\n", err.Error())
