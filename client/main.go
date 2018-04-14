@@ -172,6 +172,14 @@ func main() {
 	}
 	log.Infof("config dir %s", *configDirOpt)
 	log.Infof("tracker server %s", *trackerServer)
+	dir, _ := filepath.Split(*configDirOpt)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		//create the dir.
+		if err := os.MkdirAll(dir, 0744); err != nil {
+			panic(err)
+		}
+	}
+
 	if *regAction == "yes" {
 		RegisterClient(log, *configDirOpt, *trackerServer, *emailAddress)
 		return
