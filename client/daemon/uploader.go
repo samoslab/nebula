@@ -2,10 +2,6 @@ package daemon
 
 import (
 	"context"
-	"crypto"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/sha256"
 	"crypto/x509"
 	"errors"
 	"fmt"
@@ -16,6 +12,7 @@ import (
 
 	"github.com/samoslab/nebula/client/config"
 	client "github.com/samoslab/nebula/client/provider_client"
+	"github.com/samoslab/nebula/provider/node"
 	pb "github.com/samoslab/nebula/provider/pb"
 	mpb "github.com/samoslab/nebula/tracker/metadata/pb"
 	util_hash "github.com/samoslab/nebula/util/hash"
@@ -210,6 +207,34 @@ func (c *ClientManager) CheckFileExists(filename string) (*mpb.CheckFileExistReq
 	fmt.Printf("req:%v\n", req)
 	rsp, err := c.mclient.CheckFileExist(ctx, req)
 	return req, rsp, err
+}
+
+func (c *ClientManager) MkFolder(filepath string, folders []string, node *node.Node) (bool, error) {
+	log := c.log
+	ctx := context.Background()
+	//req.NodeId = c.NodeId
+	//err := req.SignReq(c.cfg.Node.PriKey)
+	req := &mpb.MkFolderReq{}
+	//parent := &mpb.FilePath_Path{filepath}
+	//req.Parent = &mpb.FilePath{parent}
+	req.Parent = &mpb.FilePath{&mpb.FilePath_Path{filepath}}
+	req.NodeId = node.NodeId
+	req.Folder = folders
+	fmt.Printf("parent:%+v\n", req.Parent)
+	fmt.Printf("folder:%+v\n", req.Folder)
+	req.Timestamp = uint64(time.Now().UTC().Unix())
+	fmt.Printf("mk nodeid:%x\n", node.NodeId)
+	fmt.Printf("mk prikey:%v\n", node.PriKey)
+	err := req.SignReq(node.PriKey)
+	if err != nil {
+		return false, err
+	}
+	log.Infof("make folder req:%v", req)
+	rsp, err := c.mclient.MkFolder(ctx, req)
+	if rsp.GetCode() != 0 {
+		return false, fmt.Errorf("%s", rsp.GetErrMsg())
+	}
+	return true, nil
 }
 
 func (c *ClientManager) OnlyFileSplit(filename string, dataNum, verifyNum int) ([]HashFile, error) {
@@ -464,20 +489,4 @@ func saveFile(fileName string, content []byte) error {
 		return err
 	}
 	return nil
-}
-
-// SignatureMessage sign message
-func SignatureMessage(privateKey string, message []byte) ([]byte, error) {
-	rsaPrikey, err := x509.ParsePKCS1PrivateKey([]byte(privateKey))
-	if err != nil {
-		return nil, err
-	}
-	rng := rand.Reader
-	hashed := sha256.Sum256(message)
-	sign, err := rsa.SignPKCS1v15(rng, rsaPrikey, crypto.SHA256, hashed[:])
-	if err != nil {
-		return nil, err
-	}
-
-	return sign, nil
 }
