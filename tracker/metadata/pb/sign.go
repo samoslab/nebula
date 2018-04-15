@@ -9,6 +9,9 @@ import (
 	util_bytes "github.com/samoslab/nebula/util/bytes"
 )
 
+var byte_slice_true = []byte{1}
+var byte_slice_false = []byte{0}
+
 func (self *MkFolderReq) hash() []byte {
 	hasher := sha256.New()
 	hasher.Write(self.NodeId)
@@ -21,6 +24,11 @@ func (self *MkFolderReq) hash() []byte {
 	}
 	for _, f := range self.Folder {
 		hasher.Write([]byte(f))
+	}
+	if self.Interactive {
+		hasher.Write(byte_slice_true)
+	} else {
+		hasher.Write(byte_slice_false)
 	}
 	return hasher.Sum(nil)
 }
@@ -48,16 +56,18 @@ func (self *CheckFileExistReq) hash() []byte {
 	hasher.Write(util_bytes.FromUint64(self.FileSize))
 	hasher.Write([]byte(self.FileName))
 	hasher.Write(util_bytes.FromUint64(self.FileModTime))
-	hasher.Write(self.FileData)
+	if len(self.FileData) > 0 {
+		hasher.Write(self.FileData)
+	}
 	if self.Interactive {
-		hasher.Write([]byte{1})
+		hasher.Write(byte_slice_true)
 	} else {
-		hasher.Write([]byte{0})
+		hasher.Write(byte_slice_false)
 	}
 	if self.NewVersion {
-		hasher.Write([]byte{1})
+		hasher.Write(byte_slice_true)
 	} else {
-		hasher.Write([]byte{0})
+		hasher.Write(byte_slice_false)
 	}
 	return hasher.Sum(nil)
 }
@@ -115,9 +125,9 @@ func (self *UploadFileDoneReq) hash() []byte {
 			hasher.Write(util_bytes.FromUint64(b.Size))
 			hasher.Write(util_bytes.FromUint32(b.BlockSeq))
 			if b.Checksum {
-				hasher.Write([]byte{1})
+				hasher.Write(byte_slice_true)
 			} else {
-				hasher.Write([]byte{0})
+				hasher.Write(byte_slice_false)
 			}
 			for _, by := range b.StoreNodeId {
 				hasher.Write(by)
@@ -125,14 +135,14 @@ func (self *UploadFileDoneReq) hash() []byte {
 		}
 	}
 	if self.Interactive {
-		hasher.Write([]byte{1})
+		hasher.Write(byte_slice_true)
 	} else {
-		hasher.Write([]byte{0})
+		hasher.Write(byte_slice_false)
 	}
 	if self.NewVersion {
-		hasher.Write([]byte{1})
+		hasher.Write(byte_slice_true)
 	} else {
-		hasher.Write([]byte{0})
+		hasher.Write(byte_slice_false)
 	}
 	return hasher.Sum(nil)
 }
@@ -160,9 +170,9 @@ func (self *ListFilesReq) hash() []byte {
 	hasher.Write(util_bytes.FromUint32(self.PageNum))
 	hasher.Write([]byte(self.SortType.String()))
 	if self.AscOrder {
-		hasher.Write([]byte{1})
+		hasher.Write(byte_slice_true)
 	} else {
-		hasher.Write([]byte{0})
+		hasher.Write(byte_slice_false)
 	}
 	return hasher.Sum(nil)
 }
@@ -205,9 +215,9 @@ func (self *RemoveReq) hash() []byte {
 		hasher.Write(v.Id)
 	}
 	if self.Recursive {
-		hasher.Write([]byte{1})
+		hasher.Write(byte_slice_true)
 	} else {
-		hasher.Write([]byte{0})
+		hasher.Write(byte_slice_false)
 	}
 	return hasher.Sum(nil)
 }
