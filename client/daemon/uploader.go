@@ -210,7 +210,7 @@ func (c *ClientManager) CheckFileExists(filename string) (*mpb.CheckFileExistReq
 	if err != nil {
 		return nil, nil, err
 	}
-	log.Infof("checkfileexist req:%s\n", req.GetFileHash())
+	log.Infof("checkfileexist req:%x\n", req.GetFileHash())
 	rsp, err := c.mclient.CheckFileExist(ctx, req)
 	return req, rsp, err
 }
@@ -223,6 +223,7 @@ func (c *ClientManager) MkFolder(filepath string, folders []string, node *node.N
 	req.Parent = &mpb.FilePath{&mpb.FilePath_Path{filepath}}
 	req.Folder = folders
 	req.NodeId = c.NodeId
+	req.Interactive = false
 	req.Timestamp = uint64(time.Now().UTC().Unix())
 	err := req.SignReq(node.PriKey)
 	if err != nil {
@@ -292,7 +293,7 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.ErasureCodePartitio
 	pclient := pb.NewProviderServiceClient(conn)
 
 	ha := onePartition.GetHashAuth()[0]
-	err = client.Store(pclient, fileInfo.FileName, ha.GetAuth(), ha.GetTicket(), pro.GetTimestamp(), fileInfo.FileHash, uint64(fileInfo.FileSize), first)
+	err = client.StorePiece(pclient, fileInfo.FileName, ha.GetAuth(), ha.GetTicket(), pro.GetTimestamp(), fileInfo.FileHash, uint64(fileInfo.FileSize), first)
 	if err != nil {
 		fmt.Println(err)
 		return nil, err
@@ -324,7 +325,7 @@ func (c *ClientManager) uploadFileToReplicaProvider(pro *mpb.ReplicaProvider, fi
 	log.Debugf("provider nodeid %x", pro.GetNodeId())
 	log.Debugf("provider time %d", pro.GetTimestamp())
 
-	err = client.Store(pclient, fileInfo.FileName, pro.GetAuth(), pro.GetTicket(), pro.GetTimestamp(), fileInfo.FileHash, uint64(fileInfo.FileSize), true)
+	err = client.StorePiece(pclient, fileInfo.FileName, pro.GetAuth(), pro.GetTicket(), pro.GetTimestamp(), fileInfo.FileHash, uint64(fileInfo.FileSize), true)
 	if err != nil {
 		log.Errorf("upload error %v\n", err)
 		return nil, err
@@ -384,7 +385,7 @@ func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitio
 		return err
 	}
 	ctx := context.Background()
-	c.log.Infof("upload file done req:%s", req.GetFileHash())
+	c.log.Infof("upload file done req:%x", req.GetFileHash())
 	ufdrsp, err := c.mclient.UploadFileDone(ctx, req)
 	if err != nil {
 		return err

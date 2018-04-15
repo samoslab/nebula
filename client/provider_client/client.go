@@ -26,7 +26,7 @@ func UpdateStoreReqAuth(obj *pb.StoreReq) *pb.StoreReq {
 	return obj
 }
 
-func StorePiece(client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, key []byte, fileSize uint64) error {
+func StorePiece(client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, tm uint64, key []byte, fileSize uint64, first bool) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		fmt.Printf("open file failed: %s", err.Error())
@@ -39,7 +39,6 @@ func StorePiece(client pb.ProviderServiceClient, filePath string, auth []byte, t
 		return err
 	}
 	defer stream.CloseSend()
-	first := true
 	buf := make([]byte, stream_data_size)
 	for {
 		bytesRead, err := file.Read(buf)
@@ -52,7 +51,7 @@ func StorePiece(client pb.ProviderServiceClient, filePath string, auth []byte, t
 		}
 		if first {
 			first = false
-			if err := stream.Send(UpdateStoreReqAuth(&pb.StoreReq{Data: buf[:bytesRead], Ticket: ticket, Key: key, FileSize: fileSize, Timestamp: uint64(time.Now().Unix())})); err != nil {
+			if err := stream.Send(UpdateStoreReqAuth(&pb.StoreReq{Data: buf[:bytesRead], Ticket: ticket, Auth: auth, Timestamp: tm, Key: key, FileSize: fileSize})); err != nil {
 				fmt.Printf("RPC Send StoreReq failed: %s", err.Error())
 				return err
 			}
