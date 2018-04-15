@@ -98,8 +98,12 @@ func (c *ClientManager) UploadFile(filename string) error {
 	log.Infof("start upload file %s", filename)
 	switch rsp.GetStoreType() {
 	case mpb.FileStoreType_MultiReplica:
-		log.Infof("upload manner is replication\n")
-		return c.uploadFileByMultiReplica(req, rsp)
+		log.Infof("upload manner is multi-replication\n")
+		partitions, err := c.uploadFileByMultiReplica(req, rsp)
+		if err != nil {
+			return err
+		}
+		return c.UploadFileDone(req, partitions)
 	case mpb.FileStoreType_ErasureCode:
 		log.Infof("upload manner erasure\n")
 		partFiles := []string{}
@@ -206,7 +210,7 @@ func (c *ClientManager) CheckFileExists(filename string) (*mpb.CheckFileExistReq
 	if err != nil {
 		return nil, nil, err
 	}
-	log.Infof("checkfileexist req:%s\n", req.GetFileName())
+	log.Infof("checkfileexist req:%s\n", req.GetFileHash())
 	rsp, err := c.mclient.CheckFileExist(ctx, req)
 	return req, rsp, err
 }
@@ -288,7 +292,7 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.ErasureCodePartitio
 	pclient := pb.NewProviderServiceClient(conn)
 
 	ha := onePartition.GetHashAuth()[0]
-	err = client.Store(pclient, fileInfo.FileName, ha.GetAuth(), ha.GetTicket(), fileInfo.FileHash, uint64(fileInfo.FileSize), first)
+	err = client.Store(pclient, fileInfo.FileName, ha.GetAuth(), ha.GetTicket(), pro.GetTimestamp(), fileInfo.FileHash, uint64(fileInfo.FileSize), first)
 	if err != nil {
 		fmt.Println(err)
 		return nil, err
@@ -303,14 +307,14 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.ErasureCodePartitio
 	return block, nil
 }
 
-func (c *ClientManager) uploadFileToReplicaProvider(pro *mpb.ReplicaProvider, fileInfo HashFile) error {
+func (c *ClientManager) uploadFileToReplicaProvider(pro *mpb.ReplicaProvider, fileInfo HashFile) ([]byte, error) {
 	log := c.log
 	server := fmt.Sprintf("%s:%d", pro.GetServer(), pro.GetPort())
 	log.Infof("upload to provider %s\n", server)
 	conn, err := grpc.Dial(server, grpc.WithInsecure())
 	if err != nil {
 		log.Errorf("RPC Dail failed: %v", err)
-		return err
+		return nil, err
 	}
 	defer conn.Close()
 	pclient := pb.NewProviderServiceClient(conn)
@@ -320,56 +324,75 @@ func (c *ClientManager) uploadFileToReplicaProvider(pro *mpb.ReplicaProvider, fi
 	log.Debugf("provider nodeid %x", pro.GetNodeId())
 	log.Debugf("provider time %d", pro.GetTimestamp())
 
-	err = client.Store(pclient, fileInfo.FileName, pro.GetAuth(), pro.GetTicket(), fileInfo.FileHash, uint64(fileInfo.FileSize), true)
+	err = client.Store(pclient, fileInfo.FileName, pro.GetAuth(), pro.GetTicket(), pro.GetTimestamp(), fileInfo.FileHash, uint64(fileInfo.FileSize), true)
 	if err != nil {
 		log.Errorf("upload error %v\n", err)
-		return err
+		return nil, err
 	}
 
-	return nil
+	log.Infof("upload file %s success", fileInfo.FileName)
+
+	return pro.GetNodeId(), nil
 }
 
-func (c *ClientManager) uploadFileByMultiReplica(req *mpb.CheckFileExistReq, rsp *mpb.CheckFileExistResp) error {
+func (c *ClientManager) uploadFileByMultiReplica(req *mpb.CheckFileExistReq, rsp *mpb.CheckFileExistResp) ([]*mpb.StorePartition, error) {
 
 	fileInfo := HashFile{}
 	fileInfo.FileName = req.FileName
 	fileInfo.FileSize = int64(req.FileSize)
 	fileInfo.FileHash = req.FileHash
 	fileInfo.SliceIndex = 0
+
+	block := &mpb.StoreBlock{}
+	block.Hash = fileInfo.FileHash
+	block.Size = uint64(fileInfo.FileSize)
+	block.BlockSeq = uint32(fileInfo.SliceIndex)
+	block.Checksum = false
+	block.StoreNodeId = [][]byte{}
 	for _, pro := range rsp.GetProvider() {
-		c.uploadFileToReplicaProvider(pro, fileInfo)
+		proID, err := c.uploadFileToReplicaProvider(pro, fileInfo)
+		if err != nil {
+			return nil, err
+		}
+		block.StoreNodeId = append(block.StoreNodeId, proID)
 	}
 
-	return nil
+	partition := &mpb.StorePartition{}
+	partition.Block = append(partition.Block, block)
+	partitions := []*mpb.StorePartition{partition}
+	fmt.Printf("partitions %+v\n", partitions)
+	return partitions, nil
 }
 
 func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitions []*mpb.StorePartition) error {
 	req := &mpb.UploadFileDoneReq{}
 	req.Version = 1
-	req.NodeId = reqCheck.GetNodeId()
+	req.NodeId = c.NodeId
 	req.FileHash = reqCheck.GetFileHash()
 	req.FileSize = reqCheck.GetFileSize()
+	req.FileName = reqCheck.GetFileName()
+	req.FileModTime = reqCheck.GetFileModTime()
 
-	//Todo
-	req.Parent = &mpb.FilePath{&mpb.FilePath_Path{"/folder1/folder2"}}
-	req.FileModTime = 1
+	req.Parent = reqCheck.GetParent()
+	req.Interactive = reqCheck.GetInteractive()
+	req.NewVersion = reqCheck.GetNewVersion()
 
-	rsaPrikey, err := x509.ParsePKCS1PrivateKey([]byte(c.cfg.PrivateKey))
-	if err != nil {
-		return err
-	}
-	err = req.SignReq(rsaPrikey)
-	if err != nil {
-		return err
-	}
 	req.Timestamp = uint64(time.Now().UTC().Unix())
 	req.Partition = partitions
+	err := req.SignReq(c.cfg.Node.PriKey)
+	if err != nil {
+		return err
+	}
 	ctx := context.Background()
+	c.log.Infof("upload file done req:%s", req.GetFileHash())
 	ufdrsp, err := c.mclient.UploadFileDone(ctx, req)
 	if err != nil {
 		return err
 	}
-	fmt.Printf("done: %d\n", ufdrsp.GetCode())
+	c.log.Infof("upload done code: %d", ufdrsp.GetCode())
+	if ufdrsp.GetCode() != 0 {
+		return fmt.Errorf("%s", ufdrsp.GetErrMsg())
+	}
 	return nil
 }
 

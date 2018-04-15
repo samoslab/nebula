@@ -238,4 +238,5 @@ func main() {
 	if err != nil {
 		log.Fatalf("upload file error %v", err)
 	}
+	log.Infof("file %s upload success", tempFile)
 }
