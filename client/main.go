@@ -157,6 +157,7 @@ func main() {
 	trackerServer := pflag.StringP("tracker", "s", "127.0.0.1:6677", "tracker server, 127.0.0.1:6677")
 	emailAddress := pflag.StringP("email", "e", "zhiyuan_06@foxmail.com", "email address")
 	regAction := pflag.StringP("register", "r", "no", "register first")
+	upfile := pflag.StringP("upfile", "u", "/tmp/test.zip", "upload file")
 	verifyAction := pflag.StringP("verify", "v", "no", "verify first")
 	code := pflag.StringP("code", "c", "", "email verify code")
 	resendAction := pflag.StringP("resend", "a", "no", "resend again")
@@ -219,15 +220,17 @@ func main() {
 		fmt.Printf("new client manager failed %v\n", err)
 		return
 	}
+	defer cm.Shutdown()
 	log.Infof("start client")
 	path := "/"
 	folders := []string{"tmp"}
-	tempFile := "/tmp/test.zip"
+	tempFile := *upfile
+	log.Infof("upload file %s\n", tempFile)
 	success, err := cm.MkFolder(path, folders, clientConfig.Node)
 	if err != nil {
 		log.Fatalf("mkdir folder error %v", err)
 	}
-	fmt.Printf("rsp:%s\n", success)
+	log.Infof("rsp:%v\n", success)
 	if !success {
 		log.Fatalf("create folder failed")
 	}
@@ -235,5 +238,4 @@ func main() {
 	if err != nil {
 		log.Fatalf("upload file error %v", err)
 	}
-	cm.Shutdown()
 }
