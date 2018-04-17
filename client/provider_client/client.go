@@ -29,13 +29,13 @@ func UpdateStoreReqAuth(obj *pb.StoreReq) *pb.StoreReq {
 func StorePiece(client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, tm uint64, key []byte, fileSize uint64, first bool) error {
 	file, err := os.Open(filePath)
 	if err != nil {
-		fmt.Printf("open file failed: %s", err.Error())
+		fmt.Printf("open file failed: %s\n", err.Error())
 		return err
 	}
 	defer file.Close()
 	stream, err := client.Store(context.Background())
 	if err != nil {
-		fmt.Printf("RPC Store failed: %s", err.Error())
+		fmt.Printf("RPC Store failed: %s\n", err.Error())
 		return err
 	}
 	defer stream.CloseSend()
@@ -46,18 +46,18 @@ func StorePiece(client pb.ProviderServiceClient, filePath string, auth []byte, t
 			if err == io.EOF {
 				break
 			}
-			fmt.Printf("read file failed: %s", err.Error())
+			fmt.Printf("read file failed: %s\n", err.Error())
 			return err
 		}
 		if first {
 			first = false
 			if err := stream.Send(UpdateStoreReqAuth(&pb.StoreReq{Data: buf[:bytesRead], Ticket: ticket, Auth: auth, Timestamp: tm, Key: key, FileSize: fileSize})); err != nil {
-				fmt.Printf("RPC Send StoreReq failed: %s", err.Error())
+				fmt.Printf("RPC Send StoreReq failed: %s\n", err.Error())
 				return err
 			}
 		} else {
 			if err := stream.Send(&pb.StoreReq{Data: buf[:bytesRead]}); err != nil {
-				fmt.Printf("RPC Send StoreReq failed: %s", err.Error())
+				fmt.Printf("RPC Send StoreReq failed: %s\n", err.Error())
 				return nil
 			}
 		}
@@ -67,11 +67,11 @@ func StorePiece(client pb.ProviderServiceClient, filePath string, auth []byte, t
 	}
 	storeResp, err := stream.CloseAndRecv()
 	if err != nil {
-		fmt.Printf("RPC CloseAndRecv failed: %s", err.Error())
+		fmt.Printf("RPC CloseAndRecv failed: %s\n", err.Error())
 		return err
 	}
 	if !storeResp.Success {
-		fmt.Println("RPC return false")
+		fmt.Println("RPC return false\n")
 		return errors.New("RPC return false")
 	}
 	return nil
@@ -130,7 +130,7 @@ func Retrieve(client pb.ProviderServiceClient, filePath string, auth []byte, tic
 		os.O_WRONLY|os.O_TRUNC|os.O_CREATE,
 		0666)
 	if err != nil {
-		fmt.Printf("open file failed: %s", err.Error())
+		fmt.Printf("open file failed: %s\n", err.Error())
 		return err
 	}
 	defer file.Close()
@@ -141,14 +141,14 @@ func Retrieve(client pb.ProviderServiceClient, filePath string, auth []byte, tic
 			break
 		}
 		if err != nil {
-			fmt.Printf("RPC Recv failed: %s", err.Error())
+			fmt.Printf("RPC Recv failed: %s\n", err.Error())
 			return err
 		}
 		if len(resp.Data) == 0 {
 			break
 		}
 		if _, err = file.Write(resp.Data); err != nil {
-			fmt.Printf("write file %d bytes failed : %s", len(resp.Data), err.Error())
+			fmt.Printf("write file %d bytes failed : %s\n", len(resp.Data), err.Error())
 			return err
 		}
 	}

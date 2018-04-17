@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"strings"
 
 	"google.golang.org/grpc"
 
@@ -158,11 +159,26 @@ func main() {
 	emailAddress := pflag.StringP("email", "e", "zhiyuan_06@foxmail.com", "email address")
 	upfile := pflag.StringP("upfile", "u", "/tmp/test.zip", "upload file")
 	code := pflag.StringP("code", "c", "", "email verify code")
-	operation := pflag.StringP("operation", "o", "upload", "client operation, can be register|verify|upload|download|list, default is upload ")
+	operation := pflag.StringP("operation", "o", "", "client operation, can be register|verify|mkfolder|upload|download|list|remove")
+	rootpath := pflag.StringP("rootpath", "", "", "root path for create folder")
+	newfolder := pflag.StringP("newfolder", "", "", "newfolder for create, join by ,")
+	downfile := pflag.StringP("downfile", "", "", "downfile")
+	downsize := pflag.Uint64P("downsize", "", 0, "downfile size")
+	downhash := pflag.StringP("downhash", "", "", "downhash string")
+	ispath := pflag.BoolP("ispath", "", true, "is path or fileid, true is path")
+	recursive := pflag.BoolP("recursive", "", false, "recursive delete or not")
+
+	///tmp/big1 false 181529811 07d0cf85ed032f73c91726e1e5063a620a9f23d4
 
 	pflag.Parse()
+	if *operation == "" {
+		fmt.Printf("need -o or --operation argument\n")
+		pflag.PrintDefaults()
+		return
+	}
 
 	if *trackerServer == "" {
+		pflag.PrintDefaults()
 		log.Fatal("need tracker server -s")
 	}
 	log, err := NewLogger("", true)
@@ -213,12 +229,17 @@ func main() {
 	}
 	defer cm.Shutdown()
 	log.Infof("start client")
-	path := "/"
 	switch *operation {
 	case "mkfolder":
-		folders := []string{"tmp"}
+		if *rootpath == "" {
+			log.Fatal("need --rootpath argument")
+		}
+		if *newfolder == "" {
+			log.Fatal("need --newfolder argument")
+		}
+		folders := strings.Split(*newfolder, ",")
 		log.Infof("create folder %+v", folders)
-		success, err := cm.MkFolder(path, folders, clientConfig.Node)
+		success, err := cm.MkFolder(*rootpath, folders)
 		if err != nil {
 			log.Fatalf("mkdir folder error %v", err)
 		}
@@ -235,32 +256,44 @@ func main() {
 		}
 		log.Infof("file %s upload success", tempFile)
 	case "list":
-		rsp, err := cm.ListFiles(path + "tmp")
+		if *rootpath == "" {
+			log.Fatal("need --rootpath argument")
+		}
+		rsp, err := cm.ListFiles(*rootpath)
 		if err != nil {
 			log.Fatalf("list files error %v", err)
 		}
-		log.Infof("list files records %d", rsp.GetTotalRecord())
-		for _, info := range rsp.GetFof() {
-			log.Infof("%s %s %v %d %x", info.GetId(), info.GetName(), info.GetFolder(), info.GetFileSize(), info.GetFileHash())
+		log.Infof("list files records %d", len(rsp))
+		for _, info := range rsp {
+			log.Infof("%s %s %v %d %s", info.FileHash, info.FileName, info.Folder, info.FileSize, info.ID)
 		}
 
 	case "download":
-		fileHash := []byte("")
-		fileSize := uint64(0)
-		fileName := ""
+		if *downhash == "" || *downfile == "" || *downsize == 0 {
+			log.Fatalf("need downhash downname downsize")
+		}
+		fileHash := *downhash
+		fileSize := *downsize
+		fileName := *downfile
 		folder := false
+		//bc6bfe7d-7407-4b56-aae9-785b1dd77f67 /tmp/big1 false 181529811 07d0cf85ed032f73c91726e1e5063a620a9f23d4
 		err := cm.DownloadFile(fileName, fileHash, fileSize, folder)
 		if err != nil {
-			log.Errorf("download failed %s", fileName)
+			log.Fatalf("download failed %s, err %v", fileName, err)
 		}
+		log.Infof("down success %s", fileSize)
 	case "remove":
-		path := "/tmp"
-		recursive := false
-		err := cm.RemoveFile(path, recursive)
+		if *rootpath == "" {
+			log.Fatal("need --rootpath argument")
+		}
+		recursive := *recursive
+		isPath := *ispath
+		fmt.Printf("ispath %v, recu %v\n", isPath, recursive)
+		err := cm.RemoveFile(*rootpath, recursive, isPath)
 		if err != nil {
 			log.Fatalf("remove files error %v", err)
 		}
-		log.Infof("remote %s success", path)
+		log.Infof("remove %s success", *rootpath)
 	}
 
 }
