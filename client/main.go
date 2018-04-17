@@ -156,11 +156,9 @@ func main() {
 	configDirOpt := pflag.StringP("configfile", "f", defaultConfig, "config data file")
 	trackerServer := pflag.StringP("tracker", "s", "127.0.0.1:6677", "tracker server, 127.0.0.1:6677")
 	emailAddress := pflag.StringP("email", "e", "zhiyuan_06@foxmail.com", "email address")
-	regAction := pflag.StringP("register", "r", "no", "register first")
 	upfile := pflag.StringP("upfile", "u", "/tmp/test.zip", "upload file")
-	verifyAction := pflag.StringP("verify", "v", "no", "verify first")
 	code := pflag.StringP("code", "c", "", "email verify code")
-	resendAction := pflag.StringP("resend", "a", "no", "resend again")
+	operation := pflag.StringP("operation", "o", "upload", "client operation, can be register|verify|upload|download|list, default is upload ")
 
 	pflag.Parse()
 
@@ -180,13 +178,10 @@ func main() {
 			panic(err)
 		}
 	}
-
-	if *regAction == "yes" {
+	switch *operation {
+	case "register":
 		RegisterClient(log, *configDirOpt, *trackerServer, *emailAddress)
-		return
-	}
-
-	if *verifyAction == "yes" {
+	case "verify":
 		if *code == "" {
 			fmt.Printf("code can not empy")
 			return
@@ -195,12 +190,8 @@ func main() {
 		fmt.Printf("tracker %v\n", *trackerServer)
 		fmt.Printf("code %v\n", *code)
 		verifyEmail(*configDirOpt, *trackerServer, *code)
-		return
-	}
-
-	if *resendAction == "yes" {
+	case "resend":
 		resendVerifyCode(*configDirOpt, *trackerServer)
-		return
 	}
 
 	clientConfig, err := config.LoadConfig(*configDirOpt)
@@ -223,20 +214,53 @@ func main() {
 	defer cm.Shutdown()
 	log.Infof("start client")
 	path := "/"
-	folders := []string{"tmp"}
-	tempFile := *upfile
-	log.Infof("upload file %s\n", tempFile)
-	success, err := cm.MkFolder(path, folders, clientConfig.Node)
-	if err != nil {
-		log.Fatalf("mkdir folder error %v", err)
+	switch *operation {
+	case "mkfolder":
+		folders := []string{"tmp"}
+		log.Infof("create folder %+v", folders)
+		success, err := cm.MkFolder(path, folders, clientConfig.Node)
+		if err != nil {
+			log.Fatalf("mkdir folder error %v", err)
+		}
+		log.Infof("create folder rsp:%v", success)
+		if !success {
+			log.Fatalf("create folder failed")
+		}
+	case "upload":
+		tempFile := *upfile
+		log.Infof("upload file %s", tempFile)
+		err = cm.UploadFile(tempFile)
+		if err != nil {
+			log.Fatalf("upload file error %v", err)
+		}
+		log.Infof("file %s upload success", tempFile)
+	case "list":
+		rsp, err := cm.ListFiles(path + "tmp")
+		if err != nil {
+			log.Fatalf("list files error %v", err)
+		}
+		log.Infof("list files records %d", rsp.GetTotalRecord())
+		for _, info := range rsp.GetFof() {
+			log.Infof("%s %s %v %d %x", info.GetId(), info.GetName(), info.GetFolder(), info.GetFileSize(), info.GetFileHash())
+		}
+
+	case "download":
+		fileHash := []byte("")
+		fileSize := uint64(0)
+		fileName := ""
+		folder := false
+		err := cm.DownloadFile(fileName, fileHash, fileSize, folder)
+		if err != nil {
+			log.Errorf("download failed %s", fileName)
+		}
+	case "remove":
+		path := "/tmp"
+		recursive := false
+		err := cm.RemoveFile(path, recursive)
+		if err != nil {
+			log.Fatalf("remove files error %v", err)
+		}
+		log.Infof("remote %s success", path)
 	}
-	log.Infof("rsp:%v\n", success)
-	if !success {
-		log.Fatalf("create folder failed")
-	}
-	err = cm.UploadFile(tempFile)
-	if err != nil {
-		log.Fatalf("upload file error %v", err)
-	}
-	log.Infof("file %s upload success", tempFile)
+
 }

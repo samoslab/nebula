@@ -2,7 +2,6 @@ package daemon
 
 import (
 	"context"
-	"crypto/x509"
 	"errors"
 	"fmt"
 	"math"
@@ -129,6 +128,7 @@ func (c *ClientManager) UploadFile(filename string) error {
 			}
 			fileInfos = append(fileInfos, MyPart{Filename: fname, Pieces: fileSlices})
 		}
+		fmt.Printf("fileinfos %+v\n", fileInfos)
 
 		ufpr := &mpb.UploadFilePrepareReq{}
 		ufpr.Version = 1
@@ -146,15 +146,22 @@ func (c *ClientManager) UploadFile(filename string) error {
 				phs.Size = uint32(slice.FileSize)
 				phslist = append(phslist, phs)
 			}
-			ufpr.Partition[i].Piece = phslist
+			ufpr.Partition[i] = &mpb.SplitPartition{phslist}
+		}
+		err = ufpr.SignReq(c.cfg.Node.PriKey)
+		if err != nil {
+			return err
 		}
 
 		ctx := context.Background()
+		log.Infof("upload file prepare req:%x", ufpr.FileHash)
 		ufprsp, err := c.mclient.UploadFilePrepare(ctx, ufpr)
 		if err != nil {
 			log.Errorf("UploadFilePrepare error %v", err)
 			return err
 		}
+		fmt.Printf("prepare response %+v\n", ufprsp)
+		log.Infof("upload prepare response partitions count:%d", len(ufprsp.GetPartition()))
 
 		partitions := []*mpb.StorePartition{}
 		for _, partInfo := range fileInfos {
@@ -165,6 +172,7 @@ func (c *ClientManager) UploadFile(filename string) error {
 			}
 			partitions = append(partitions, partition)
 		}
+		fmt.Printf("uploadfiledone\n")
 
 		return c.UploadFileDone(req, partitions)
 
@@ -251,13 +259,16 @@ func (c *ClientManager) OnlyFileSplit(filename string, dataNum, verifyNum int) (
 }
 
 func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, rsp *mpb.UploadFilePrepareResp, hashFiles []HashFile) (*mpb.StorePartition, error) {
+	log := c.log
 	partition := &mpb.StorePartition{}
+	partition.Block = []*mpb.StoreBlock{}
 	providers, err := c.PingProvider(rsp.GetPartition())
 	if err != nil {
 		return nil, err
 	}
 
 	for i, pro := range providers {
+		log.Infof("provider %d %+v", i, pro.GetProviderAuth())
 		if i == 0 {
 			block, err := c.uploadFileToErasureProvider(pro, hashFiles[i], true)
 			if err != nil {
@@ -397,7 +408,7 @@ func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitio
 	return nil
 }
 
-func (c *ClientManager) ListFiles() (*mpb.ListFilesResp, error) {
+func (c *ClientManager) ListFiles(path string) (*mpb.ListFilesResp, error) {
 	req := &mpb.ListFilesReq{}
 	req.Version = 1
 	req.Timestamp = uint64(time.Now().UTC().Unix())
@@ -405,20 +416,20 @@ func (c *ClientManager) ListFiles() (*mpb.ListFilesResp, error) {
 	req.PageSize = 10
 	req.PageNum = 1
 	req.SortType = mpb.SortType_Name
+	req.Parent = &mpb.FilePath{&mpb.FilePath_Path{path}}
 	req.AscOrder = true
-	rsaPrikey, err := x509.ParsePKCS1PrivateKey([]byte(c.cfg.PrivateKey))
-	if err != nil {
-		return nil, err
-	}
-	err = req.SignReq(rsaPrikey)
+	err := req.SignReq(c.cfg.Node.PriKey)
 	if err != nil {
 		return nil, err
 	}
 	ctx := context.Background()
+	c.log.Infof("req:%+v", req.Timestamp)
 	rsp, err := c.mclient.ListFiles(ctx, req)
+
 	if err != nil {
 		return nil, err
 	}
+
 	if rsp.GetCode() != 0 {
 		return nil, fmt.Errorf("errmsg %s", rsp.GetErrMsg())
 	}
@@ -426,43 +437,65 @@ func (c *ClientManager) ListFiles() (*mpb.ListFilesResp, error) {
 }
 
 // DownloadFile download file
-func (c *ClientManager) DownloadFile(fileInfo HashFile) error {
+func (c *ClientManager) DownloadFile(fileName string, fileHash []byte, fileSize uint64, folder bool) error {
+	log := c.log
+	fof := &mpb.FileOrFolder{Name: fileName, FileHash: fileHash, FileSize: fileSize, Folder: folder}
+	if fof.GetFolder() {
+		log.Infof("download folder %s", fof.GetName())
+	}
 	req := &mpb.RetrieveFileReq{}
 	req.Version = 1
 	req.NodeId = c.NodeId
 	req.Timestamp = uint64(time.Now().UTC().Unix())
-	req.FileHash = []byte(fileInfo.FileHash)
-	req.FileSize = uint64(fileInfo.FileSize)
-	rsaPrikey, err := x509.ParsePKCS1PrivateKey([]byte(c.cfg.PrivateKey))
-	if err != nil {
-		return err
-	}
-	err = req.SignReq(rsaPrikey)
+	req.FileHash = fof.FileHash
+	req.FileSize = fof.FileSize
+	err := req.SignReq(c.cfg.Node.PriKey)
 	if err != nil {
 		return err
 	}
 	ctx := context.Background()
+	log.Infof("download file req:%s, %s", string(fof.GetName()), fof.GetId())
 	rsp, err := c.mclient.RetrieveFile(ctx, req)
 	if err != nil {
 		return err
 	}
-	if rsp.GetCode() == 1 {
-		return errors.New("get file info failed")
+	if rsp.GetCode() != 0 {
+		return fmt.Errorf("%s", rsp.GetErrMsg())
 	}
 
 	// tiny file
 	if filedata := rsp.GetFileData(); filedata != nil {
-		fmt.Printf("filedata %s", filedata)
-		saveFile(fileInfo.FileName, filedata)
+		saveFile(fof.Name, filedata)
+		log.Infof("tiny file %s", fof.Name)
 		return nil
 	}
 
-	for i, partition := range rsp.GetPartition() {
-		c.log.Infof("partition has %d ", i)
-		c.saveFileByPartition(fileInfo.FileName, partition)
+	log.Infof("there is %d partitions", len(rsp.GetPartition()))
+	partitions := rsp.GetPartition()
+	partitionCount := len(partitions)
+	if partitionCount == 1 {
+		blockCount := len(partitions[0].GetBlock())
+		if blockCount == 1 { // 1 partition 1 block is multiReplica
+			log.Infof("file %s is multi replication files", fof.Name)
+			_, _, err := c.saveFileByPartition(fof.Name, partitions[0], true)
+			return err
+		}
 	}
 
-	err = RsDecoder(fileInfo.FileName, "", 4, 2)
+	// erasure files
+	datas := 0
+	paritys := 0
+	for _, partition := range partitions {
+		datas, paritys, err = c.saveFileByPartition(fof.Name, partition, false)
+		if err != nil {
+			log.Errorf("save file by partition error %v", err)
+			return err
+		}
+		log.Infof("dataShards %d, parityShards %d", datas, paritys)
+	}
+
+	log.Infof("file %s erasure files", fof.Name)
+	err = RsDecoder(fof.Name, "", datas, paritys)
 	if err != nil {
 		return err
 	}
@@ -470,40 +503,43 @@ func (c *ClientManager) DownloadFile(fileInfo HashFile) error {
 	return nil
 }
 
-func (c *ClientManager) saveFileByPartition(filename string, partition *mpb.RetrievePartition) error {
-	fmt.Printf("there is %d blocks", len(partition.GetBlock()))
+func (c *ClientManager) saveFileByPartition(filename string, partition *mpb.RetrievePartition, multiReplica bool) (int, int, error) {
+	log := c.log
+	log.Infof("there is %d blocks", len(partition.GetBlock()))
 	dataShards := 0
 	parityShards := 0
 	for _, block := range partition.GetBlock() {
 		if block.GetChecksum() {
-			dataShards += 1
+			dataShards++
 		} else {
-			parityShards += 1
+			parityShards++
 		}
 		node := block.GetStoreNode()
-		if len(node) > 1 {
-			fmt.Printf("node > 1")
-		}
+		log.Infof("file %s store node is %d", filename, len(node))
 		node1 := node[0]
 		server := fmt.Sprintf("%s:%d", node1.GetServer(), node1.GetPort())
 		conn, err := grpc.Dial(server, grpc.WithInsecure())
 		if err != nil {
-			fmt.Printf("RPC Dial failed: %s", err.Error())
-			return err
+			log.Errorf("RPC Dial failed: %s", err.Error())
+			return 0, 0, err
 		}
 		defer conn.Close()
 		pclient := pb.NewProviderServiceClient(conn)
 
-		tempFilePrefix := filepath.Join(c.TempDir, filename)
-		tempFileName := fmt.Sprintf("%s.%d", tempFilePrefix, block.GetBlockSeq())
-		err = client.Retrieve(pclient, tempFileName, node1.GetAuth(), node1.GetTicket(), block.GetHash())
+		//tempFilePrefix := filepath.Join(c.TempDir, filename)
+		tempFileName := fmt.Sprintf("%s.%d", filename, block.GetBlockSeq())
+		if multiReplica {
+			tempFileName = filename
+		}
+		log.Infof("tempFilename %s", tempFileName)
+		err = client.Retrieve(pclient, tempFileName, node1.GetAuth(), node1.GetTicket(), block.GetHash(), block.GetSize())
 		if err != nil {
-			return err
+			return 0, 0, err
 		}
 	}
 
 	// rs code
-	return nil
+	return dataShards, parityShards, nil
 }
 
 func saveFile(fileName string, content []byte) error {
@@ -517,4 +553,31 @@ func saveFile(fileName string, content []byte) error {
 		return err
 	}
 	return nil
+}
+
+// RemoveFile download file
+func (c *ClientManager) RemoveFile(filePath string, recursive bool) error {
+	log := c.log
+	req := &mpb.RemoveReq{}
+	req.NodeId = c.NodeId
+	req.Timestamp = uint64(time.Now().Unix())
+	req.Recursive = recursive
+	req.Target = &mpb.FilePath{&mpb.FilePath_Path{filePath}}
+
+	err := req.SignReq(c.cfg.Node.PriKey)
+	if err != nil {
+		return err
+	}
+
+	log.Infof("remove file req:%s", filePath)
+	rsp, err := c.mclient.Remove(context.Background(), req)
+	if err != nil {
+		return err
+	}
+	log.Infof("remove file rsp:%+v", rsp)
+	if rsp.GetCode() != 0 {
+		return fmt.Errorf("%s", rsp.GetErrMsg())
+	}
+	return nil
+
 }

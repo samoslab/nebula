@@ -121,11 +121,11 @@ func Store(client pb.ProviderServiceClient, filePath string, auth []byte, ticket
 
 func updateRetrieveReqAuth(obj *pb.RetrieveReq) *pb.RetrieveReq {
 	// TODO
-	obj.Auth = []byte("mock-auth")
+	//obj.Auth = []byte("mock-auth")
 	return obj
 
 }
-func Retrieve(client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, key []byte) error {
+func Retrieve(client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, key []byte, filesize uint64) error {
 	file, err := os.OpenFile(filePath,
 		os.O_WRONLY|os.O_TRUNC|os.O_CREATE,
 		0666)
@@ -134,7 +134,7 @@ func Retrieve(client pb.ProviderServiceClient, filePath string, auth []byte, tic
 		return err
 	}
 	defer file.Close()
-	stream, err := client.Retrieve(context.Background(), updateRetrieveReqAuth(&pb.RetrieveReq{Ticket: ticket, Key: key, Timestamp: uint64(time.Now().Unix())}))
+	stream, err := client.Retrieve(context.Background(), updateRetrieveReqAuth(&pb.RetrieveReq{Ticket: ticket, Key: key, Auth: auth, FileSize: filesize, Timestamp: uint64(time.Now().Unix())}))
 	for {
 		resp, err := stream.Recv()
 		if err == io.EOF {
