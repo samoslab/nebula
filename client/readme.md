@@ -6,6 +6,9 @@
 
 不管是使用纠删码还是多副本，数据存储到Provider完成后，再执行第三歩UploadFileDone把分区和分片信息传到服务器端，如果是多副本方式，分区和分片数都是1，存储的Provider(storeNodeId)是多个
 
+纠删码上传
+纠删码下载
+
 ```
 
 1. register

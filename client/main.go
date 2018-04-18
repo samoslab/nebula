@@ -154,15 +154,14 @@ func main() {
 	}
 	defaultAppDir := filepath.Join(usr.HomeDir, ".spo-nebula-client")
 	defaultConfig := filepath.Join(defaultAppDir, "config.json")
-	configDirOpt := pflag.StringP("configfile", "f", defaultConfig, "config data file")
+	configDirOpt := pflag.StringP("configfile", "c", defaultConfig, "config data file")
 	trackerServer := pflag.StringP("tracker", "s", "127.0.0.1:6677", "tracker server, 127.0.0.1:6677")
 	emailAddress := pflag.StringP("email", "e", "zhiyuan_06@foxmail.com", "email address")
-	upfile := pflag.StringP("upfile", "u", "/tmp/test.zip", "upload file")
-	code := pflag.StringP("code", "c", "", "email verify code")
+	opfile := pflag.StringP("opfile", "f", "", "operation file")
+	code := pflag.StringP("code", "i", "", "email verify code")
 	operation := pflag.StringP("operation", "o", "", "client operation, can be register|verify|mkfolder|upload|download|list|remove")
-	rootpath := pflag.StringP("rootpath", "", "", "root path for create folder")
-	newfolder := pflag.StringP("newfolder", "", "", "newfolder for create, join by ,")
-	downfile := pflag.StringP("downfile", "", "", "downfile")
+	rootpath := pflag.StringP("rootpath", "p", "", "root path for create folder")
+	newfolder := pflag.StringP("newfolder", "n", "", "newfolder for create, join by ,")
 	downsize := pflag.Uint64P("downsize", "", 0, "downfile size")
 	downhash := pflag.StringP("downhash", "", "", "downhash string")
 	ispath := pflag.BoolP("ispath", "", true, "is path or fileid, true is path")
@@ -248,7 +247,7 @@ func main() {
 			log.Fatalf("create folder failed")
 		}
 	case "upload":
-		tempFile := *upfile
+		tempFile := *opfile
 		log.Infof("upload file %s", tempFile)
 		err = cm.UploadFile(tempFile)
 		if err != nil {
@@ -269,12 +268,12 @@ func main() {
 		}
 
 	case "download":
-		if *downhash == "" || *downfile == "" || *downsize == 0 {
+		if *downhash == "" || *opfile == "" || *downsize == 0 {
 			log.Fatalf("need downhash downname downsize")
 		}
 		fileHash := *downhash
 		fileSize := *downsize
-		fileName := *downfile
+		fileName := *opfile
 		folder := false
 		//bc6bfe7d-7407-4b56-aae9-785b1dd77f67 /tmp/big1 false 181529811 07d0cf85ed032f73c91726e1e5063a620a9f23d4
 		err := cm.DownloadFile(fileName, fileHash, fileSize, folder)

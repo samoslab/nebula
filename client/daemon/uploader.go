@@ -119,16 +119,27 @@ func (c *ClientManager) UploadFile(filename string) error {
 			partFiles = append(partFiles, filename)
 		}
 
+		log.Infof("file %s need split to %d partitions", req.GetFileName(), len(partFiles))
+
+		dataShards := int(rsp.GetDataPieceCount())
+		verifyShards := int(rsp.GetVerifyPieceCount())
+
+		log.Infof("prepare response gave %d dataShards, %d verifyShards", dataShards, verifyShards)
+
 		fileInfos := []MyPart{}
 
 		for _, fname := range partFiles {
-			fileSlices, err := c.OnlyFileSplit(fname, int(rsp.GetDataPieceCount()), int(rsp.GetVerifyPieceCount()))
+			fileSlices, err := c.OnlyFileSplit(fname, dataShards, verifyShards)
 			if err != nil {
 				return err
 			}
+			log.Debugf("%s gen %d block files ", fname, len(fileSlices))
 			fileInfos = append(fileInfos, MyPart{Filename: fname, Pieces: fileSlices})
+			log.Infof("file %s need split to %d blocks", req.GetFileName(), len(fileSlices))
+			for _, fs := range fileSlices {
+				log.Debugf("erasure block files %s", fs.FileName)
+			}
 		}
-		fmt.Printf("fileinfos %+v\n", fileInfos)
 
 		ufpr := &mpb.UploadFilePrepareReq{}
 		ufpr.Version = 1
@@ -138,16 +149,21 @@ func (c *ClientManager) UploadFile(filename string) error {
 		ufpr.FileSize = req.FileSize
 		ufpr.Partition = make([]*mpb.SplitPartition, len(partFiles))
 		// todo delete temp file
+		block := 0
 		for i, partInfo := range fileInfos {
 			phslist := []*mpb.PieceHashAndSize{}
-			for _, slice := range partInfo.Pieces {
+			for j, slice := range partInfo.Pieces {
 				phs := &mpb.PieceHashAndSize{}
 				phs.Hash = slice.FileHash
 				phs.Size = uint32(slice.FileSize)
 				phslist = append(phslist, phs)
+				log.Debugf("current %d(th) piece", j)
+				block++
 			}
 			ufpr.Partition[i] = &mpb.SplitPartition{phslist}
+			log.Debugf("current %d(th) partitions", i)
 		}
+		log.Infof("request has %d partitions, %d pieces", len(ufpr.Partition), block)
 		err = ufpr.SignReq(c.cfg.Node.PriKey)
 		if err != nil {
 			return err
@@ -165,7 +181,7 @@ func (c *ClientManager) UploadFile(filename string) error {
 		log.Infof("upload prepare response partitions count:%d", len(rspPartitions))
 
 		if len(rspPartitions) == 0 {
-			return fmt.Errorf("only 0 partitions")
+			return fmt.Errorf("only 0 partitions, not correct")
 		}
 
 		for _, part := range rspPartitions {
@@ -180,13 +196,14 @@ func (c *ClientManager) UploadFile(filename string) error {
 		partitions := []*mpb.StorePartition{}
 		for _, partInfo := range fileInfos {
 
-			partition, err := c.uploadFileBatchByErasure(ufpr, rspPartitions, partInfo.Pieces)
+			partition, err := c.uploadFileBatchByErasure(ufpr, rspPartitions, partInfo.Pieces, dataShards)
 			if err != nil {
 				return err
 			}
+			log.Debugf("partition has %d storeblocks", len(partition.GetBlock()))
 			partitions = append(partitions, partition)
 		}
-		log.Info("upload file done")
+		log.Info("upload file done, store %d partitions", len(partitions))
 
 		return c.UploadFileDone(req, partitions)
 
@@ -263,7 +280,7 @@ func (c *ClientManager) MkFolder(filepath string, folders []string) (bool, error
 func (c *ClientManager) OnlyFileSplit(filename string, dataNum, verifyNum int) ([]HashFile, error) {
 	// Split file and hash
 	// todo delete temp file
-	fileSlices, err := RsEncoder(c.TempDir, filename, dataNum, verifyNum)
+	fileSlices, err := RsEncoder("", filename, dataNum, verifyNum)
 	if err != nil {
 		c.log.Errorf("reed se error %v", err)
 		return nil, err
@@ -272,7 +289,7 @@ func (c *ClientManager) OnlyFileSplit(filename string, dataNum, verifyNum int) (
 
 }
 
-func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, rspPartitions []*mpb.ErasureCodePartition, hashFiles []HashFile) (*mpb.StorePartition, error) {
+func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, rspPartitions []*mpb.ErasureCodePartition, hashFiles []HashFile, dataShards int) (*mpb.StorePartition, error) {
 	log := c.log
 	partition := &mpb.StorePartition{}
 	partition.Block = []*mpb.StoreBlock{}
@@ -283,21 +300,28 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 		return nil, err
 	}
 
+	checksum := false
 	for i, pro := range providers {
 		log.Infof("provider %d %s:%d", i, pro.GetServer(), pro.GetPort())
+		if i < dataShards {
+			checksum = false
+		} else {
+			checksum = true
+		}
 		if i == 0 {
-			block, err := c.uploadFileToErasureProvider(pro, rspPartition.GetTimestamp(), hashFiles[i], true)
+			block, err := c.uploadFileToErasureProvider(pro, rspPartition.GetTimestamp(), hashFiles[i], true, checksum)
 			if err != nil {
 				return nil, err
 			}
 			partition.Block = append(partition.Block, block)
 		} else {
-			block, err := c.uploadFileToErasureProvider(pro, rspPartition.GetTimestamp(), hashFiles[i], false)
+			block, err := c.uploadFileToErasureProvider(pro, rspPartition.GetTimestamp(), hashFiles[i], true, checksum)
 			if err != nil {
 				return nil, err
 			}
 			partition.Block = append(partition.Block, block)
 		}
+		log.Debugf("privider %s:%d has %d blocks", pro.GetServer(), pro.GetPort(), len(partition.GetBlock()))
 	}
 	return partition, nil
 }
@@ -307,12 +331,12 @@ func getOneOfPartition(pro *mpb.ErasureCodePartition) *mpb.BlockProviderAuth {
 	return pa
 }
 
-func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, tm uint64, fileInfo HashFile, first bool) (*mpb.StoreBlock, error) {
+func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, tm uint64, fileInfo HashFile, first, checksum bool) (*mpb.StoreBlock, error) {
 	log := c.log
 	block := &mpb.StoreBlock{}
 	onePartition := pro
 	server := fmt.Sprintf("%s:%d", onePartition.GetServer(), onePartition.GetPort())
-	log.Infof("file %+v upload to server %s", fileInfo, server)
+	log.Infof("file %+v upload to server %s", fileInfo.FileName, server)
 	conn, err := grpc.Dial(server, grpc.WithInsecure())
 	if err != nil {
 		fmt.Printf("RPC Dial failed: %s", err.Error())
@@ -324,15 +348,15 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 	ha := onePartition.GetHashAuth()[0]
 	err = client.StorePiece(pclient, fileInfo.FileName, ha.GetAuth(), ha.GetTicket(), tm, fileInfo.FileHash, uint64(fileInfo.FileSize), first)
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 	block.Hash = fileInfo.FileHash
 	block.Size = uint64(fileInfo.FileSize)
 	block.BlockSeq = uint32(fileInfo.SliceIndex)
-	block.Checksum = true
+	block.Checksum = checksum
 	block.StoreNodeId = [][]byte{}
 	block.StoreNodeId = append(block.StoreNodeId, []byte(onePartition.GetNodeId()))
+	log.Debugf("block file %s, block storeNodeId %x", fileInfo.FileName, onePartition.GetNodeId())
 
 	return block, nil
 }
@@ -506,7 +530,7 @@ func (c *ClientManager) DownloadFile(fileName string, filehash string, fileSize 
 		blockCount := len(partitions[0].GetBlock())
 		if blockCount == 1 { // 1 partition 1 block is multiReplica
 			log.Infof("file %s is multi replication files", fof.Name)
-			_, _, err := c.saveFileByPartition(fof.Name, partitions[0], true)
+			_, _, err := c.saveFileByPartition(fof.Name, partitions[0], rsp.GetTimestamp(), true)
 			return err
 		}
 	}
@@ -515,7 +539,7 @@ func (c *ClientManager) DownloadFile(fileName string, filehash string, fileSize 
 	datas := 0
 	paritys := 0
 	for _, partition := range partitions {
-		datas, paritys, err = c.saveFileByPartition(fof.Name, partition, false)
+		datas, paritys, err = c.saveFileByPartition(fof.Name, partition, rsp.GetTimestamp(), false)
 		if err != nil {
 			log.Errorf("save file by partition error %v", err)
 			return err
@@ -532,16 +556,16 @@ func (c *ClientManager) DownloadFile(fileName string, filehash string, fileSize 
 	return nil
 }
 
-func (c *ClientManager) saveFileByPartition(filename string, partition *mpb.RetrievePartition, multiReplica bool) (int, int, error) {
+func (c *ClientManager) saveFileByPartition(filename string, partition *mpb.RetrievePartition, tm uint64, multiReplica bool) (int, int, error) {
 	log := c.log
 	log.Infof("there is %d blocks", len(partition.GetBlock()))
 	dataShards := 0
 	parityShards := 0
-	for _, block := range partition.GetBlock() {
+	for i, block := range partition.GetBlock() {
 		if block.GetChecksum() {
-			dataShards++
-		} else {
 			parityShards++
+		} else {
+			dataShards++
 		}
 		node := block.GetStoreNode()
 		node1 := node[0]
@@ -558,12 +582,14 @@ func (c *ClientManager) saveFileByPartition(filename string, partition *mpb.Retr
 		if multiReplica {
 			tempFileName = filename
 		}
-		log.Infof("file %s store node is %s", tempFileName, server)
-		log.Infof("node ticket %s", node1.GetTicket())
+		log.Infof("file %s retrieve from %s", tempFileName, server)
+		log.Infof("node ticket %s, tm %d", node1.GetTicket(), tm)
 		log.Infof("filename %s ticket %s size %d", tempFileName, node1.GetTicket(), block.GetSize())
-		err = client.Retrieve(pclient, tempFileName, node1.GetAuth(), node1.GetTicket(), block.GetHash(), block.GetSize())
-		if err != nil {
-			return 0, 0, err
+		if i == 2 {
+			err = client.Retrieve(pclient, tempFileName, node1.GetAuth(), node1.GetTicket(), block.GetHash(), tm, block.GetSize())
+			if err != nil {
+				return 0, 0, err
+			}
 		}
 		log.Infof("retrieve %s success", tempFileName)
 	}

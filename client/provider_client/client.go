@@ -58,7 +58,7 @@ func StorePiece(client pb.ProviderServiceClient, filePath string, auth []byte, t
 		} else {
 			if err := stream.Send(&pb.StoreReq{Data: buf[:bytesRead]}); err != nil {
 				fmt.Printf("RPC Send StoreReq failed: %s\n", err.Error())
-				return nil
+				return err
 			}
 		}
 		if bytesRead < stream_data_size {
@@ -125,7 +125,7 @@ func updateRetrieveReqAuth(obj *pb.RetrieveReq) *pb.RetrieveReq {
 	return obj
 
 }
-func Retrieve(client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, key []byte, filesize uint64) error {
+func Retrieve(client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, key []byte, tm, filesize uint64) error {
 	file, err := os.OpenFile(filePath,
 		os.O_WRONLY|os.O_TRUNC|os.O_CREATE,
 		0666)
@@ -134,7 +134,7 @@ func Retrieve(client pb.ProviderServiceClient, filePath string, auth []byte, tic
 		return err
 	}
 	defer file.Close()
-	stream, err := client.Retrieve(context.Background(), updateRetrieveReqAuth(&pb.RetrieveReq{Ticket: ticket, Key: key, Auth: auth, FileSize: filesize, Timestamp: uint64(time.Now().Unix())}))
+	stream, err := client.Retrieve(context.Background(), updateRetrieveReqAuth(&pb.RetrieveReq{Ticket: ticket, Key: key, Auth: auth, FileSize: filesize, Timestamp: tm}))
 	for {
 		resp, err := stream.Recv()
 		if err == io.EOF {
