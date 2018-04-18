@@ -390,9 +390,13 @@ func (self *pingProviderService) Store(stream pb.ProviderService_StoreServer) er
 func (self *pingProviderService) Retrieve(req *pb.RetrieveReq, stream pb.ProviderService_RetrieveServer) error {
 	return nil
 }
+func (self *pingProviderService) Remove(ctx context.Context, req *pb.RemoveReq) (*pb.RemoveResp, error) {
+	return nil, nil
+}
 func (self *pingProviderService) GetFragment(ctx context.Context, req *pb.GetFragmentReq) (*pb.GetFragmentResp, error) {
 	return nil, nil
 }
+
 func addStorage(configDir string, trackerServer string, path string, volume string) {
 	fmt.Printf("addStorage path:%s, volume:%s\n", path, volume)
 	//TODO

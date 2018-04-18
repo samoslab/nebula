@@ -8,7 +8,10 @@ service ProviderService {
 
 	rpc Retrieve(RetrieveReq) returns (stream RetrieveResp){}
 
+	rpc Remove(RemoveReq) returns (RemoveResp){}
+
 	rpc GetFragment(GetFragmentReq) returns (GetFragmentResp){}
+	
 }
 
 
@@ -45,6 +48,18 @@ message RetrieveReq {
 
 message RetrieveResp {
 	bytes data=1;
+}
+
+message RemoveReq{
+	uint32 version =1;
+	bytes auth = 2;
+	uint64 timestamp=3;
+	bytes key = 4;
+	uint64 fileSize=5;
+}
+
+message RemoveResp{
+	bool success = 1;
 }
 
 message GetFragmentReq {
