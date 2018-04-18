@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/klauspost/reedsolomon"
-	util_hash "github.com/spolabs/nebula/util/hash"
+	util_hash "github.com/samoslab/nebula/util/hash"
 )
 
 // RsEncoder reedsolomon stream encoder file

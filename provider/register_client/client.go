@@ -2,16 +2,11 @@ package register_client
 
 import (
 	"context"
-	"crypto"
-	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha256"
 	"time"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/samoslab/nebula/provider/node"
 	pb "github.com/samoslab/nebula/tracker/register/provider/pb"
-	util_bytes "github.com/samoslab/nebula/util/bytes"
 )
 
 func GetPublicKey(client pb.ProviderRegisterServiceClient) (pubKey []byte, ip string, err error) {
@@ -55,18 +50,6 @@ func Register(client pb.ProviderRegisterServiceClient, nodeIdEnc []byte, publicK
 	return resp.Code, resp.ErrMsg, nil
 }
 
-func signVerifyBillEmailReq(req *pb.VerifyBillEmailReq, priKey *rsa.PrivateKey) {
-	hasher := sha256.New()
-	hasher.Write(req.NodeId)
-	hasher.Write(util_bytes.FromUint64(req.Timestamp))
-	hasher.Write([]byte(req.VerifyCode))
-	sign, err := rsa.SignPKCS1v15(rand.Reader, priKey, crypto.SHA256, hasher.Sum(nil))
-	if err != nil {
-		log.Fatal("sign VerifyBillEmail error: " + err.Error())
-	}
-	req.Sign = sign
-}
-
 func VerifyBillEmail(client pb.ProviderRegisterServiceClient, verifyCode string) (code uint32, errMsg string, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -74,23 +57,12 @@ func VerifyBillEmail(client pb.ProviderRegisterServiceClient, verifyCode string)
 	req := &pb.VerifyBillEmailReq{NodeId: node.NodeId,
 		Timestamp:  uint64(time.Now().Unix()),
 		VerifyCode: verifyCode}
-	signVerifyBillEmailReq(req, node.PriKey)
+	req.SignReq(node.PriKey)
 	resp, err := client.VerifyBillEmail(ctx, req)
 	if err != nil {
 		return 0, "", err
 	}
 	return resp.Code, resp.ErrMsg, nil
-}
-
-func signResendVerifyCodeReq(req *pb.ResendVerifyCodeReq, priKey *rsa.PrivateKey) {
-	hasher := sha256.New()
-	hasher.Write(req.NodeId)
-	hasher.Write(util_bytes.FromUint64(req.Timestamp))
-	sign, err := rsa.SignPKCS1v15(rand.Reader, priKey, crypto.SHA256, hasher.Sum(nil))
-	if err != nil {
-		log.Fatal("sign VerifyBillEmail error: " + err.Error())
-	}
-	req.Sign = sign
 }
 
 func ResendVerifyCode(client pb.ProviderRegisterServiceClient) (success bool, err error) {
@@ -99,7 +71,7 @@ func ResendVerifyCode(client pb.ProviderRegisterServiceClient) (success bool, er
 	node := node.LoadFormConfig()
 	req := &pb.ResendVerifyCodeReq{NodeId: node.NodeId,
 		Timestamp: uint64(time.Now().Unix())}
-	signResendVerifyCodeReq(req, node.PriKey)
+	req.SignReq(node.PriKey)
 	resp, err := client.ResendVerifyCode(ctx, req)
 	if err != nil {
 		return false, err

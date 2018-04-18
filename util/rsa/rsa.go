@@ -6,15 +6,15 @@ import (
 	"crypto/rsa"
 )
 
-func EncryptLong(pubKey *rsa.PublicKey, data []byte, bts int) ([]byte, error) {
-	if len(data) <= bts-11 {
+func EncryptLong(pubKey *rsa.PublicKey, data []byte, keyBytes int) ([]byte, error) {
+	if len(data) <= keyBytes-11 {
 		return rsa.EncryptPKCS1v15(rand.Reader, pubKey, data)
 	}
 	var err error
 	var encrypt []byte
 	var buffer bytes.Buffer
 	for i := 0; i < len(data); {
-		end := i + bts - 11
+		end := i + keyBytes - 11
 		if end > len(data) {
 			end = len(data)
 		}
@@ -28,15 +28,15 @@ func EncryptLong(pubKey *rsa.PublicKey, data []byte, bts int) ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-func DecryptLong(priKey *rsa.PrivateKey, data []byte, bts int) ([]byte, error) {
-	if len(data) <= bts {
+func DecryptLong(priKey *rsa.PrivateKey, data []byte, keyBytes int) ([]byte, error) {
+	if len(data) <= keyBytes {
 		return rsa.DecryptPKCS1v15(rand.Reader, priKey, data)
 	}
 	var err error
 	var decrypt []byte
 	var buffer bytes.Buffer
 	for i := 0; i < len(data); {
-		end := i + bts
+		end := i + keyBytes
 		if end > len(data) {
 			end = len(data)
 		}
