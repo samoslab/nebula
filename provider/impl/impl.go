@@ -14,7 +14,6 @@ import (
 
 	"github.com/boltdb/bolt"
 	"github.com/pkg/errors"
-	log "github.com/sirupsen/logrus"
 	"github.com/samoslab/nebula/provider/config"
 	"github.com/samoslab/nebula/provider/node"
 	pb "github.com/samoslab/nebula/provider/pb"
@@ -22,6 +21,7 @@ import (
 	util_file "github.com/samoslab/nebula/util/file"
 	util_hash "github.com/samoslab/nebula/util/hash"
 	util_num "github.com/samoslab/nebula/util/num"
+	log "github.com/sirupsen/logrus"
 )
 
 const stream_data_size = 32 * 1024
@@ -292,6 +292,24 @@ func sendFileToStream(path string, file *os.File, stream pb.ProviderService_Retr
 		}
 	}
 	return nil
+}
+
+func (self *ProviderService) Remove(ctx context.Context, req *pb.RemoveReq) (*pb.RemoveResp, error) {
+	if !skip_check_auth {
+		if err := req.CheckAuth(self.Node.PubKeyBytes); err != nil {
+			log.Warnf("check auth failed: %s", err.Error())
+			return nil, err
+		}
+	}
+	// subPath, bigFile, storageIdx, position, size := self.querySubPath(req.Key)
+	// if subPath == "" {
+	// 	return nil, os.ErrNotExist
+	// }
+	// if bigFile {
+	// 	//TODO
+	// }
+	// // TODO
+	return nil, nil
 }
 
 func (self *ProviderService) GetFragment(ctx context.Context, req *pb.GetFragmentReq) (*pb.GetFragmentResp, error) {
