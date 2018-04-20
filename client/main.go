@@ -8,145 +8,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"google.golang.org/grpc"
-
 	"github.com/samoslab/nebula/client/config"
 	"github.com/samoslab/nebula/client/daemon"
 	client "github.com/samoslab/nebula/client/register"
-	"github.com/samoslab/nebula/provider/node"
-	regpb "github.com/samoslab/nebula/tracker/register/client/pb"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/pflag"
 )
 
-// NewLogger create logger instance
-func NewLogger(logFilename string, debug bool) (*logrus.Logger, error) {
-	log := logrus.New()
-	log.Out = os.Stdout
-	log.Formatter = &logrus.TextFormatter{
-		FullTimestamp:    true,
-		QuoteEmptyFields: true,
-	}
-	log.Level = logrus.InfoLevel
-
-	if debug {
-		log.Level = logrus.DebugLevel
-	}
-
-	return log, nil
-}
-
-func verifyEmail(configDir string, trackerServer string, verifyCode string) {
-	cc, err := config.LoadConfig(configDir)
-	if err != nil {
-		if err == config.ErrNoConf {
-			fmt.Printf("Config file is not ready, please run \"%s register\" to register first\n", os.Args[0])
-			return
-		} else if err == config.ErrConfVerify {
-			fmt.Println("Config file wrong, can not verify email.")
-			return
-		}
-		fmt.Println("failed to load config, can not verify email: " + err.Error())
-		return
-	}
-	if verifyCode == "" {
-		fmt.Printf("verifyCode is required.\n")
-		os.Exit(9)
-	}
-	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
-	if err != nil {
-		fmt.Printf("RPC Dial failed: %s\n", err.Error())
-		return
-	}
-	defer conn.Close()
-	registerClient := regpb.NewClientRegisterServiceClient(conn)
-	code, errMsg, err := client.VerifyContactEmail(registerClient, verifyCode, cc.Node)
-	if err != nil {
-		fmt.Printf("verifyEmail failed: %s\n", err.Error())
-		return
-	}
-	if code != 0 {
-		fmt.Println(errMsg)
-		return
-	}
-	fmt.Println("verifyEmail success, you can start daemon now.")
-}
-
-// RegisterClient register client info to tracker
-func RegisterClient(log *logrus.Logger, configDir, trackerServer, emailAddress string) error {
-	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
-	if err != nil {
-		log.Fatalf("RPC Dial failed: %s", err.Error())
-		return err
-	}
-	defer conn.Close()
-
-	registerClient := regpb.NewClientRegisterServiceClient(conn)
-
-	cc, err := config.LoadConfig(configDir)
-	if err != nil {
-		fmt.Printf("load config error %v\n", err)
-		fmt.Printf("generate config\n")
-		no := node.NewNode(10)
-		cc = &config.ClientConfig{}
-		cc.PublicKey = no.PublicKeyStr()
-		cc.PrivateKey = no.PrivateKeyStr()
-		cc.NodeId = no.NodeIdStr()
-		cc.Email = emailAddress
-		cc.TrackerServer = trackerServer
-		cc.Node = no
-		err = config.SaveClientConfig(configDir, cc)
-		if err != nil {
-			log.Infof("create config failed %v\n", err)
-			return err
-		}
-	}
-
-	rsp, err := client.DoRegister(registerClient, cc)
-	if err != nil {
-		log.Infof("register error %v", err)
-		return err
-	}
-
-	if rsp.GetCode() != 0 {
-		log.Infof("register failed: %+v\n", rsp.GetErrMsg())
-	}
-
-	log.Infof("register success")
-	return nil
-}
-
-func resendVerifyCode(configDir string, trackerServer string) {
-	cc, err := config.LoadConfig(configDir)
-	if err != nil {
-		if err == config.ErrNoConf {
-			fmt.Printf("Config file is not ready, please run \"%s register\" to register first\n", os.Args[0])
-			return
-		} else if err == config.ErrConfVerify {
-			fmt.Println("Config file wrong, can not resend verify code email.")
-			return
-		}
-		fmt.Println("failed to load config, can not resend verify code email: " + err.Error())
-		return
-	}
-	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
-	if err != nil {
-		fmt.Printf("RPC Dial failed: %s\n", err.Error())
-		return
-	}
-	defer conn.Close()
-	crsc := regpb.NewClientRegisterServiceClient(conn)
-	success, err := client.ResendVerifyCode(crsc, cc.Node)
-	if err != nil {
-		fmt.Printf("resendVerifyCode failed: %s\n", err.Error())
-		return
-	}
-	if !success {
-		fmt.Println("resendVerifyCode failed, please retry")
-		return
-	}
-	fmt.Println("resendVerifyCode success, you can verify bill email.")
-}
 func main() {
 	usr, err := user.Current()
 	if err != nil {
@@ -180,7 +47,7 @@ func main() {
 		pflag.PrintDefaults()
 		log.Fatal("need tracker server -s")
 	}
-	log, err := NewLogger("", true)
+	log, err := daemon.NewLogger("", true)
 	if err != nil {
 		return
 	}
@@ -195,7 +62,7 @@ func main() {
 	}
 	switch *operation {
 	case "register":
-		RegisterClient(log, *configDirOpt, *trackerServer, *emailAddress)
+		client.RegisterClient(log, *configDirOpt, *trackerServer, *emailAddress)
 	case "verify":
 		if *code == "" {
 			fmt.Printf("code can not empy")
@@ -204,9 +71,9 @@ func main() {
 		fmt.Printf("config %v\n", *configDirOpt)
 		fmt.Printf("tracker %v\n", *trackerServer)
 		fmt.Printf("code %v\n", *code)
-		verifyEmail(*configDirOpt, *trackerServer, *code)
+		client.VerifyEmail(*configDirOpt, *trackerServer, *code)
 	case "resend":
-		resendVerifyCode(*configDirOpt, *trackerServer)
+		client.ResendVerifyCode(*configDirOpt, *trackerServer)
 	}
 
 	clientConfig, err := config.LoadConfig(*configDirOpt)
@@ -247,9 +114,15 @@ func main() {
 			log.Fatalf("create folder failed")
 		}
 	case "upload":
+		if *rootpath == "" {
+			log.Fatal("need --rootpath argument")
+		}
+		if *opfile == "" {
+			log.Fatal("need -p argument")
+		}
 		tempFile := *opfile
 		log.Infof("upload file %s", tempFile)
-		err = cm.UploadFile(tempFile)
+		err = cm.UploadFile(*rootpath, tempFile)
 		if err != nil {
 			log.Fatalf("upload file error %v", err)
 		}

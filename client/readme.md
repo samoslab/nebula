@@ -49,7 +49,8 @@ Request Body: {
 URI:/store/upload
 Method: POST
 Request Body: {
-  "filename":"/tmp/abc.txt"
+  "parent":/tmp
+  "filename":["/tmp/abc.txt"]
   }
 ```
 

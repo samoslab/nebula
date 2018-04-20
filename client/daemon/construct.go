@@ -13,9 +13,9 @@ type MyPart struct {
 }
 
 type DownFile struct {
-	ID       string
-	FileSize uint64
-	FileName string
-	FileHash string
-	Folder   bool
+	ID       string `json:"id"`
+	FileSize uint64 `json:"filesize"`
+	FileName string `json:"filename"`
+	FileHash string `json:"filehash"`
+	Folder   bool   `json:"folder"`
 }
