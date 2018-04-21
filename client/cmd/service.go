@@ -22,7 +22,7 @@ func main() {
 	defaultAppDir := filepath.Join(usr.HomeDir, ".spo-nebula-client")
 	defaultConfig := filepath.Join(defaultAppDir, "config.json")
 	configDirOpt := pflag.StringP("configfile", "c", defaultConfig, "config data file")
-	//trackerServer := pflag.StringP("tracker", "s", "127.0.0.1:6677", "tracker server, 127.0.0.1:6677")
+	trackerServer := pflag.StringP("tracker", "s", "127.0.0.1:6677", "tracker server, 127.0.0.1:6677")
 	pflag.Parse()
 	log, err := daemon.NewLogger("", true)
 	if err != nil {

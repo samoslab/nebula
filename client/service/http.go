@@ -284,13 +284,16 @@ type VerifyEmailReq struct {
 }
 
 type MkfolderReq struct {
-	Folders []string `json:"folders"`
-	Parent  string   `json:"parent"`
+	Folders     []string `json:"folders"`
+	Parent      string   `json:"parent"`
+	Interactive bool     `json:"interactive"`
 }
 
 type UploadReq struct {
-	Files  string `json:"files"`
-	Parent string `json:"parent"`
+	Filename    string `json:"filename"`
+	Parent      string `json:"parent"`
+	Interactive bool   `json:"interactive"`
+	NewVersion  bool   `json:"newversion"`
 }
 
 type DownloadReq struct {
@@ -301,7 +304,11 @@ type DownloadReq struct {
 }
 
 type ListReq struct {
-	Path string `json:"path"`
+	Path     string `json:"path"`
+	PageSize uint32 `json:"pagesize"`
+	PageNum  uint32 `json:"pagenum"`
+	SortType int32  `json:"sorttype"`
+	AscOrder bool   `json:"ascorder"`
 }
 
 type RemoveReq struct {
@@ -438,7 +445,7 @@ func MkfolderHandler(s *HTTPServer) http.HandlerFunc {
 		defer r.Body.Close()
 
 		log.Infof("mkfolder parent %s folders %+v\n", mkReq.Parent, mkReq.Folders)
-		result, err := s.cm.MkFolder(mkReq.Parent, mkReq.Folders)
+		result, err := s.cm.MkFolder(mkReq.Parent, mkReq.Folders, mkReq.Interactive)
 		if err != nil {
 			log.Errorf("create folder %+v error %v", mkReq.Parent, mkReq.Folders, err)
 		}
@@ -486,8 +493,8 @@ func UploadHandler(s *HTTPServer) http.HandlerFunc {
 
 		defer r.Body.Close()
 
-		log.Infof("upload parent %s files %+v\n", upReq.Parent, upReq.Files)
-		err := s.cm.UploadFile(upReq.Parent, upReq.Files)
+		log.Infof("upload parent %s files %+v\n", upReq.Parent, upReq.Filename)
+		err := s.cm.UploadFile(upReq.Parent, upReq.Filename, upReq.Interactive, upReq.NewVersion)
 		code := 0
 		errmsg := ""
 		result := "success"
@@ -583,7 +590,7 @@ func ListHandler(s *HTTPServer) http.HandlerFunc {
 		defer r.Body.Close()
 
 		log.Infof("list %+v", listReq)
-		result, err := s.cm.ListFiles(listReq.Path)
+		result, err := s.cm.ListFiles(listReq.Path, listReq.PageSize, listReq.PageNum, listReq.SortType, listReq.AscOrder)
 		code := 0
 		errmsg := ""
 		if err != nil {

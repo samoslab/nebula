@@ -77,9 +77,9 @@ func (c *ClientManager) ConnectProvider() error {
 }
 
 // UploadFile upload file to provider
-func (c *ClientManager) UploadFile(parent, filename string) error {
+func (c *ClientManager) UploadFile(parent, filename string, interactive, newVersion bool) error {
 	log := c.Log
-	req, rsp, err := c.CheckFileExists(filename)
+	req, rsp, err := c.CheckFileExists(filename, interactive, newVersion)
 	if err != nil {
 		return err
 	}
@@ -211,7 +211,7 @@ func (c *ClientManager) UploadFile(parent, filename string) error {
 	return nil
 }
 
-func (c *ClientManager) CheckFileExists(filename string) (*mpb.CheckFileExistReq, *mpb.CheckFileExistResp, error) {
+func (c *ClientManager) CheckFileExists(filename string, interactive, newVersion bool) (*mpb.CheckFileExistReq, *mpb.CheckFileExistResp, error) {
 	log := c.Log
 	hash, err := util_hash.Sha1File(filename)
 	if err != nil {
@@ -225,8 +225,8 @@ func (c *ClientManager) CheckFileExists(filename string) (*mpb.CheckFileExistReq
 	ctx := context.Background()
 	req := &mpb.CheckFileExistReq{}
 	req.FileSize = uint64(fileInfo.Size())
-	req.Interactive = true
-	req.NewVersion = false
+	req.Interactive = interactive
+	req.NewVersion = newVersion
 	req.Parent = &mpb.FilePath{&mpb.FilePath_Path{dir}}
 	req.FileHash = hash
 	req.NodeId = c.NodeId
@@ -249,26 +249,26 @@ func (c *ClientManager) CheckFileExists(filename string) (*mpb.CheckFileExistReq
 	if err != nil {
 		return nil, nil, err
 	}
-	log.Infof("checkfileexist req:%x\n", req.GetFileHash())
+	log.Infof("checkfileexist req:%x\n", req.GetFileName())
 	rsp, err := c.mclient.CheckFileExist(ctx, req)
 	return req, rsp, err
 }
 
 // MkFolder create folder
-func (c *ClientManager) MkFolder(filepath string, folders []string) (bool, error) {
+func (c *ClientManager) MkFolder(filepath string, folders []string, interactive bool) (bool, error) {
 	log := c.Log
 	ctx := context.Background()
 	req := &mpb.MkFolderReq{}
 	req.Parent = &mpb.FilePath{&mpb.FilePath_Path{filepath}}
 	req.Folder = folders
 	req.NodeId = c.NodeId
-	req.Interactive = false
+	req.Interactive = interactive
 	req.Timestamp = uint64(time.Now().UTC().Unix())
 	err := req.SignReq(c.cfg.Node.PriKey)
 	if err != nil {
 		return false, err
 	}
-	log.Infof("make folder req:%+v", req.GetFolder())
+	log.Infof("make folder req:%+v, nodeId:%x", req.GetFolder(), c.NodeId)
 	rsp, err := c.mclient.MkFolder(ctx, req)
 	if rsp.GetCode() != 0 {
 		return false, fmt.Errorf("%s", rsp.GetErrMsg())
@@ -450,22 +450,22 @@ func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitio
 	return nil
 }
 
-func (c *ClientManager) ListFiles(path string) ([]*DownFile, error) {
+func (c *ClientManager) ListFiles(path string, pageSize, pageNum uint32, sortType int32, ascOrder bool) ([]*DownFile, error) {
 	req := &mpb.ListFilesReq{}
 	req.Version = 1
 	req.Timestamp = uint64(time.Now().UTC().Unix())
 	req.NodeId = c.NodeId
-	req.PageSize = 10
-	req.PageNum = 1
-	req.SortType = mpb.SortType_Name
+	req.PageSize = pageSize
+	req.PageNum = pageNum
+	req.SortType = mpb.SortType(sortType)
 	req.Parent = &mpb.FilePath{&mpb.FilePath_Path{path}}
-	req.AscOrder = true
+	req.AscOrder = ascOrder
 	err := req.SignReq(c.cfg.Node.PriKey)
 	if err != nil {
 		return nil, err
 	}
 	ctx := context.Background()
-	c.Log.Infof("req:%+v", req.Timestamp)
+	c.Log.Infof("req:%+v, path %s", req.Timestamp, req.Parent)
 	rsp, err := c.mclient.ListFiles(ctx, req)
 
 	if err != nil {
@@ -561,7 +561,7 @@ func (c *ClientManager) saveFileByPartition(filename string, partition *mpb.Retr
 	log.Infof("there is %d blocks", len(partition.GetBlock()))
 	dataShards := 0
 	parityShards := 0
-	for i, block := range partition.GetBlock() {
+	for _, block := range partition.GetBlock() {
 		if block.GetChecksum() {
 			parityShards++
 		} else {
@@ -585,11 +585,9 @@ func (c *ClientManager) saveFileByPartition(filename string, partition *mpb.Retr
 		log.Infof("file %s retrieve from %s", tempFileName, server)
 		log.Infof("node ticket %s, tm %d", node1.GetTicket(), tm)
 		log.Infof("filename %s ticket %s size %d", tempFileName, node1.GetTicket(), block.GetSize())
-		if i == 2 {
-			err = client.Retrieve(pclient, tempFileName, node1.GetAuth(), node1.GetTicket(), block.GetHash(), tm, block.GetSize())
-			if err != nil {
-				return 0, 0, err
-			}
+		err = client.Retrieve(pclient, tempFileName, node1.GetAuth(), node1.GetTicket(), block.GetHash(), tm, block.GetSize())
+		if err != nil {
+			return 0, 0, err
 		}
 		log.Infof("retrieve %s success", tempFileName)
 	}

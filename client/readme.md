@@ -18,7 +18,6 @@ URI:/store/register
 Method:POST
 Request Body: {
    email:string
-   configdir:string
    }
 ```
 
@@ -40,6 +39,7 @@ Method: POST
 Request Body: {
   "parent":"/"
   "":["abc","tmp"]
+  "interactive":bool
 }
 ```
 
@@ -50,7 +50,9 @@ URI:/store/upload
 Method: POST
 Request Body: {
   "parent":/tmp
-  "filename":["/tmp/abc.txt"]
+  "filename":"/tmp/abc.txt"
+  "interactive":true
+  "newversion" :false
   }
 ```
 
@@ -62,6 +64,10 @@ URI:/store/list
 Method: get
 Request Body: {
   "path":"/tmp"
+  "pagesize":10
+  "pagenum":3
+  "sorttype":1
+  "ascorder":true
   }
 ```
 

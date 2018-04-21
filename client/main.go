@@ -31,10 +31,14 @@ func main() {
 	newfolder := pflag.StringP("newfolder", "n", "", "newfolder for create, join by ,")
 	downsize := pflag.Uint64P("downsize", "", 0, "downfile size")
 	downhash := pflag.StringP("downhash", "", "", "downhash string")
+	interactive := pflag.BoolP("interactive", "", false, "interactive or not")
+	newVersion := pflag.BoolP("newversion", "", false, "newversion or not")
 	ispath := pflag.BoolP("ispath", "", true, "is path or fileid, true is path")
 	recursive := pflag.BoolP("recursive", "", false, "recursive delete or not")
-
-	///tmp/big1 false 181529811 07d0cf85ed032f73c91726e1e5063a620a9f23d4
+	pageSize := pflag.Uint32P("pagesize", "", 10, "page size")
+	pageNum := pflag.Uint32P("pagenum", "", 3, "page number")
+	sortType := pflag.Int32P("sorttype", "", 1, "list files sort type")
+	ascOrder := pflag.BoolP("ascorder", "", true, "asc order or not")
 
 	pflag.Parse()
 	if *operation == "" {
@@ -94,7 +98,7 @@ func main() {
 		return
 	}
 	defer cm.Shutdown()
-	log.Infof("start client")
+	log.Infof("start client id:%s", clientConfig.NodeId)
 	switch *operation {
 	case "mkfolder":
 		if *rootpath == "" {
@@ -105,7 +109,7 @@ func main() {
 		}
 		folders := strings.Split(*newfolder, ",")
 		log.Infof("create folder %+v", folders)
-		success, err := cm.MkFolder(*rootpath, folders)
+		success, err := cm.MkFolder(*rootpath, folders, *interactive)
 		if err != nil {
 			log.Fatalf("mkdir folder error %v", err)
 		}
@@ -120,18 +124,18 @@ func main() {
 		if *opfile == "" {
 			log.Fatal("need -p argument")
 		}
-		tempFile := *opfile
-		log.Infof("upload file %s", tempFile)
-		err = cm.UploadFile(*rootpath, tempFile)
+		log.Infof("upload file %s", *opfile)
+		err = cm.UploadFile(*rootpath, *opfile, *interactive, *newVersion)
 		if err != nil {
 			log.Fatalf("upload file error %v", err)
 		}
-		log.Infof("file %s upload success", tempFile)
+		log.Infof("file %s upload success", *opfile)
 	case "list":
 		if *rootpath == "" {
 			log.Fatal("need --rootpath argument")
 		}
-		rsp, err := cm.ListFiles(*rootpath)
+		log.Infof("rootpath %s", *rootpath)
+		rsp, err := cm.ListFiles(*rootpath, *pageSize, *pageNum, *sortType, *ascOrder)
 		if err != nil {
 			log.Fatalf("list files error %v", err)
 		}
