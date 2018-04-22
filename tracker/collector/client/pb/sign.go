@@ -48,3 +48,7 @@ func (self *CollectReq) SignReq(priKey *rsa.PrivateKey) (err error) {
 	self.Sign, err = rsa.SignPKCS1v15(rand.Reader, priKey, crypto.SHA256, self.hash())
 	return
 }
+
+func (self *CollectReq) VerifySign(pubKey *rsa.PublicKey) error {
+	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, self.hash(), self.Sign)
+}
