@@ -10,11 +10,11 @@ service ClientCollectorService {
 
 
 message CollectReq{
-    bytes nodeId=1;
-    uint64 timestamp=2;
-    repeated ActionLog actionLog=3;
-    bytes sign=4;
-    
+    uint32 version =1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    repeated ActionLog actionLog=4;
+    bytes sign=5;
 }
 
 message CollectResp{
@@ -28,10 +28,13 @@ message ActionLog{
     bool success=4;
     bytes fileHash=5;
     uint64 fileSize=6;
-    bytes blockHash=7;
-    uint32 blockSize=8;
-    uint64 beginTime=9;
-    uint64 endTime=10;
-    uint32 transportSize=11;
-    string info=12;// error info
+    uint32 partitionSeq=7;
+    bool checksum=8;
+    uint32 blockSeq=9;
+    bytes blockHash=10;
+    uint64 blockSize=11;
+    uint64 beginTime=12;
+    uint64 endTime=13;
+    uint64 transportSize=14;
+    string info=15;// error info
 }
