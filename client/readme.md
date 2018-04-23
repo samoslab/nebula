@@ -65,10 +65,38 @@ Method: get
 Request Body: {
   "path":"/tmp"
   "pagesize":10
-  "pagenum":3
-  "sorttype":1
+  "pagenum":1
+  "sorttype":name|size|modtime
   "ascorder":true
   }
+
+```
+
+Example
+
+```
+curl -X POST -H "Content-Type:application/json" -d '{"path":"/tmp/ok", "pagesize":10, "pagenum":1, "sorttype":"name", "ascorder":true}' http://127.0.0.1:7788/store/list
+{
+    "errmsg": "",
+    "code": 0,
+    "Data": [
+        {
+            "id": "f844e3f3-97a5-4da3-989e-ef354c8f4426",
+            "filesize": 45382461,
+            "filename": "/tmp/ok/testfile.big",
+            "filehash": "8839307ab1fa4e37498136ddf47107058e33ecd5",
+            "folder": false
+        },
+        {
+            "id": "aa84ec51-c52c-41bf-bb65-8a28b6c8a57b",
+            "filesize": 90764994,
+            "filename": "/tmp/ok/erasure.12",
+            "filehash": "7d5d901257ca0ac2fc170ade09f17524d195c6e8",
+            "folder": false
+        }
+   ]
+}
+
 ```
 
 ## store download files
@@ -90,7 +118,7 @@ Request Body: {
 URI:/store/remove
 Method: POST
 Request Body: {
-   path:string
+   filepath:string
    folder:bool
    recursion:bool
    }

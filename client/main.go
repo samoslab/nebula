@@ -36,8 +36,8 @@ func main() {
 	ispath := pflag.BoolP("ispath", "", true, "is path or fileid, true is path")
 	recursive := pflag.BoolP("recursive", "", false, "recursive delete or not")
 	pageSize := pflag.Uint32P("pagesize", "", 10, "page size")
-	pageNum := pflag.Uint32P("pagenum", "", 3, "page number")
-	sortType := pflag.Int32P("sorttype", "", 1, "list files sort type")
+	pageNum := pflag.Uint32P("pagenum", "", 1, "page number")
+	sortType := pflag.StringP("sorttype", "", "name", "list files sort type")
 	ascOrder := pflag.BoolP("ascorder", "", true, "asc order or not")
 
 	pflag.Parse()
@@ -134,7 +134,7 @@ func main() {
 		if *rootpath == "" {
 			log.Fatal("need --rootpath argument")
 		}
-		log.Infof("rootpath %s", *rootpath)
+		log.Infof("rootpath %s, pageNum %d ,pageSize %d", *rootpath, *pageNum, *pageSize)
 		rsp, err := cm.ListFiles(*rootpath, *pageSize, *pageNum, *sortType, *ascOrder)
 		if err != nil {
 			log.Fatalf("list files error %v", err)

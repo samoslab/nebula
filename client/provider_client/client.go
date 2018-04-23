@@ -26,7 +26,7 @@ func UpdateStoreReqAuth(obj *pb.StoreReq) *pb.StoreReq {
 	return obj
 }
 
-func StorePiece(client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, tm uint64, key []byte, fileSize uint64, first bool) error {
+func StorePiece(client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, tm uint64, key []byte, fileSize uint64) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		fmt.Printf("open file failed: %s\n", err.Error())
@@ -49,17 +49,9 @@ func StorePiece(client pb.ProviderServiceClient, filePath string, auth []byte, t
 			fmt.Printf("read file failed: %s\n", err.Error())
 			return err
 		}
-		if first {
-			first = false
-			if err := stream.Send(UpdateStoreReqAuth(&pb.StoreReq{Data: buf[:bytesRead], Ticket: ticket, Auth: auth, Timestamp: tm, Key: key, FileSize: fileSize})); err != nil {
-				fmt.Printf("RPC Send StoreReq failed: %s\n", err.Error())
-				return err
-			}
-		} else {
-			if err := stream.Send(&pb.StoreReq{Data: buf[:bytesRead]}); err != nil {
-				fmt.Printf("RPC Send StoreReq failed: %s\n", err.Error())
-				return err
-			}
+		if err := stream.Send(UpdateStoreReqAuth(&pb.StoreReq{Data: buf[:bytesRead], Ticket: ticket, Auth: auth, Timestamp: tm, Key: key, FileSize: fileSize})); err != nil {
+			fmt.Printf("RPC Send StoreReq failed: %s\n", err.Error())
+			return err
 		}
 		if bytesRead < stream_data_size {
 			break
@@ -77,7 +69,7 @@ func StorePiece(client pb.ProviderServiceClient, filePath string, auth []byte, t
 	return nil
 }
 
-func Store(client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, tm uint64, key []byte, fileSize uint64, first bool) error {
+func Store(client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, tm uint64, key []byte, fileSize uint64) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		fmt.Printf("open file failed: %s", err.Error())
@@ -96,16 +88,9 @@ func Store(client pb.ProviderServiceClient, filePath string, auth []byte, ticket
 		return err
 	}
 
-	if first {
-		if err := stream.Send(UpdateStoreReqAuth(&pb.StoreReq{Data: buf, Ticket: ticket, Auth: auth, Timestamp: tm, Key: key, FileSize: fileSize})); err != nil {
-			fmt.Printf("RPC Send StoreReq failed: %s", err.Error())
-			return err
-		}
-	} else {
-		if err := stream.Send(&pb.StoreReq{Data: buf}); err != nil {
-			fmt.Printf("RPC Send StoreReq failed: %s", err.Error())
-			return nil
-		}
+	if err := stream.Send(UpdateStoreReqAuth(&pb.StoreReq{Data: buf, Ticket: ticket, Auth: auth, Timestamp: tm, Key: key, FileSize: fileSize})); err != nil {
+		fmt.Printf("RPC Send StoreReq failed: %s", err.Error())
+		return err
 	}
 	storeResp, err := stream.CloseAndRecv()
 	if err != nil {

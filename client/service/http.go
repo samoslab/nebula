@@ -336,14 +336,14 @@ type ListReq struct {
 	Path     string `json:"path"`
 	PageSize uint32 `json:"pagesize"`
 	PageNum  uint32 `json:"pagenum"`
-	SortType int32  `json:"sorttype"`
+	SortType string `json:"sorttype"`
 	AscOrder bool   `json:"ascorder"`
 }
 
 type RemoveReq struct {
 	FilePath  string `json:"filepath"`
 	Recursion bool   `json:"recursion"`
-	Folder    bool   `json:"folder"`
+	IsPath    bool   `json:"ispath"`
 }
 
 // MkfolderHandler create folders
@@ -376,6 +376,10 @@ func RegisterHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		defer r.Body.Close()
+		if regReq.Email == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument email must not empty"))
+			return
+		}
 
 		var err error
 		if regReq.Resend {
@@ -442,6 +446,11 @@ func EmailHandler(s *HTTPServer) http.HandlerFunc {
 
 		defer r.Body.Close()
 
+		if mailReq.Code == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument code must not empty"))
+			return
+		}
+
 		err := regclient.VerifyEmail(s.cfg.ConfigDir, s.cfg.TrackerServer, mailReq.Code)
 		code := 0
 		errmsg := ""
@@ -489,8 +498,17 @@ func MkfolderHandler(s *HTTPServer) http.HandlerFunc {
 			errorResponse(ctx, w, http.StatusBadRequest, err)
 			return
 		}
-
 		defer r.Body.Close()
+		if mkReq.Parent == "" || len(mkReq.Folders) == 0 {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument parent or folders must not empty"))
+			return
+		}
+		for _, folder := range mkReq.Folders {
+			if strings.Contains(folder, "/") {
+				errorResponse(ctx, w, http.StatusBadRequest, fmt.Errorf("folder %s contains /", folder))
+				return
+			}
+		}
 
 		log.Infof("mkfolder parent %s folders %+v\n", mkReq.Parent, mkReq.Folders)
 		result, err := s.cm.MkFolder(mkReq.Parent, mkReq.Folders, mkReq.Interactive)
@@ -544,6 +562,11 @@ func UploadHandler(s *HTTPServer) http.HandlerFunc {
 
 		defer r.Body.Close()
 
+		if upReq.Filename == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument filename must not empty"))
+			return
+		}
+
 		log.Infof("upload parent %s files %+v\n", upReq.Parent, upReq.Filename)
 		err := s.cm.UploadFile(upReq.Parent, upReq.Filename, upReq.Interactive, upReq.NewVersion)
 		code := 0
@@ -595,6 +618,11 @@ func DownloadHandler(s *HTTPServer) http.HandlerFunc {
 
 		defer r.Body.Close()
 
+		if downReq.FileHash == "" || downReq.FileSize == 0 || downReq.FileName == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument filehash filesize or filename must not empty"))
+			return
+		}
+
 		log.Infof("download  %+v", downReq)
 		err := s.cm.DownloadFile(downReq.FileName, downReq.FileHash, downReq.FileSize, downReq.Folder)
 		code := 0
@@ -645,6 +673,10 @@ func ListHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		defer r.Body.Close()
+		if listReq.Path == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument path must not empty"))
+			return
+		}
 
 		log.Infof("list %+v", listReq)
 		result, err := s.cm.ListFiles(listReq.Path, listReq.PageSize, listReq.PageNum, listReq.SortType, listReq.AscOrder)
@@ -695,9 +727,13 @@ func RemoveHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		defer r.Body.Close()
+		if rmReq.FilePath == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument filepath must not empty"))
+			return
+		}
 
 		log.Infof("remove %+v", rmReq)
-		err := s.cm.RemoveFile(rmReq.FilePath, rmReq.Recursion, rmReq.Folder)
+		err := s.cm.RemoveFile(rmReq.FilePath, rmReq.Recursion, rmReq.IsPath)
 		code := 0
 		errmsg := ""
 		result := true
