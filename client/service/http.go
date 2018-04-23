@@ -42,8 +42,9 @@ var (
 
 // HTTPServer exposes the API endpoints and static website
 type HTTPServer struct {
-	cfg           config.Config
-	log           logrus.FieldLogger
+	cfg config.Config
+	log logrus.FieldLogger
+	//log           *logrus.Logger
 	cm            *daemon.ClientManager
 	httpListener  *http.Server
 	httpsListener *http.Server
@@ -51,17 +52,45 @@ type HTTPServer struct {
 	done          chan struct{}
 }
 
+func InitClientManager(log logrus.FieldLogger) (*daemon.ClientManager, error) {
+	_, defaultConfig := daemon.GetConfigFile()
+	clientConfig, err := config.LoadConfig(defaultConfig)
+	if err != nil {
+		if err == config.ErrNoConf {
+			return nil, fmt.Errorf("Config file is not ready, please call /store/register to register first")
+		} else if err == config.ErrConfVerify {
+			return nil, fmt.Errorf("Config file wrong, can not start daemon.")
+		}
+	}
+	//clientConfig.TempDir = "/tmp"
+	cm, err := daemon.NewClientManager(log, clientConfig.TrackerServer, clientConfig)
+	if err != nil {
+		fmt.Printf("new client manager failed %v\n", err)
+		return cm, err
+	}
+	return cm, nil
+}
+
 // NewHTTPServer creates an HTTPServer
-func NewHTTPServer(log logrus.FieldLogger, cm *daemon.ClientManager, cfg config.Config) *HTTPServer {
+func NewHTTPServer(log logrus.FieldLogger, cfg config.Config) *HTTPServer {
+	cm, err := InitClientManager(log)
+	if err != nil {
+		log.Errorf("init client manager failed, error %v", err)
+	}
 	return &HTTPServer{
-		cfg: cfg,
-		log: log.WithFields(logrus.Fields{
-			"prefix": "nebula.http",
-		}),
+		cfg:  cfg,
+		log:  log,
 		cm:   cm,
 		quit: make(chan struct{}),
 		done: make(chan struct{}),
 	}
+}
+
+func (s *HTTPServer) CanBeWork() bool {
+	if s.cm != nil {
+		return true
+	}
+	return false
 }
 
 // Run runs the HTTPServer
@@ -275,8 +304,8 @@ func (s *HTTPServer) setupMux() *http.ServeMux {
 }
 
 type RegisterReq struct {
-	Email     string `json:"email"`
-	ConfigDir string `json:"config_dir"`
+	Email  string `json:"email"`
+	Resend bool   `josn:"resend"`
 }
 
 type VerifyEmailReq struct {
@@ -322,11 +351,10 @@ type RemoveReq struct {
 // Accept: application/json
 // URI: /store/mkfolder
 // Args:
-//    {"address": "...", "tokenType": "BTC"}
 
 func RegisterHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log := s.cm.Log
+		log := s.log
 		ctx := r.Context()
 		w.Header().Set("Accept", "application/json")
 
@@ -349,16 +377,30 @@ func RegisterHandler(s *HTTPServer) http.HandlerFunc {
 
 		defer r.Body.Close()
 
-		log.Infof("register email %s dir %s", regReq.Email, regReq.ConfigDir)
-		err := regclient.RegisterClient(log, regReq.ConfigDir, s.cfg.TrackerServer, regReq.Email)
+		var err error
+		if regReq.Resend {
+			err = regclient.ResendVerifyCode(s.cfg.ConfigDir, s.cfg.TrackerServer)
+		} else {
+			log.Infof("register email %s dir %s", regReq.Email, s.cfg.ConfigDir)
+			err = regclient.RegisterClient(log, s.cfg.ConfigDir, s.cfg.TrackerServer, regReq.Email)
+		}
 		code := 0
 		errmsg := ""
 		result := "ok"
 		if err != nil {
-			log.Errorf("create folder %+v error %v", regReq, err)
+			log.Errorf("send email %+v error %v", regReq, err)
 			code = 1
 			errmsg = err.Error()
 			result = ""
+		}
+		if !regReq.Resend {
+			cm, err := InitClientManager(log)
+			if err != nil {
+				code = 1
+				errmsg = err.Error()
+			} else {
+				s.cm = cm
+			}
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
@@ -374,8 +416,11 @@ func RegisterHandler(s *HTTPServer) http.HandlerFunc {
 
 func EmailHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log := s.cm.Log
 		ctx := r.Context()
+		if !s.CanBeWork() {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
+		}
+		log := s.cm.Log
 		w.Header().Set("Accept", "application/json")
 
 		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
@@ -402,7 +447,7 @@ func EmailHandler(s *HTTPServer) http.HandlerFunc {
 		errmsg := ""
 		result := "ok"
 		if err != nil {
-			log.Errorf("create folder %+v error %v", mailReq, err)
+			log.Errorf("verify email %+v error %v", mailReq, err)
 			code = 1
 			errmsg = err.Error()
 			result = ""
@@ -421,8 +466,11 @@ func EmailHandler(s *HTTPServer) http.HandlerFunc {
 
 func MkfolderHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log := s.cm.Log
 		ctx := r.Context()
+		if !s.CanBeWork() {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
+		}
+		log := s.cm.Log
 		w.Header().Set("Accept", "application/json")
 
 		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
@@ -470,8 +518,11 @@ func MkfolderHandler(s *HTTPServer) http.HandlerFunc {
 
 func UploadHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log := s.cm.Log
 		ctx := r.Context()
+		if !s.CanBeWork() {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
+		}
+		log := s.cm.Log
 		w.Header().Set("Accept", "application/json")
 
 		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
@@ -518,8 +569,11 @@ func UploadHandler(s *HTTPServer) http.HandlerFunc {
 
 func DownloadHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log := s.cm.Log
 		ctx := r.Context()
+		if !s.CanBeWork() {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
+		}
+		log := s.cm.Log
 		w.Header().Set("Accept", "application/json")
 
 		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
@@ -566,8 +620,11 @@ func DownloadHandler(s *HTTPServer) http.HandlerFunc {
 
 func ListHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log := s.cm.Log
 		ctx := r.Context()
+		if !s.CanBeWork() {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
+		}
+		log := s.cm.Log
 		w.Header().Set("Accept", "application/json")
 
 		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
@@ -613,8 +670,11 @@ func ListHandler(s *HTTPServer) http.HandlerFunc {
 
 func RemoveHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log := s.cm.Log
 		ctx := r.Context()
+		if !s.CanBeWork() {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
+		}
+		log := s.cm.Log
 		w.Header().Set("Accept", "application/json")
 
 		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
@@ -713,6 +773,9 @@ func (s *HTTPServer) Shutdown() {
 	shutdown("HTTP", s.httpListener)
 	shutdown("HTTPS", s.httpsListener)
 
+	if s.cm != nil {
+		s.cm.Shutdown()
+	}
 	wg.Wait()
 
 	<-s.done

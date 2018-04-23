@@ -31,19 +31,19 @@ type ClientManager struct {
 	mclient    mpb.MatadataServiceClient
 	NodeId     []byte
 	TempDir    string
-	Log        *logrus.Logger
+	Log        logrus.FieldLogger
 	cfg        *config.ClientConfig
 	serverConn *grpc.ClientConn
 }
 
 // NewClientManager create manager
-func NewClientManager(log *logrus.Logger, trackerServer string, cfg *config.ClientConfig) (*ClientManager, error) {
+func NewClientManager(log logrus.FieldLogger, trackerServer string, cfg *config.ClientConfig) (*ClientManager, error) {
 	if trackerServer == "" {
 		return nil, errors.New("tracker server nil")
 	}
-	if cfg == nil {
-		return nil, errors.New("client config nil")
-	}
+	//if cfg == nil {
+	//return nil, errors.New("client config nil")
+	//}
 	c := &ClientManager{}
 	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
 	if err != nil {

@@ -2,13 +2,8 @@ package register
 
 import (
 	"context"
-	"crypto"
-	"crypto/rand"
-	"crypto/rsa"
-	"crypto/sha256"
 	"crypto/x509"
 	"fmt"
-	"log"
 	"os"
 	"time"
 
@@ -18,7 +13,6 @@ import (
 	"github.com/samoslab/nebula/provider/node"
 	pb "github.com/samoslab/nebula/tracker/register/client/pb"
 	regpb "github.com/samoslab/nebula/tracker/register/client/pb"
-	util_bytes "github.com/samoslab/nebula/util/bytes"
 	rsalong "github.com/samoslab/nebula/util/rsa"
 	"github.com/sirupsen/logrus"
 )
@@ -68,18 +62,6 @@ func DoRegister(registClient pb.ClientRegisterServiceClient, cfg *config.ClientC
 	return rsp, nil
 }
 
-func signVerifyContactEmailReq(req *pb.VerifyContactEmailReq, priKey *rsa.PrivateKey) {
-	hasher := sha256.New()
-	hasher.Write(req.NodeId)
-	hasher.Write(util_bytes.FromUint64(req.Timestamp))
-	hasher.Write([]byte(req.VerifyCode))
-	sign, err := rsa.SignPKCS1v15(rand.Reader, priKey, crypto.SHA256, hasher.Sum(nil))
-	if err != nil {
-		log.Fatal("sign VerifyContactEmail error: " + err.Error())
-	}
-	req.Sign = sign
-}
-
 func VerifyContactEmail(client pb.ClientRegisterServiceClient, verifyCode string, node *node.Node) (code uint32, errMsg string, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -93,7 +75,6 @@ func VerifyContactEmail(client pb.ClientRegisterServiceClient, verifyCode string
 	if err != nil {
 		return 0, "", err
 	}
-	//signVerifyContactEmailReq(req, node.PriKey)
 	resp, err := client.VerifyContactEmail(ctx, req)
 	if err != nil {
 		return 0, "", err
@@ -118,7 +99,7 @@ func resendVerifyCode(client pb.ClientRegisterServiceClient, node *node.Node) (s
 }
 
 // RegisterClient register client info to tracker
-func RegisterClient(log *logrus.Logger, configDir, trackerServer, emailAddress string) error {
+func RegisterClient(log logrus.FieldLogger, configDir, trackerServer, emailAddress string) error {
 	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("RPC Dial failed: %s", err.Error())
@@ -198,34 +179,36 @@ func VerifyEmail(configDir string, trackerServer string, verifyCode string) erro
 	return nil
 }
 
-func ResendVerifyCode(configDir string, trackerServer string) {
+func ResendVerifyCode(configDir string, trackerServer string) error {
 	cc, err := config.LoadConfig(configDir)
 	if err != nil {
 		if err == config.ErrNoConf {
 			fmt.Printf("Config file is not ready, please run \"%s register\" to register first\n", os.Args[0])
-			return
+			return err
 		} else if err == config.ErrConfVerify {
 			fmt.Println("Config file wrong, can not resend verify code email.")
-			return
+			return err
 		}
 		fmt.Println("failed to load config, can not resend verify code email: " + err.Error())
-		return
+		return err
 	}
 	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
 	if err != nil {
 		fmt.Printf("RPC Dial failed: %s\n", err.Error())
-		return
+		return err
 	}
 	defer conn.Close()
 	crsc := regpb.NewClientRegisterServiceClient(conn)
 	success, err := resendVerifyCode(crsc, cc.Node)
 	if err != nil {
 		fmt.Printf("resendVerifyCode failed: %s\n", err.Error())
-		return
+		return err
 	}
 	if !success {
 		fmt.Println("resendVerifyCode failed, please retry")
-		return
+		return fmt.Errorf("resendVerifyCode failed, please retry")
 	}
+
 	fmt.Println("resendVerifyCode success, you can verify bill email.")
+	return nil
 }
