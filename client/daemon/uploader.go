@@ -51,11 +51,10 @@ func NewClientManager(log logrus.FieldLogger, trackerServer string, cfg *config.
 	c := &ClientManager{}
 	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
 	if err != nil {
-		fmt.Printf("RPC Dial failed: %s", err.Error())
+		log.Errorf("RPC Dial failed: %s", err.Error())
 		return nil, err
 	}
-	fmt.Printf("tracker server %s\n", trackerServer)
-	//defer conn.Close()
+	log.Infof("tracker server %s", trackerServer)
 	c.serverConn = conn
 
 	c.mclient = mpb.NewMatadataServiceClient(conn)
@@ -88,7 +87,7 @@ func (c *ClientManager) UploadFile(parent, filename string, interactive, newVers
 		return err
 	}
 
-	log.Infof("check file exists rsp code:%d\n", rsp.GetCode())
+	log.Infof("check file exists rsp code:%d", rsp.GetCode())
 	if rsp.GetCode() == 0 {
 		log.Infof("upload success %s %s", filename, rsp.GetErrMsg())
 		return nil
@@ -101,14 +100,14 @@ func (c *ClientManager) UploadFile(parent, filename string, interactive, newVers
 	log.Infof("start upload file %s", filename)
 	switch rsp.GetStoreType() {
 	case mpb.FileStoreType_MultiReplica:
-		log.Infof("upload manner is multi-replication\n")
-		partitions, err := c.uploadFileByMultiReplica(req, rsp)
+		log.Infof("upload manner is multi-replication")
+		partitions, err := c.uploadFileByMultiReplica(filename, req, rsp)
 		if err != nil {
 			return err
 		}
 		return c.UploadFileDone(req, partitions)
 	case mpb.FileStoreType_ErasureCode:
-		log.Infof("upload manner erasure\n")
+		log.Infof("upload manner is erasure")
 		partFiles := []string{}
 		var err error
 		fileSize := int64(req.GetFileSize())
@@ -230,7 +229,7 @@ func (c *ClientManager) CheckFileExists(filename string, interactive, newVersion
 	if err != nil {
 		return nil, nil, err
 	}
-	dir, _ := filepath.Split(filename)
+	dir, fname := filepath.Split(filename)
 	ctx := context.Background()
 	req := &mpb.CheckFileExistReq{}
 	req.FileSize = uint64(fileInfo.Size())
@@ -239,7 +238,7 @@ func (c *ClientManager) CheckFileExists(filename string, interactive, newVersion
 	req.Parent = &mpb.FilePath{&mpb.FilePath_Path{dir}}
 	req.FileHash = hash
 	req.NodeId = c.NodeId
-	req.FileName = filename
+	req.FileName = fname
 	req.Timestamp = uint64(time.Now().UTC().Unix())
 	mtime, err := GetFileModTime(filename)
 	if err != nil {
@@ -258,7 +257,7 @@ func (c *ClientManager) CheckFileExists(filename string, interactive, newVersion
 	if err != nil {
 		return nil, nil, err
 	}
-	log.Infof("checkfileexist req:%x\n", req.GetFileName())
+	log.Infof("check file exist req:%s", req.GetFileName())
 	rsp, err := c.mclient.CheckFileExist(ctx, req)
 	return req, rsp, err
 }
@@ -363,7 +362,7 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 func (c *ClientManager) uploadFileToReplicaProvider(pro *mpb.ReplicaProvider, fileInfo HashFile) ([]byte, error) {
 	log := c.Log
 	server := fmt.Sprintf("%s:%d", pro.GetServer(), pro.GetPort())
-	log.Infof("upload to provider %s\n", server)
+	log.Infof("upload to provider %s", server)
 	conn, err := grpc.Dial(server, grpc.WithInsecure())
 	if err != nil {
 		log.Errorf("RPC Dail failed: %v", err)
@@ -379,7 +378,7 @@ func (c *ClientManager) uploadFileToReplicaProvider(pro *mpb.ReplicaProvider, fi
 
 	err = client.StorePiece(log, pclient, fileInfo.FileName, pro.GetAuth(), pro.GetTicket(), pro.GetTimestamp(), fileInfo.FileHash, uint64(fileInfo.FileSize))
 	if err != nil {
-		log.Errorf("upload error %v\n", err)
+		log.Errorf("upload error %v", err)
 		return nil, err
 	}
 
@@ -388,10 +387,10 @@ func (c *ClientManager) uploadFileToReplicaProvider(pro *mpb.ReplicaProvider, fi
 	return pro.GetNodeId(), nil
 }
 
-func (c *ClientManager) uploadFileByMultiReplica(req *mpb.CheckFileExistReq, rsp *mpb.CheckFileExistResp) ([]*mpb.StorePartition, error) {
+func (c *ClientManager) uploadFileByMultiReplica(filename string, req *mpb.CheckFileExistReq, rsp *mpb.CheckFileExistResp) ([]*mpb.StorePartition, error) {
 
 	fileInfo := HashFile{}
-	fileInfo.FileName = req.FileName
+	fileInfo.FileName = filename
 	fileInfo.FileSize = int64(req.FileSize)
 	fileInfo.FileHash = req.FileHash
 	fileInfo.SliceIndex = 0
@@ -413,7 +412,7 @@ func (c *ClientManager) uploadFileByMultiReplica(req *mpb.CheckFileExistReq, rsp
 	partition := &mpb.StorePartition{}
 	partition.Block = append(partition.Block, block)
 	partitions := []*mpb.StorePartition{partition}
-	fmt.Printf("partitions %+v\n", partitions)
+	fmt.Printf("partitions %+v", partitions)
 	return partitions, nil
 }
 
@@ -517,7 +516,7 @@ func (c *ClientManager) DownloadFile(fileName string, filehash string, fileSize 
 		return err
 	}
 	ctx := context.Background()
-	log.Infof("download file req size:%d, hash:%+v", fof.GetFileSize(), fof.GetFileHash())
+	log.Infof("download file request hash:%s, size %d", filehash, fof.GetFileSize())
 	rsp, err := c.mclient.RetrieveFile(ctx, req)
 	if err != nil {
 		return err
@@ -529,7 +528,7 @@ func (c *ClientManager) DownloadFile(fileName string, filehash string, fileSize 
 	// tiny file
 	if filedata := rsp.GetFileData(); filedata != nil {
 		saveFile(fof.Name, filedata)
-		log.Infof("tiny file %s", fof.Name)
+		log.Infof("download tiny file %s", fof.Name)
 		return nil
 	}
 
