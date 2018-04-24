@@ -9,6 +9,7 @@ import (
 
 	pb "github.com/samoslab/nebula/provider/pb"
 	util_hash "github.com/samoslab/nebula/util/hash"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 )
 
@@ -26,16 +27,16 @@ func UpdateStoreReqAuth(obj *pb.StoreReq) *pb.StoreReq {
 	return obj
 }
 
-func StorePiece(client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, tm uint64, key []byte, fileSize uint64) error {
+func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, tm uint64, key []byte, fileSize uint64) error {
 	file, err := os.Open(filePath)
 	if err != nil {
-		fmt.Printf("open file failed: %s\n", err.Error())
+		log.Errorf("open file failed: %s\n", err.Error())
 		return err
 	}
 	defer file.Close()
 	stream, err := client.Store(context.Background())
 	if err != nil {
-		fmt.Printf("RPC Store failed: %s\n", err.Error())
+		log.Errorf("RPC Store failed: %s\n", err.Error())
 		return err
 	}
 	defer stream.CloseSend()
@@ -46,11 +47,11 @@ func StorePiece(client pb.ProviderServiceClient, filePath string, auth []byte, t
 			if err == io.EOF {
 				break
 			}
-			fmt.Printf("read file failed: %s\n", err.Error())
+			log.Errorf("read file failed: %s\n", err.Error())
 			return err
 		}
 		if err := stream.Send(UpdateStoreReqAuth(&pb.StoreReq{Data: buf[:bytesRead], Ticket: ticket, Auth: auth, Timestamp: tm, Key: key, FileSize: fileSize})); err != nil {
-			fmt.Printf("RPC Send StoreReq failed: %s\n", err.Error())
+			log.Errorf("RPC Send StoreReq failed: %s\n", err.Error())
 			return err
 		}
 		if bytesRead < stream_data_size {
@@ -59,7 +60,7 @@ func StorePiece(client pb.ProviderServiceClient, filePath string, auth []byte, t
 	}
 	storeResp, err := stream.CloseAndRecv()
 	if err != nil {
-		fmt.Printf("RPC CloseAndRecv failed: %s\n", err.Error())
+		log.Errorf("RPC CloseAndRecv failed: %s\n", err.Error())
 		return err
 	}
 	if !storeResp.Success {
@@ -69,32 +70,32 @@ func StorePiece(client pb.ProviderServiceClient, filePath string, auth []byte, t
 	return nil
 }
 
-func Store(client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, tm uint64, key []byte, fileSize uint64) error {
+func Store(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, tm uint64, key []byte, fileSize uint64) error {
 	file, err := os.Open(filePath)
 	if err != nil {
-		fmt.Printf("open file failed: %s", err.Error())
+		log.Errorf("open file failed: %s", err.Error())
 		return err
 	}
 	defer file.Close()
 	stream, err := client.Store(context.Background())
 	if err != nil {
-		fmt.Printf("RPC Store failed: %s", err.Error())
+		log.Errorf("RPC Store failed: %s", err.Error())
 		return err
 	}
 	defer stream.CloseSend()
 	buf, err := util_hash.GetFileData(filePath)
 	if err != nil {
-		fmt.Printf("get file data error %v", err)
+		log.Errorf("get file data error %v", err)
 		return err
 	}
 
 	if err := stream.Send(UpdateStoreReqAuth(&pb.StoreReq{Data: buf, Ticket: ticket, Auth: auth, Timestamp: tm, Key: key, FileSize: fileSize})); err != nil {
-		fmt.Printf("RPC Send StoreReq failed: %s", err.Error())
+		log.Errorf("RPC Send StoreReq failed: %s", err.Error())
 		return err
 	}
 	storeResp, err := stream.CloseAndRecv()
 	if err != nil {
-		fmt.Printf("RPC CloseAndRecv failed: %s", err.Error())
+		log.Errorf("RPC CloseAndRecv failed: %s", err.Error())
 		return err
 	}
 	if !storeResp.Success {
@@ -110,12 +111,12 @@ func updateRetrieveReqAuth(obj *pb.RetrieveReq) *pb.RetrieveReq {
 	return obj
 
 }
-func Retrieve(client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, key []byte, tm, filesize uint64) error {
+func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, key []byte, tm, filesize uint64) error {
 	file, err := os.OpenFile(filePath,
 		os.O_WRONLY|os.O_TRUNC|os.O_CREATE,
 		0666)
 	if err != nil {
-		fmt.Printf("open file failed: %s\n", err.Error())
+		log.Errorf("open file failed: %s\n", err.Error())
 		return err
 	}
 	defer file.Close()
@@ -126,14 +127,14 @@ func Retrieve(client pb.ProviderServiceClient, filePath string, auth []byte, tic
 			break
 		}
 		if err != nil {
-			fmt.Printf("RPC Recv failed: %s\n", err.Error())
+			log.Errorf("RPC Recv failed: %s\n", err.Error())
 			return err
 		}
 		if len(resp.Data) == 0 {
 			break
 		}
 		if _, err = file.Write(resp.Data); err != nil {
-			fmt.Printf("write file %d bytes failed : %s\n", len(resp.Data), err.Error())
+			log.Errorf("write file %d bytes failed : %s\n", len(resp.Data), err.Error())
 			return err
 		}
 	}

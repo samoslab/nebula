@@ -8,16 +8,17 @@ import (
 
 	"github.com/klauspost/reedsolomon"
 	util_hash "github.com/samoslab/nebula/util/hash"
+	"github.com/sirupsen/logrus"
 )
 
 // RsEncoder reedsolomon stream encoder file
-func RsEncoder(outDir, fname string, dataShards, parShards int) ([]HashFile, error) {
+func RsEncoder(log logrus.FieldLogger, outDir, fname string, dataShards, parShards int) ([]HashFile, error) {
 	enc, err := reedsolomon.NewStream(dataShards, parShards)
 	if err != nil {
 		return nil, err
 	}
 
-	fmt.Println("Opening", fname)
+	log.Infof("Opening %s", fname)
 	f, err := os.Open(fname)
 	if err != nil {
 		return nil, err
@@ -38,7 +39,7 @@ func RsEncoder(outDir, fname string, dataShards, parShards int) ([]HashFile, err
 	}
 	for i := range out {
 		outfn := fmt.Sprintf("%s.%d", file, i)
-		fmt.Println("Creating", outfn)
+		log.Infof("Creating %s", outfn)
 		out[i], err = os.Create(filepath.Join(dir, outfn))
 		if err != nil {
 			return nil, err
@@ -78,7 +79,7 @@ func RsEncoder(outDir, fname string, dataShards, parShards int) ([]HashFile, err
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("File split into %d data + %d parity shards.\n", dataShards, parShards)
+	log.Infof("File split into %d data + %d parity shards.\n", dataShards, parShards)
 	result := []HashFile{}
 	for i := range out {
 		outfn := filepath.Join(dir, fmt.Sprintf("%s.%d", file, i))
@@ -90,7 +91,7 @@ func RsEncoder(outDir, fname string, dataShards, parShards int) ([]HashFile, err
 		if err != nil {
 			return nil, err
 		}
-		//fmt.Printf("filename %s, hash %+v ,size %d\n", outfn, hash, fileInfo.Size())
+		//log.Infof("filename %s, hash %+v ,size %d\n", outfn, hash, fileInfo.Size())
 		hf := HashFile{}
 		hf.FileHash = hash
 		hf.FileName = outfn
@@ -102,7 +103,7 @@ func RsEncoder(outDir, fname string, dataShards, parShards int) ([]HashFile, err
 }
 
 // RsDecoder reedsolomon stream decoder file
-func RsDecoder(fname, outfname string, dataShards, parShards int) error {
+func RsDecoder(log logrus.FieldLogger, fname, outfname string, dataShards, parShards int) error {
 	// Create matrix
 	enc, err := reedsolomon.NewStream(dataShards, parShards)
 	if err != nil {
@@ -110,7 +111,7 @@ func RsDecoder(fname, outfname string, dataShards, parShards int) error {
 	}
 
 	// Open the inputs
-	shards, size, err := openInput(dataShards, parShards, fname)
+	shards, size, err := openInput(log, dataShards, parShards, fname)
 	if err != nil {
 		return err
 	}
@@ -118,10 +119,10 @@ func RsDecoder(fname, outfname string, dataShards, parShards int) error {
 	// Verify the shards
 	ok, err := enc.Verify(shards)
 	if ok {
-		fmt.Println("No reconstruction needed")
+		log.Info("No reconstruction needed")
 	} else {
-		fmt.Println("Verification failed. Reconstructing data")
-		shards, size, err = openInput(dataShards, parShards, fname)
+		log.Info("Verification failed. Reconstructing data")
+		shards, size, err = openInput(log, dataShards, parShards, fname)
 		if err != nil {
 			return err
 		}
@@ -130,7 +131,7 @@ func RsDecoder(fname, outfname string, dataShards, parShards int) error {
 		for i := range out {
 			if shards[i] == nil {
 				outfn := fmt.Sprintf("%s.%d", fname, i)
-				fmt.Println("Creating", outfn)
+				log.Infof("Creating %s", outfn)
 				out[i], err = os.Create(outfn)
 				if err != nil {
 					return err
@@ -139,7 +140,7 @@ func RsDecoder(fname, outfname string, dataShards, parShards int) error {
 		}
 		err = enc.Reconstruct(shards, out)
 		if err != nil {
-			fmt.Println("Reconstruct failed -", err)
+			log.Info("Reconstruct failed -", err)
 			return err
 		}
 		// Close output.
@@ -156,10 +157,10 @@ func RsDecoder(fname, outfname string, dataShards, parShards int) error {
 				//}
 			}
 		}
-		shards, size, err = openInput(dataShards, parShards, fname)
+		shards, size, err = openInput(log, dataShards, parShards, fname)
 		ok, err = enc.Verify(shards)
 		if !ok {
-			fmt.Println("Verification failed after reconstruction, data likely corrupted:", err)
+			log.Info("Verification failed after reconstruction, data likely corrupted:", err)
 		}
 		if err != nil {
 			return err
@@ -172,14 +173,14 @@ func RsDecoder(fname, outfname string, dataShards, parShards int) error {
 		outfn = fname
 	}
 
-	fmt.Println("Writing data to", outfn)
+	log.Info("Writing data to", outfn)
 	f, err := os.Create(outfn)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 
-	shards, size, err = openInput(dataShards, parShards, fname)
+	shards, size, err = openInput(log, dataShards, parShards, fname)
 	if err != nil {
 		return err
 	}
@@ -193,15 +194,15 @@ func RsDecoder(fname, outfname string, dataShards, parShards int) error {
 	return nil
 }
 
-func openInput(dataShards, parShards int, fname string) (r []io.Reader, size int64, err error) {
+func openInput(log logrus.FieldLogger, dataShards, parShards int, fname string) (r []io.Reader, size int64, err error) {
 	// Create shards and load the data.
 	shards := make([]io.Reader, dataShards+parShards)
 	for i := range shards {
 		infn := fmt.Sprintf("%s.%d", fname, i)
-		fmt.Println("Opening", infn)
+		log.Infof("Opening %s", infn)
 		f, err := os.Open(infn)
 		if err != nil {
-			fmt.Println("Error reading file", err)
+			log.Info("Error reading file", err)
 			shards[i] = nil
 			continue
 		} else {

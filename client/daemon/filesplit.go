@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
-	"path/filepath"
 	"strconv"
 )
 
@@ -50,32 +49,26 @@ func FileShardNum(fileName string, chunkSize int64) (int, error) {
 }
 
 // FileSplit split file by size
-func FileSplit(outDir, fileName string, chunkSize int64) ([]string, error) {
-	fileInfo, err := os.Stat(fileName)
-	if err != nil {
-		return nil, err
-	}
-
-	num := int(math.Ceil(float64(fileInfo.Size()) / float64(chunkSize)))
-
+func FileSplit(outDir, fileName string, fileSize int64, chunkSize, chunkNum int64) ([]string, error) {
 	fi, err := os.OpenFile(fileName, os.O_RDONLY, os.ModePerm)
 	if err != nil {
 		return nil, err
 	}
 	defer fi.Close()
 	b := make([]byte, chunkSize)
-	partFiles := make([]string, num)
+	partFiles := []string{}
 	var i int64 = 1
-	for ; i <= int64(num); i++ {
+	for ; i <= int64(chunkNum); i++ {
 
 		fi.Seek((i-1)*(chunkSize), 0)
-		if len(b) > int((fileInfo.Size() - (i-1)*chunkSize)) {
-			b = make([]byte, fileInfo.Size()-(i-1)*chunkSize)
+		if len(b) > int((fileSize - (i-1)*chunkSize)) {
+			b = make([]byte, fileSize-(i-1)*chunkSize)
 		}
 
 		fi.Read(b)
 
-		filename := filepath.Join(outDir, strconv.Itoa(int(i))+".part")
+		//filename := filepath.Join(outDir, fileName+".part."+strconv.Itoa(int(i)))
+		filename := fileName + ".part." + strconv.Itoa(int(i))
 		f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, os.ModePerm)
 		if err != nil {
 			fmt.Println(err)
@@ -88,24 +81,26 @@ func FileSplit(outDir, fileName string, chunkSize int64) ([]string, error) {
 	return partFiles, nil
 }
 
-func FileJoin(num int) {
-	fii, err := os.OpenFile("test.zip.1", os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm)
+func FileJoin(filename string, partfiles []string) error {
+	fii, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm)
 	if err != nil {
 		fmt.Println(err)
-		return
+		return err
 	}
-	for i := 1; i <= num; i++ {
-		f, err := os.OpenFile("./"+strconv.Itoa(int(i))+".db", os.O_RDONLY, os.ModePerm)
+	defer fii.Close()
+	for _, file := range partfiles {
+		f, err := os.OpenFile(file, os.O_RDONLY, os.ModePerm)
 		if err != nil {
 			fmt.Println(err)
-			return
+			return err
 		}
 		b, err := ioutil.ReadAll(f)
 		if err != nil {
 			fmt.Println(err)
-			return
+			return err
 		}
 		fii.Write(b)
 		f.Close()
 	}
+	return nil
 }
