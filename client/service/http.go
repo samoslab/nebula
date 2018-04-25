@@ -326,10 +326,10 @@ type UploadReq struct {
 }
 
 type DownloadReq struct {
+	Parent   string `json:"parent"`
 	FileHash string `json:"filehash"`
 	FileSize uint64 `json:"filesize"`
 	FileName string `json:"filename"`
-	Folder   bool   `json:"folder"`
 }
 
 type ListReq struct {
@@ -562,18 +562,23 @@ func UploadHandler(s *HTTPServer) http.HandlerFunc {
 
 		defer r.Body.Close()
 
-		if upReq.Filename == "" {
-			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument filename must not empty"))
+		if upReq.Filename == "" && upReq.Parent == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument filename or parent must not empty"))
 			return
 		}
 
 		log.Infof("upload parent %s files %+v\n", upReq.Parent, upReq.Filename)
-		err := s.cm.UploadFile(upReq.Parent, upReq.Filename, upReq.Interactive, upReq.NewVersion)
+		var err error
+		if upReq.Filename != "" {
+			err = s.cm.UploadFile(upReq.Filename, upReq.Interactive, upReq.NewVersion)
+		} else {
+			err = s.cm.UploadDir(upReq.Parent, upReq.Interactive, upReq.NewVersion)
+		}
 		code := 0
 		errmsg := ""
 		result := "success"
 		if err != nil {
-			log.Errorf("upload files %+v error %v", upReq, err)
+			log.Errorf("upload %+v error %v", upReq, err)
 			code = 1
 			errmsg = err.Error()
 			result = ""
@@ -624,7 +629,12 @@ func DownloadHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		log.Infof("download  %+v", downReq)
-		err := s.cm.DownloadFile(downReq.FileName, downReq.FileHash, downReq.FileSize, downReq.Folder)
+		var err error
+		if downReq.Parent == "" {
+			err = s.cm.DownloadFile(downReq.FileName, downReq.FileHash, downReq.FileSize)
+		} else {
+			err = s.cm.DownloadDir(downReq.Parent)
+		}
 		code := 0
 		errmsg := ""
 		result := "success"

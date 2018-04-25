@@ -12,6 +12,9 @@ Index
 | [/store/remove](#storeremove-post)                             | POST      |
 
 
+统一说明 返回json object结构统一为： 成功：{"code":0, "data":object} 失败：{"code":1,"errmsg":"errmsg","data":object}  
+
+  
 ## 1. store register
 ```
 URI:/store/register
@@ -45,6 +48,7 @@ Request Body: {
 
 ## 4. store upload file
 
+if filename is not empty , then upload this file, else if filename is empty but parent not empty, then upload  this directory
 ```
 URI:/store/upload
 Method: POST
@@ -101,6 +105,8 @@ curl -X POST -H "Content-Type:application/json" -d '{"path":"/tmp/ok", "pagesize
 
 ## store download files
 
+filehash and filehash is from /store/list result
+
 ```
 URI:/store/download
 Method: POST
@@ -108,20 +114,27 @@ Request Body: {
   filehash:string
   filesize:uint64
   filename:string
-  folder:bool
+  folder:string
   }
 ```
 
 ## 7. storeremove files
 
 ```
-URI:/store/remove
+URI:/store/remove post
 Method: POST
 Request Body: {
    filepath:string
    folder:bool
    recursion:bool
    }
+```
+
+## 8. storeprogress 
+```
+URI:/store/porgress get
+Method: GET
+Args:
 ```
 
 # specification

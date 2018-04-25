@@ -125,7 +125,7 @@ func main() {
 			log.Fatal("need -p argument")
 		}
 		log.Infof("upload file %s", *opfile)
-		err = cm.UploadFile(*rootpath, *opfile, *interactive, *newVersion)
+		err = cm.UploadFile(*opfile, *interactive, *newVersion)
 		if err != nil {
 			log.Fatalf("upload file error %v", err)
 		}
@@ -151,9 +151,8 @@ func main() {
 		fileHash := *downhash
 		fileSize := *downsize
 		fileName := *opfile
-		folder := false
 		//bc6bfe7d-7407-4b56-aae9-785b1dd77f67 /tmp/big1 false 181529811 07d0cf85ed032f73c91726e1e5063a620a9f23d4
-		err := cm.DownloadFile(fileName, fileHash, fileSize, folder)
+		err := cm.DownloadFile(fileName, fileHash, fileSize)
 		if err != nil {
 			log.Fatalf("download failed %s, err %v", fileName, err)
 		}

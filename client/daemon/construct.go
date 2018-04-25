@@ -19,3 +19,8 @@ type DownFile struct {
 	FileHash string `json:"filehash"`
 	Folder   bool   `json:"folder"`
 }
+
+type DirPair struct {
+	Name   string
+	Parent string
+}

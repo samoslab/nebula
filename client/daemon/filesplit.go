@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"math"
 	"os"
+	"path/filepath"
 	"strconv"
 )
 
@@ -103,4 +104,23 @@ func FileJoin(filename string, partfiles []string) error {
 		f.Close()
 	}
 	return nil
+}
+
+func GetDirsAndFiles(root string) ([]DirPair, []string, error) {
+	dirs := []DirPair{}
+	files := []string{}
+	err := filepath.Walk(root, func(path string, f os.FileInfo, err error) error {
+		if f.IsDir() {
+			parent, _ := filepath.Split(path)
+			dirs = append(dirs, DirPair{Name: f.Name(), Parent: parent})
+		} else {
+			files = append(files, path)
+		}
+		return nil
+	},
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	return dirs, files, nil
 }
