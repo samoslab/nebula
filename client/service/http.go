@@ -299,6 +299,9 @@ func (s *HTTPServer) setupMux() *http.ServeMux {
 	handleAPI("/store/download", DownloadHandler(s))
 	handleAPI("/store/list", ListHandler(s))
 	handleAPI("/store/remove", RemoveHandler(s))
+	handleAPI("/store/progress", ProgressHandler(s))
+	handleAPI("/store/uploaddir", UploadHandler(s))
+	handleAPI("/store/downloaddir", DownloadHandler(s))
 
 	return mux
 }
@@ -344,6 +347,14 @@ type RemoveReq struct {
 	FilePath  string `json:"filepath"`
 	Recursion bool   `json:"recursion"`
 	IsPath    bool   `json:"ispath"`
+}
+
+type ProgressReq struct {
+	Files []string `json:"files"`
+}
+
+type ProgressRsp struct {
+	Progress map[string]float64 `json:"progress"`
 }
 
 // MkfolderHandler create folders
@@ -510,7 +521,7 @@ func MkfolderHandler(s *HTTPServer) http.HandlerFunc {
 			}
 		}
 
-		log.Infof("mkfolder parent %s folders %+v\n", mkReq.Parent, mkReq.Folders)
+		log.Infof("mkfolder parent %s folders %+v", mkReq.Parent, mkReq.Folders)
 		result, err := s.cm.MkFolder(mkReq.Parent, mkReq.Folders, mkReq.Interactive)
 		if err != nil {
 			log.Errorf("create folder %+v error %v", mkReq.Parent, mkReq.Folders, err)
@@ -567,7 +578,7 @@ func UploadHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		log.Infof("upload parent %s files %+v\n", upReq.Parent, upReq.Filename)
+		log.Infof("upload parent %s files %+v", upReq.Parent, upReq.Filename)
 		var err error
 		if upReq.Filename != "" {
 			err = s.cm.UploadFile(upReq.Filename, upReq.Interactive, upReq.NewVersion)
@@ -623,7 +634,7 @@ func DownloadHandler(s *HTTPServer) http.HandlerFunc {
 
 		defer r.Body.Close()
 
-		if downReq.FileHash == "" || downReq.FileSize == 0 || downReq.FileName == "" {
+		if downReq.Parent == "" && (downReq.FileHash == "" || downReq.FileSize == 0 || downReq.FileName == "") {
 			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument filehash filesize or filename must not empty"))
 			return
 		}
@@ -755,6 +766,58 @@ func RemoveHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
+		if err != nil {
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+		if err := JSONResponse(w, rsp); err != nil {
+			fmt.Printf("error %v\n", err)
+		}
+	}
+}
+
+func ProgressHandler(s *HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		if !s.CanBeWork() {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
+		}
+		log := s.cm.Log
+
+		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
+			return
+		}
+
+		if r.Header.Get("Content-Type") != "application/json" {
+			errorResponse(ctx, w, http.StatusUnsupportedMediaType, errors.New("Invalid content type"))
+			return
+		}
+
+		progressReq := &ProgressReq{}
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&progressReq); err != nil {
+			err = fmt.Errorf("Invalid json request body: %v", err)
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+
+		defer r.Body.Close()
+		if len(progressReq.Files) == 0 {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument files must not empty"))
+			return
+		}
+
+		log.Infof("progress %+v", progressReq)
+		progressRsp, err := s.cm.GetProgress(progressReq.Files)
+		code := 0
+		errmsg := ""
+		if err != nil {
+			log.Errorf("remove files %+v error %v", progressReq, err)
+			code = 1
+			errmsg = err.Error()
+		}
+
+		rsp, err := common.MakeUnifiedHTTPResponse(code, progressRsp, errmsg)
 		if err != nil {
 			errorResponse(ctx, w, http.StatusBadRequest, err)
 			return

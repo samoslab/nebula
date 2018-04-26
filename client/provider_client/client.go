@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/samoslab/nebula/client/common"
 	pb "github.com/samoslab/nebula/provider/pb"
 	util_hash "github.com/samoslab/nebula/util/hash"
 	"github.com/sirupsen/logrus"
@@ -27,7 +28,7 @@ func UpdateStoreReqAuth(obj *pb.StoreReq) *pb.StoreReq {
 	return obj
 }
 
-func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, tm uint64, key []byte, fileSize uint64) error {
+func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, tm uint64, key []byte, fileSize uint64, progress map[string]common.ProgressCell) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		log.Errorf("open file failed: %s\n", err.Error())
@@ -50,9 +51,21 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, filePat
 			log.Errorf("read file failed: %s\n", err.Error())
 			return err
 		}
+		log.Infof("send %d bytes ", bytesRead)
 		if err := stream.Send(UpdateStoreReqAuth(&pb.StoreReq{Data: buf[:bytesRead], Ticket: ticket, Auth: auth, Timestamp: tm, Key: key, FileSize: fileSize})); err != nil {
 			log.Errorf("RPC Send StoreReq failed: %s\n", err.Error())
+			if err.Error() == "EOF" {
+				continue
+			}
 			return err
+		}
+		// for progress
+		if cell, ok := progress[filePath]; ok {
+			alreadySent := cell.Current + uint64(bytesRead)
+			cell.Current = alreadySent
+			progress[filePath] = cell
+		} else {
+			log.Errorf("file %s not in progress map", filePath)
 		}
 		if bytesRead < stream_data_size {
 			break

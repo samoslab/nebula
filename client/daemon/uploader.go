@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/samoslab/nebula/client/common"
 	"github.com/samoslab/nebula/client/config"
 	client "github.com/samoslab/nebula/client/provider_client"
 	pb "github.com/samoslab/nebula/provider/pb"
@@ -38,6 +39,7 @@ type ClientManager struct {
 	Log        logrus.FieldLogger
 	cfg        *config.ClientConfig
 	serverConn *grpc.ClientConn
+	Progress   map[string]common.ProgressCell
 }
 
 // NewClientManager create manager
@@ -62,6 +64,7 @@ func NewClientManager(log logrus.FieldLogger, trackerServer string, cfg *config.
 	c.TempDir = cfg.TempDir
 	c.NodeId = cfg.Node.NodeId
 	c.cfg = cfg
+	c.Progress = map[string]common.ProgressCell{}
 	return c, nil
 }
 
@@ -121,6 +124,7 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 		return fmt.Errorf("%d:%s", rsp.GetCode(), rsp.GetErrMsg())
 	}
 
+	c.Progress[filename] = common.ProgressCell{Total: req.FileSize, Current: 0, Rate: 0.0}
 	log.Infof("start upload file %s", filename)
 	switch rsp.GetStoreType() {
 	case mpb.FileStoreType_MultiReplica:
@@ -367,7 +371,7 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 	pclient := pb.NewProviderServiceClient(conn)
 
 	ha := onePartition.GetHashAuth()[0]
-	err = client.StorePiece(log, pclient, fileInfo.FileName, ha.GetAuth(), ha.GetTicket(), tm, fileInfo.FileHash, uint64(fileInfo.FileSize))
+	err = client.StorePiece(log, pclient, fileInfo.FileName, ha.GetAuth(), ha.GetTicket(), tm, fileInfo.FileHash, uint64(fileInfo.FileSize), c.Progress)
 	if err != nil {
 		return nil, err
 	}
@@ -399,7 +403,7 @@ func (c *ClientManager) uploadFileToReplicaProvider(pro *mpb.ReplicaProvider, fi
 	log.Debugf("provider nodeid %x", pro.GetNodeId())
 	log.Debugf("provider time %d", pro.GetTimestamp())
 
-	err = client.StorePiece(log, pclient, fileInfo.FileName, pro.GetAuth(), pro.GetTicket(), pro.GetTimestamp(), fileInfo.FileHash, uint64(fileInfo.FileSize))
+	err = client.StorePiece(log, pclient, fileInfo.FileName, pro.GetAuth(), pro.GetTicket(), pro.GetTimestamp(), fileInfo.FileHash, uint64(fileInfo.FileSize), c.Progress)
 	if err != nil {
 		log.Errorf("upload error %v", err)
 		return nil, err
@@ -761,4 +765,17 @@ func (c *ClientManager) RemoveFile(filePath string, recursive bool, isPath bool)
 	}
 	return nil
 
+}
+
+// GetProgress returns progress rate
+func (c *ClientManager) GetProgress(files []string) (map[string]float64, error) {
+	a := map[string]float64{}
+	for k, v := range c.Progress {
+		if v.Total != 0 {
+			a[k] = float64(v.Current / v.Total)
+		} else {
+			a[k] = 0.0
+		}
+	}
+	return a, nil
 }

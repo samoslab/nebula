@@ -12,6 +12,13 @@ import (
 	"time"
 )
 
+// ProgressCell for progress bar
+type ProgressCell struct {
+	Total   uint64
+	Current uint64
+	Rate    float64
+}
+
 // UnifiedResponse for all reponse format
 type UnifiedResponse struct {
 	Errmsg string `json:"errmsg"`
