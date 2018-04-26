@@ -106,11 +106,12 @@ curl -X POST -H "Content-Type:application/json" -d '{"path":"/tmp/ok", "pagesize
 ## store download files
 
 filehash and filehash is from /store/list result
-
+download directory if parent isn't empty but others is empty , or download filename
 ```
 URI:/store/download
 Method: POST
 Request Body: {
+  parent:string
   filehash:string
   filesize:uint64
   filename:string
@@ -131,12 +132,29 @@ Request Body: {
 ```
 
 ## 8. storeprogress 
+returns all progress info if files is empty
 ```
-URI:/store/porgress get
-Method: GET
-Args:
+URI:/store/porgress post
+Method: POST
+Request Body: {
+   files:[]string
+   }
+
 ```
 
+Example
+
+```
+curl -X POST -H "Content-Type:application/json" -d '{"files":[]}' http://127.0.0.1:7788/store/progress
+{
+    "errmsg": "",
+    "code": 0,
+    "Data": {
+        "/tmp/abc/ipip.big1": 0.66
+    }
+}
+
+```
 # specification
 
 ```

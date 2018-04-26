@@ -33,13 +33,14 @@ var (
 
 // ClientManager client manager
 type ClientManager struct {
-	mclient    mpb.MatadataServiceClient
-	NodeId     []byte
-	TempDir    string
-	Log        logrus.FieldLogger
-	cfg        *config.ClientConfig
-	serverConn *grpc.ClientConn
-	Progress   map[string]common.ProgressCell
+	mclient              mpb.MatadataServiceClient
+	NodeId               []byte
+	TempDir              string
+	Log                  logrus.FieldLogger
+	cfg                  *config.ClientConfig
+	serverConn           *grpc.ClientConn
+	Progress             map[string]common.ProgressCell
+	PartitionToOriginMap map[string]string // a.txt.1 -> a.txt ; a.txt.2 -> a.txt for progress
 }
 
 // NewClientManager create manager
@@ -65,6 +66,7 @@ func NewClientManager(log logrus.FieldLogger, trackerServer string, cfg *config.
 	c.NodeId = cfg.Node.NodeId
 	c.cfg = cfg
 	c.Progress = map[string]common.ProgressCell{}
+	c.PartitionToOriginMap = map[string]string{}
 	return c, nil
 }
 
@@ -124,11 +126,11 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 		return fmt.Errorf("%d:%s", rsp.GetCode(), rsp.GetErrMsg())
 	}
 
-	c.Progress[filename] = common.ProgressCell{Total: req.FileSize, Current: 0, Rate: 0.0}
 	log.Infof("start upload file %s", filename)
 	switch rsp.GetStoreType() {
 	case mpb.FileStoreType_MultiReplica:
 		log.Infof("upload manner is multi-replication")
+		c.Progress[filename] = common.ProgressCell{Total: req.FileSize, Current: 0, Rate: 0.0}
 		partitions, err := c.uploadFileByMultiReplica(filename, req, rsp)
 		if err != nil {
 			return err
@@ -159,6 +161,7 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 
 		fileInfos := []MyPart{}
 
+		erasureSize := int64(0)
 		for _, fname := range partFiles {
 			fileSlices, err := c.OnlyFileSplit(fname, dataShards, verifyShards)
 			if err != nil {
@@ -169,8 +172,12 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 			log.Infof("file %s need split to %d blocks", fname, len(fileSlices))
 			for _, fs := range fileSlices {
 				log.Debugf("erasure block files %s", fs.FileName)
+				c.PartitionToOriginMap[fs.FileName] = filename
+				erasureSize += fs.FileSize
 			}
+			c.PartitionToOriginMap[fname] = filename
 		}
+		c.Progress[filename] = common.ProgressCell{Total: uint64(erasureSize), Current: 0, Rate: 0.0}
 
 		ufpr := &mpb.UploadFilePrepareReq{}
 		ufpr.Version = Version
@@ -233,12 +240,17 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 		}
 		log.Infof("upload file done, there are %d store partitions", len(partitions))
 
+		// delete  temporary file
 		for _, partInfo := range fileInfos {
 			for _, slice := range partInfo.Pieces {
 				log.Debugf("delete tempfile %s", slice.FileName)
-				//if err := os.Remove(slice.FileName); err != nil {
-				//log.Errorf("delete %s failed, error %v", slice.FileName, err)
-				//}
+				if err := os.Remove(slice.FileName); err != nil {
+					log.Errorf("delete %s failed, error %v", slice.FileName, err)
+				}
+			}
+			log.Debugf("delete tempfile %s", partInfo.Filename)
+			if err := os.Remove(partInfo.Filename); err != nil {
+				log.Errorf("delete %s failed, error %v", partInfo.Filename, err)
 			}
 		}
 		return c.UploadFileDone(req, partitions)
@@ -371,7 +383,7 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 	pclient := pb.NewProviderServiceClient(conn)
 
 	ha := onePartition.GetHashAuth()[0]
-	err = client.StorePiece(log, pclient, fileInfo.FileName, ha.GetAuth(), ha.GetTicket(), tm, fileInfo.FileHash, uint64(fileInfo.FileSize), c.Progress)
+	err = client.StorePiece(log, pclient, fileInfo.FileName, ha.GetAuth(), ha.GetTicket(), tm, fileInfo.FileHash, uint64(fileInfo.FileSize), c.Progress, c.PartitionToOriginMap)
 	if err != nil {
 		return nil, err
 	}
@@ -403,7 +415,7 @@ func (c *ClientManager) uploadFileToReplicaProvider(pro *mpb.ReplicaProvider, fi
 	log.Debugf("provider nodeid %x", pro.GetNodeId())
 	log.Debugf("provider time %d", pro.GetTimestamp())
 
-	err = client.StorePiece(log, pclient, fileInfo.FileName, pro.GetAuth(), pro.GetTicket(), pro.GetTimestamp(), fileInfo.FileHash, uint64(fileInfo.FileSize), c.Progress)
+	err = client.StorePiece(log, pclient, fileInfo.FileName, pro.GetAuth(), pro.GetTicket(), pro.GetTimestamp(), fileInfo.FileHash, uint64(fileInfo.FileSize), c.Progress, c.PartitionToOriginMap)
 	if err != nil {
 		log.Errorf("upload error %v", err)
 		return nil, err
@@ -428,6 +440,7 @@ func (c *ClientManager) uploadFileByMultiReplica(filename string, req *mpb.Check
 	block.BlockSeq = uint32(fileInfo.SliceIndex)
 	block.Checksum = false
 	block.StoreNodeId = [][]byte{}
+	c.PartitionToOriginMap[filename] = filename
 	for _, pro := range rsp.GetProvider() {
 		proID, err := c.uploadFileToReplicaProvider(pro, fileInfo)
 		if err != nil {
@@ -630,9 +643,9 @@ func (c *ClientManager) DownloadFile(fileName string, filehash string, fileSize 
 		// delete middle files
 		for _, file := range middleFiles {
 			log.Infof("need delete %s", file)
-			//if err := os.Remove(file); err != nil {
-			//log.Errorf("delete %s failed, error %v", file, err)
-			//}
+			if err := os.Remove(file); err != nil {
+				log.Errorf("delete %s failed, error %v", file, err)
+			}
 		}
 
 		return nil
@@ -654,9 +667,9 @@ func (c *ClientManager) DownloadFile(fileName string, filehash string, fileSize 
 		// delete middle files
 		for _, file := range middleFiles {
 			log.Infof("need delete %s", file)
-			//if err := os.Remove(file); err != nil {
-			//log.Errorf("delete %s failed, error %v", file, err)
-			//}
+			if err := os.Remove(file); err != nil {
+				log.Errorf("delete %s failed, error %v", file, err)
+			}
 		}
 
 	}
@@ -668,9 +681,9 @@ func (c *ClientManager) DownloadFile(fileName string, filehash string, fileSize 
 	}
 	for _, file := range partFiles {
 		log.Infof("need delete %s", file)
-		//if err := os.Remove(file); err != nil {
-		//log.Errorf("delete %s failed, error %v", file, err)
-		//}
+		if err := os.Remove(file); err != nil {
+			log.Errorf("delete %s failed, error %v", file, err)
+		}
 	}
 	return nil
 }
@@ -772,7 +785,7 @@ func (c *ClientManager) GetProgress(files []string) (map[string]float64, error) 
 	a := map[string]float64{}
 	for k, v := range c.Progress {
 		if v.Total != 0 {
-			a[k] = float64(v.Current / v.Total)
+			a[k] = float64(v.Current) / float64(v.Total)
 		} else {
 			a[k] = 0.0
 		}

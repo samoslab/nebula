@@ -2,7 +2,6 @@ package provider_client
 
 import (
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"time"
@@ -28,7 +27,7 @@ func UpdateStoreReqAuth(obj *pb.StoreReq) *pb.StoreReq {
 	return obj
 }
 
-func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, tm uint64, key []byte, fileSize uint64, progress map[string]common.ProgressCell) error {
+func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, tm uint64, key []byte, fileSize uint64, progress map[string]common.ProgressCell, fileMap map[string]string) error {
 	file, err := os.Open(filePath)
 	if err != nil {
 		log.Errorf("open file failed: %s\n", err.Error())
@@ -42,6 +41,10 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, filePat
 	}
 	defer stream.CloseSend()
 	buf := make([]byte, stream_data_size)
+	realfile, ok := fileMap[filePath]
+	if !ok {
+		log.Errorf("file %s not in reverse partition map", filePath)
+	}
 	for {
 		bytesRead, err := file.Read(buf)
 		if err != nil {
@@ -51,7 +54,6 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, filePat
 			log.Errorf("read file failed: %s\n", err.Error())
 			return err
 		}
-		log.Infof("send %d bytes ", bytesRead)
 		if err := stream.Send(UpdateStoreReqAuth(&pb.StoreReq{Data: buf[:bytesRead], Ticket: ticket, Auth: auth, Timestamp: tm, Key: key, FileSize: fileSize})); err != nil {
 			log.Errorf("RPC Send StoreReq failed: %s\n", err.Error())
 			if err.Error() == "EOF" {
@@ -60,26 +62,29 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, filePat
 			return err
 		}
 		// for progress
-		if cell, ok := progress[filePath]; ok {
-			alreadySent := cell.Current + uint64(bytesRead)
-			cell.Current = alreadySent
-			progress[filePath] = cell
-		} else {
-			log.Errorf("file %s not in progress map", filePath)
+		if realfile != "" {
+			if cell, ok := progress[realfile]; ok {
+				cell.Current = cell.Current + uint64(bytesRead)
+				progress[realfile] = cell
+			} else {
+				log.Errorf("file %s not in progress map", realfile)
+			}
 		}
 		if bytesRead < stream_data_size {
 			break
 		}
 	}
+	log.Infof("file %s %+v", filePath, progress)
 	storeResp, err := stream.CloseAndRecv()
 	if err != nil {
 		log.Errorf("RPC CloseAndRecv failed: %s\n", err.Error())
 		return err
 	}
 	if !storeResp.Success {
-		fmt.Println("RPC return false\n")
+		log.Error("RPC return false")
 		return errors.New("RPC return false")
 	}
+	time.Sleep(time.Second)
 	return nil
 }
 
@@ -112,7 +117,7 @@ func Store(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath str
 		return err
 	}
 	if !storeResp.Success {
-		fmt.Println("RPC return false")
+		log.Error("RPC return false")
 		return errors.New("RPC return false")
 	}
 	return nil

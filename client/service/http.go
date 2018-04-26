@@ -802,10 +802,6 @@ func ProgressHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		defer r.Body.Close()
-		if len(progressReq.Files) == 0 {
-			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument files must not empty"))
-			return
-		}
 
 		log.Infof("progress %+v", progressReq)
 		progressRsp, err := s.cm.GetProgress(progressReq.Files)
