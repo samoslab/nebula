@@ -1,17 +1,11 @@
 package daemon
 
-// HashFile file info for reedsolomon
-type HashFile struct {
-	FileSize   int64
-	FileName   string
-	FileHash   []byte
-	SliceIndex int
-}
+import "github.com/samoslab/nebula/client/common"
 
 // MyPart partition for upload file prepare
 type MyPart struct {
-	Filename string
-	Pieces   []HashFile
+	FileName string
+	Pieces   []common.HashFile
 }
 
 // DownFile list files format, used when download file

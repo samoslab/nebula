@@ -75,3 +75,11 @@ func SendRequest(method, url, token string, reqBody io.Reader) (*http.Response, 
 	}
 	return rsp, err
 }
+
+// HashFile file info for reedsolomon
+type HashFile struct {
+	FileSize   int64
+	FileName   string
+	FileHash   []byte
+	SliceIndex int
+}

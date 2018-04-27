@@ -68,8 +68,7 @@ func FileSplit(outDir, fileName string, fileSize int64, chunkSize, chunkNum int6
 
 		fi.Read(b)
 
-		//filename := filepath.Join(outDir, fileName+".part."+strconv.Itoa(int(i)))
-		filename := fileName + ".part." + strconv.Itoa(int(i))
+		filename := fileName + ".part." + strconv.Itoa(int(i-1))
 		f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, os.ModePerm)
 		if err != nil {
 			fmt.Println(err)
@@ -82,8 +81,9 @@ func FileSplit(outDir, fileName string, fileSize int64, chunkSize, chunkNum int6
 	return partFiles, nil
 }
 
+// FileJoin join many files into filename
 func FileJoin(filename string, partfiles []string) error {
-	fii, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY|os.O_APPEND, os.ModePerm)
+	fii, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		fmt.Println(err)
 		return err

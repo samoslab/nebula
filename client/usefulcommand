@@ -62,6 +62,13 @@ curl -X POST -H "Content-Type:application/json" -d '{"filehash":"732e7a7d3db77ff
     "Data": ""
 }
 
+curl -X POST -H "Content-Type:application/json" -d '{"target":"62633239633363392d373462332d343961632d396633312d363731336331376433633334", "ispath":false, "recursion":false }' http://127.0.0.1:7788/store/remove
+{
+    "errmsg": "",
+    "code": 0,
+    "Data": "success"
+}
+
 curl -X POST -H "Content-Type:application/json" -d '{"files":[]}' http://127.0.0.1:7788/store/progress
 {
     "errmsg": "",
@@ -77,3 +84,4 @@ alter table file_version DROP CONSTRAINT fk_hash_ref_file;
 alter table file_owner DROP CONSTRAINT fk_node_id_ref_client;
 alter table file_owner DROP CONSTRAINT fk_hash_ref_file;
 alter table file_owner DROP CONSTRAINT parent_id;
+DROP INDEX file_owner_node_id_name_parent_id_key CASCADE;

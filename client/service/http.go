@@ -344,7 +344,7 @@ type ListReq struct {
 }
 
 type RemoveReq struct {
-	FilePath  string `json:"filepath"`
+	Target    string `json:"target"`
 	Recursion bool   `json:"recursion"`
 	IsPath    bool   `json:"ispath"`
 }
@@ -748,13 +748,13 @@ func RemoveHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		defer r.Body.Close()
-		if rmReq.FilePath == "" {
-			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument filepath must not empty"))
+		if rmReq.Target == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument target must not empty"))
 			return
 		}
 
 		log.Infof("remove %+v", rmReq)
-		err := s.cm.RemoveFile(rmReq.FilePath, rmReq.Recursion, rmReq.IsPath)
+		err := s.cm.RemoveFile(rmReq.Target, rmReq.Recursion, false)
 		code := 0
 		errmsg := ""
 		result := true

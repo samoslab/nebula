@@ -125,7 +125,7 @@ Request Body: {
 URI:/store/remove post
 Method: POST
 Request Body: {
-   filepath:string
+   target:string
    folder:bool
    recursion:bool
    }

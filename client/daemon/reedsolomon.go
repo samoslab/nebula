@@ -7,18 +7,19 @@ import (
 	"path/filepath"
 
 	"github.com/klauspost/reedsolomon"
+	"github.com/samoslab/nebula/client/common"
 	util_hash "github.com/samoslab/nebula/util/hash"
 	"github.com/sirupsen/logrus"
 )
 
 // RsEncoder reedsolomon stream encoder file
-func RsEncoder(log logrus.FieldLogger, outDir, fname string, dataShards, parShards int) ([]HashFile, error) {
+func RsEncoder(log logrus.FieldLogger, outDir, fname string, dataShards, parShards int) ([]common.HashFile, error) {
 	enc, err := reedsolomon.NewStream(dataShards, parShards)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Infof("Opening %s", fname)
+	log.Infof("[reedsolomon] Opening %s", fname)
 	f, err := os.Open(fname)
 	if err != nil {
 		return nil, err
@@ -39,7 +40,7 @@ func RsEncoder(log logrus.FieldLogger, outDir, fname string, dataShards, parShar
 	}
 	for i := range out {
 		outfn := fmt.Sprintf("%s.%d", file, i)
-		log.Infof("Creating %s", outfn)
+		log.Infof("[reedsolomon] Creating %s", outfn)
 		out[i], err = os.Create(filepath.Join(dir, outfn))
 		if err != nil {
 			return nil, err
@@ -79,8 +80,8 @@ func RsEncoder(log logrus.FieldLogger, outDir, fname string, dataShards, parShar
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("File split into %d data + %d parity shards.\n", dataShards, parShards)
-	result := []HashFile{}
+	log.Infof("File split into %d data + %d parity shards.", dataShards, parShards)
+	result := []common.HashFile{}
 	for i := range out {
 		outfn := filepath.Join(dir, fmt.Sprintf("%s.%d", file, i))
 		hash, err := util_hash.Sha1File(outfn)
@@ -91,8 +92,7 @@ func RsEncoder(log logrus.FieldLogger, outDir, fname string, dataShards, parShar
 		if err != nil {
 			return nil, err
 		}
-		//log.Infof("filename %s, hash %+v ,size %d\n", outfn, hash, fileInfo.Size())
-		hf := HashFile{}
+		hf := common.HashFile{}
 		hf.FileHash = hash
 		hf.FileName = outfn
 		hf.FileSize = fileInfo.Size()
@@ -131,7 +131,7 @@ func RsDecoder(log logrus.FieldLogger, fname, outfname string, dataShards, parSh
 		for i := range out {
 			if shards[i] == nil {
 				outfn := fmt.Sprintf("%s.%d", fname, i)
-				log.Infof("Creating %s", outfn)
+				log.Infof("[reedsolomon] Creating %s", outfn)
 				out[i], err = os.Create(outfn)
 				if err != nil {
 					return err
@@ -148,13 +148,6 @@ func RsDecoder(log logrus.FieldLogger, fname, outfname string, dataShards, parSh
 			if out[i] != nil {
 				err := out[i].(*os.File).Close()
 				return err
-			}
-			outfn := fmt.Sprintf("%s.%d", fname, i)
-			if len(outfn) > 3 {
-				fmt.Printf("remove file %s\n", outfn)
-				//if err := os.Remove(outfn); err != nil {
-				//fmt.Printf("remove file %s err %v", outfn, err)
-				//}
 			}
 		}
 		shards, size, err = openInput(log, dataShards, parShards, fname)
@@ -173,7 +166,7 @@ func RsDecoder(log logrus.FieldLogger, fname, outfname string, dataShards, parSh
 		outfn = fname
 	}
 
-	log.Info("Writing data to", outfn)
+	log.Info("Writing data to ", outfn)
 	f, err := os.Create(outfn)
 	if err != nil {
 		return err
@@ -199,7 +192,7 @@ func openInput(log logrus.FieldLogger, dataShards, parShards int, fname string) 
 	shards := make([]io.Reader, dataShards+parShards)
 	for i := range shards {
 		infn := fmt.Sprintf("%s.%d", fname, i)
-		log.Infof("Opening %s", infn)
+		log.Infof("[reedsolomon] Opening %s", infn)
 		f, err := os.Open(infn)
 		if err != nil {
 			log.Info("Error reading file", err)
@@ -209,7 +202,9 @@ func openInput(log logrus.FieldLogger, dataShards, parShards int, fname string) 
 			shards[i] = f
 		}
 		stat, err := f.Stat()
-		checkErr(err)
+		if err != nil {
+			return shards, 0, err
+		}
 		if stat.Size() > 0 {
 			size = stat.Size()
 		} else {
@@ -217,11 +212,4 @@ func openInput(log logrus.FieldLogger, dataShards, parShards int, fname string) 
 		}
 	}
 	return shards, size, nil
-}
-
-func checkErr(err error) error {
-	if err != nil {
-		return err
-	}
-	return nil
 }
