@@ -12,6 +12,13 @@ import (
 	"time"
 )
 
+// ProgressCell for progress bar
+type ProgressCell struct {
+	Total   uint64
+	Current uint64
+	Rate    float64
+}
+
 // UnifiedResponse for all reponse format
 type UnifiedResponse struct {
 	Errmsg string `json:"errmsg"`
@@ -67,4 +74,12 @@ func SendRequest(method, url, token string, reqBody io.Reader) (*http.Response, 
 		return nil, err
 	}
 	return rsp, err
+}
+
+// HashFile file info for reedsolomon
+type HashFile struct {
+	FileSize   int64
+	FileName   string
+	FileHash   []byte
+	SliceIndex int
 }
