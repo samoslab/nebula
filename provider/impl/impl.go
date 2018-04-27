@@ -42,11 +42,11 @@ type ProviderService struct {
 func initAllStorage(conf *config.ProviderConfig) {
 	initStorage(conf.MainStoragePath, 0)
 	for _, info := range conf.ExtraStorage {
-		initStorage(info.Path, int(info.Index+1))
+		initStorage(info.Path, info.Index+1)
 	}
 }
 
-func initStorage(path string, index int) {
+func initStorage(path string, index byte) {
 	exist, fileInfo := util_file.ExistsWithInfo(path)
 	if !exist {
 		log.Fatalf("storage path not exists: %s", path)
@@ -61,7 +61,7 @@ func initStorage(path string, index int) {
 		if err != nil {
 			log.Fatalf("mkdir sys folder: %s failed: %s", p, err)
 		}
-		newFile, err := os.Create(p + sep + "storage-" + strconv.Itoa(index) + ".nebula")
+		newFile, err := os.Create(p + sep + "storage-" + strconv.FormatInt(int64(index), 10) + ".nebula")
 		if err != nil {
 			log.Fatalf("create storage index file failed: %s", err)
 		}
@@ -93,9 +93,13 @@ func NewProviderService() *ProviderService {
 		log.Fatalf("open Provider DB failed:%s", err)
 	}
 	if !exists {
-		ps.ProviderDb.Update(func(tx *bolt.Tx) error {
-			_, err := tx.CreateBucket(path_bucket)
-			return err
+		err = ps.ProviderDb.Update(func(tx *bolt.Tx) error {
+			_, er := tx.CreateBucket(path_bucket)
+			if er != nil {
+				return er
+			}
+			_, er = tx.CreateBucket(del_small_bucket)
+			return er
 		})
 		if err != nil {
 			log.Fatalf("create bucket: %s", err)
@@ -203,7 +207,7 @@ func (self *ProviderService) Retrieve(req *pb.RetrieveReq, stream pb.ProviderSer
 	if subPath == "" {
 		return os.ErrNotExist
 	}
-	path, err := getAbsPathOfSubPath(subPath, int(storageIdx))
+	path, err := getAbsPathOfSubPath(subPath, storageIdx)
 	if err != nil {
 		return err
 	}
@@ -294,24 +298,150 @@ func sendFileToStream(path string, file *os.File, stream pb.ProviderService_Retr
 	return nil
 }
 
-func (self *ProviderService) Remove(ctx context.Context, req *pb.RemoveReq) (*pb.RemoveResp, error) {
+func (self *ProviderService) Remove(ctx context.Context, req *pb.RemoveReq) (resp *pb.RemoveResp, err error) {
 	if !skip_check_auth {
 		if err := req.CheckAuth(self.Node.PubKeyBytes); err != nil {
 			log.Warnf("check auth failed: %s", err.Error())
 			return nil, err
 		}
 	}
-	// subPath, bigFile, storageIdx, position, size := self.querySubPath(req.Key)
-	// if subPath == "" {
-	// 	return nil, os.ErrNotExist
-	// }
-	// if bigFile {
-	// 	//TODO
-	// }
-	// // TODO
-	return nil, nil
+	subPath, bigFile, storageIdx, position, size := self.querySubPath(req.Key)
+	if subPath == "" {
+		return nil, os.ErrNotExist
+	}
+	if bigFile {
+		var absPath string
+		absPath, err = getAbsPathOfSubPath(subPath, storageIdx)
+		if err != nil {
+			return nil, err
+		}
+		err = self.ProviderDb.Update(func(tx *bolt.Tx) error {
+			b := tx.Bucket(path_bucket)
+			er := b.Delete(req.Key)
+			if er != nil {
+				return er
+			}
+			return os.Remove(absPath)
+		})
+		return nil, err
+	} else {
+		subPathBytes := []byte(subPath)
+		key := make([]byte, len(subPathBytes)+1)
+		key[0] = storageIdx
+		for i, b := range subPathBytes {
+			key[i+1] = b
+		}
+		var val []byte
+		self.ProviderDb.View(func(tx *bolt.Tx) error {
+			b := tx.Bucket(del_small_bucket)
+			val = b.Get(key)
+			return nil
+		})
+		sequentialTail, rangeStr := combineDelRange(storageIdx, subPath, val, position, size)
+		full := false
+		var absPath string
+		if sequentialTail > 0 {
+			absPath, err = getAbsPathOfSubPath(subPath, storageIdx)
+			if err != nil {
+				return nil, err
+			}
+			fi, err := os.Stat(absPath)
+			if err != nil {
+				return nil, err
+			}
+			if int64(sequentialTail) == fi.Size() {
+				full = true
+			}
+		}
+		err = self.ProviderDb.Update(func(tx *bolt.Tx) error {
+			b := tx.Bucket(path_bucket)
+			er := b.Delete(req.Key)
+			if er != nil {
+				return er
+			}
+			b = tx.Bucket(del_small_bucket)
+			if full {
+				er = b.Delete(key)
+				if er != nil {
+					return er
+				}
+				return os.Remove(absPath)
+			} else {
+				return b.Put(key, []byte(rangeStr))
+			}
+		})
+		return nil, err
+	}
 }
 
+const del_range_sep = ","
+const del_range_section = "-"
+
+func combineDelRange(storageIdx byte, subPath string, val []byte, position uint32, size uint32) (sequentialTail uint32, rangeStr string) {
+	if len(val) > 0 {
+		arr := strings.Split(string(val), del_range_sep)
+		rangeArr := make([][]uint32, 0, len(arr))
+		for _, str := range arr {
+			unit := strings.Split(str, del_range_section)
+			if len(unit) != 2 {
+				log.Errorf("del range string[%s] format error, storageIdx:%d, subPath:%s, value:%s", str, storageIdx, subPath, string(val))
+				break
+			}
+			beginIdx, err := strconv.Atoi(unit[0])
+			endIdx, err2 := strconv.Atoi(unit[1])
+			if err != nil || err2 != nil {
+				log.Errorf("del range string[%s] format error, storageIdx:%d, subPath:%s, value:%s", str, storageIdx, subPath, string(val))
+				break
+			}
+			rangeArr = append(rangeArr, []uint32{uint32(beginIdx), uint32(endIdx)})
+		}
+		le := len(rangeArr)
+		if le > 0 {
+			if position == rangeArr[le-1][1] {
+				rangeArr[le-1][1] = position + size
+			} else if position > rangeArr[le-1][1] {
+				resSlice := make([][]uint32, le+1)
+				copy(resSlice[0:le], rangeArr)
+				resSlice[le] = []uint32{position, position + size}
+				rangeArr = resSlice
+			} else if position+size == rangeArr[0][0] {
+				rangeArr[0][0] = position
+			} else if position+size < rangeArr[0][0] {
+				resSlice := make([][]uint32, le+1)
+				copy(resSlice[1:le+1], rangeArr)
+				resSlice[0] = []uint32{position, position + size}
+				rangeArr = resSlice
+			} else {
+				resSlice := make([][]uint32, 0, le+1)
+				i := 0
+				for ; i < le; i++ {
+					if rangeArr[i][1] < position {
+						resSlice = append(resSlice, rangeArr[i])
+					} else if rangeArr[i][1] == position {
+						if rangeArr[i+1][0] == position+size {
+							resSlice = append(resSlice, []uint32{rangeArr[i][0], rangeArr[i+1][1]})
+							i++
+						} else {
+							resSlice = append(resSlice, []uint32{rangeArr[i][0], position + size})
+						}
+					}
+				}
+				rangeArr = resSlice
+			}
+			arr = make([]string, 0, len(rangeArr))
+			for _, unit := range rangeArr {
+				arr = append(arr, strconv.FormatInt(int64(unit[0]), 10)+del_range_section+strconv.FormatInt(int64(unit[1]), 10))
+			}
+			rangeStr = strings.Join(arr, del_range_sep)
+			if len(rangeArr) == 1 && rangeArr[0][0] == 0 {
+				return rangeArr[0][1], rangeStr
+			} else {
+				return 0, rangeStr
+			}
+		}
+	}
+	return 0, strconv.FormatInt(int64(position), 10) + del_range_section + strconv.FormatInt(int64(position+size), 10)
+}
 func (self *ProviderService) GetFragment(ctx context.Context, req *pb.GetFragmentReq) (*pb.GetFragmentResp, error) {
 	if len(req.Positions) == 0 || req.Size == 0 {
 		return nil, errors.New("invalid req")
@@ -331,7 +461,7 @@ func (self *ProviderService) GetFragment(ctx context.Context, req *pb.GetFragmen
 	if subPath == "" {
 		return nil, os.ErrNotExist
 	}
-	path, err := getAbsPathOfSubPath(subPath, int(storageIdx))
+	path, err := getAbsPathOfSubPath(subPath, storageIdx)
 	if err != nil {
 		return nil, err
 	}
@@ -386,14 +516,14 @@ func (self *ProviderService) GetFragment(ctx context.Context, req *pb.GetFragmen
 	return &pb.GetFragmentResp{Data: res}, nil
 }
 
-func getAbsPathOfSubPath(subPath string, storageIdx int) (string, error) {
+func getAbsPathOfSubPath(subPath string, storageIdx byte) (string, error) {
 	conf := config.GetProviderConfig()
 	parent := conf.MainStoragePath
 	if storageIdx != 0 {
-		if storageIdx > len(conf.ExtraStorage) {
+		if int(storageIdx) > len(conf.ExtraStorage) {
 			return "", errors.New("storage index out of bounds")
 		}
-		parent = conf.ExtraStorage[strconv.Itoa(storageIdx)].Path
+		parent = conf.ExtraStorage[strconv.FormatInt(int64(storageIdx), 10)].Path
 	}
 	return parent + strings.Replace(subPath, slash, sep, -1), nil
 }
@@ -465,6 +595,7 @@ func logPath(subPath string, bigFile bool, storageIdx byte, position uint32, siz
 
 const max_combine_file_size = 1048576 //1M
 var path_bucket = []byte("path")
+var del_small_bucket = []byte("del_small")
 
 func (self *ProviderService) queryByKey(key []byte) []byte {
 	var res []byte
