@@ -51,7 +51,7 @@ func FileShardNum(fileName string, chunkSize int64) (int, error) {
 
 // FileSplit split file by size
 func FileSplit(outDir, fileName string, fileSize int64, chunkSize, chunkNum int64) ([]string, error) {
-	fi, err := os.OpenFile(fileName, os.O_RDONLY, os.ModePerm)
+	fi, err := os.OpenFile(fileName, os.O_RDONLY, 0644)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func FileSplit(outDir, fileName string, fileSize int64, chunkSize, chunkNum int6
 		fi.Read(b)
 
 		filename := fileName + ".part." + strconv.Itoa(int(i-1))
-		f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, os.ModePerm)
+		f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			fmt.Println(err)
 			return nil, err
@@ -90,7 +90,7 @@ func FileJoin(filename string, partfiles []string) error {
 	}
 	defer fii.Close()
 	for _, file := range partfiles {
-		f, err := os.OpenFile(file, os.O_RDONLY, os.ModePerm)
+		f, err := os.OpenFile(file, os.O_RDONLY, 0644)
 		if err != nil {
 			fmt.Println(err)
 			return err

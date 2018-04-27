@@ -640,10 +640,11 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 
 	// for progress stats
 	realSizeAfterRS := uint64(0)
-	for _, partition := range partitions {
-		for _, block := range partition.GetBlock() {
+	for i, partition := range partitions {
+		for j, block := range partition.GetBlock() {
 			c.PartitionToOriginMap[hex.EncodeToString(block.GetHash())] = downFileName
 			realSizeAfterRS += block.GetSize()
+			fmt.Printf("partition %d block %d hash %x size %d checksum %v seq %d\n", i, j, block.Hash, block.Size, block.Checksum, block.BlockSeq)
 		}
 	}
 	c.Progress[downFileName] = common.ProgressCell{Total: realSizeAfterRS, Current: 0, Rate: 0.0}
@@ -708,14 +709,13 @@ func (c *ClientManager) saveFileByPartition(filename string, partition *mpb.Retr
 	dataShards := 0
 	parityShards := 0
 	middleFiles := []string{}
-	for pi, block := range partition.GetBlock() {
+	for _, block := range partition.GetBlock() {
 		if block.GetChecksum() {
 			parityShards++
 		} else {
 			dataShards++
 		}
 		nodes := block.GetStoreNode()
-		log.Infof("[block %d] blockSeq %d size %d nodes %d hash %x", pi, block.GetBlockSeq(), block.GetSize(), len(nodes), block.GetHash())
 		node := nodes[0]
 		server := fmt.Sprintf("%s:%d", node.GetServer(), node.GetPort())
 		conn, err := grpc.Dial(server, grpc.WithInsecure())
@@ -730,7 +730,7 @@ func (c *ClientManager) saveFileByPartition(filename string, partition *mpb.Retr
 		if multiReplica {
 			tempFileName = filename
 		}
-		log.Infof("[part file] %s retrieve from %s, ticket %s", tempFileName, server, node.GetTicket())
+		log.Infof("[part file] %s retrieve from %s, hash %x, size %d", tempFileName, server, block.GetHash(), block.GetSize())
 		err = client.Retrieve(log, pclient, tempFileName, node.GetAuth(), node.GetTicket(), block.GetHash(), block.GetSize(), tm, c.Progress, c.PartitionToOriginMap)
 		if err != nil {
 			return 0, 0, nil, err

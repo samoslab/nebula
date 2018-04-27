@@ -47,6 +47,7 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, fileInf
 	if !ok {
 		log.Errorf("file %s not in reverse partition map", filePath)
 	}
+	first := true
 	for {
 		bytesRead, err := file.Read(buf)
 		if err != nil {
@@ -56,12 +57,23 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, fileInf
 			log.Errorf("read file failed: %s\n", err.Error())
 			return err
 		}
-		if err := stream.Send(UpdateStoreReqAuth(&pb.StoreReq{Data: buf[:bytesRead], Ticket: ticket, Auth: auth, Timestamp: tm, Key: fileInfo.FileHash, FileSize: fileSize})); err != nil {
-			log.Errorf("RPC Send StoreReq failed: %s\n", err.Error())
-			if err.Error() == "EOF" {
-				continue
+		if first {
+			first = false
+			if err := stream.Send(UpdateStoreReqAuth(&pb.StoreReq{Data: buf[:bytesRead], Ticket: ticket, Auth: auth, Timestamp: tm, Key: fileInfo.FileHash, FileSize: fileSize})); err != nil {
+				log.Errorf("RPC Send StoreReq failed: %s\n", err.Error())
+				//if err.Error() == "EOF" {
+				//continue
+				//}
+				return err
 			}
-			return err
+		} else {
+			if err := stream.Send(UpdateStoreReqAuth(&pb.StoreReq{Data: buf[:bytesRead]})); err != nil {
+				log.Errorf("RPC Send StoreReq failed: %s\n", err.Error())
+				//if err.Error() == "EOF" {
+				//continue
+				//}
+				return err
+			}
 		}
 		// for progress
 		if realfile != "" {

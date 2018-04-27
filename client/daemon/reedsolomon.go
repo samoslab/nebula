@@ -178,7 +178,7 @@ func RsDecoder(log logrus.FieldLogger, fname, outfname string, dataShards, parSh
 		return err
 	}
 
-	// We don't know the exact filesize.
+	// We don't know the exact filesize. has bug
 	err = enc.Join(f, shards, int64(dataShards)*size)
 	if err != nil {
 		return err
