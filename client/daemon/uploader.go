@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -77,8 +78,45 @@ func (c *ClientManager) Shutdown() {
 	c.serverConn.Close()
 }
 
+func fping(ips []string) ([]string, error) {
+	commands := "fping " + strings.Join(ips, " ")
+	cmd := exec.Command("/bin/sh", "-c", commands)
+	ip, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	aliveIps := []string{}
+	for _, ip := range strings.Split(string(ip), "\n") {
+		if strings.HasSuffix(ip, "is alive") {
+			aliveIps = append(aliveIps, strings.Trim(ip, " is alive"))
+		}
+	}
+	return aliveIps, nil
+}
+
 // PingProvider ping provider
 func (c *ClientManager) PingProvider(pro []*mpb.BlockProviderAuth) ([]*mpb.BlockProviderAuth, error) {
+	//todo if provider ip is same
+	allIPMap := map[string]*mpb.BlockProviderAuth{}
+	allIps := []string{}
+	for _, bpa := range pro {
+		serverIP := bpa.GetServer()
+		if _, ok := allIPMap[serverIP]; !ok {
+			allIPMap[serverIP] = bpa
+			allIps = append(allIps, serverIP)
+		}
+	}
+
+	availableIps, err := fping(allIps)
+	if err != nil {
+		return nil, err
+	}
+
+	availableProvider := []*mpb.BlockProviderAuth{}
+	for _, ip := range availableIps {
+		provider, _ := allIPMap[ip]
+		availableProvider = append(availableProvider, provider)
+	}
 	return pro, nil
 }
 
