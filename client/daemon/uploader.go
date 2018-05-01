@@ -9,8 +9,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/samoslab/nebula/client/common"
@@ -36,14 +36,13 @@ var (
 
 // ClientManager client manager
 type ClientManager struct {
-	mclient              mpb.MatadataServiceClient
-	NodeId               []byte
-	TempDir              string
-	Log                  logrus.FieldLogger
-	cfg                  *config.ClientConfig
-	serverConn           *grpc.ClientConn
-	Progress             map[string]common.ProgressCell
-	PartitionToOriginMap map[string]string // a.txt.1 -> a.txt ; a.txt.2 -> a.txt for progress
+	mclient    mpb.MatadataServiceClient
+	NodeId     []byte
+	TempDir    string
+	Log        logrus.FieldLogger
+	cfg        *config.ClientConfig
+	serverConn *grpc.ClientConn
+	PM         *common.ProgressManager
 }
 
 // NewClientManager create manager
@@ -68,8 +67,7 @@ func NewClientManager(log logrus.FieldLogger, trackerServer string, cfg *config.
 	c.TempDir = cfg.TempDir
 	c.NodeId = cfg.Node.NodeId
 	c.cfg = cfg
-	c.Progress = map[string]common.ProgressCell{}
-	c.PartitionToOriginMap = map[string]string{}
+	c.PM = common.NewProgressManager()
 	return c, nil
 }
 
@@ -173,7 +171,7 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 	switch rsp.GetStoreType() {
 	case mpb.FileStoreType_MultiReplica:
 		log.Infof("upload manner is multi-replication")
-		c.Progress[filename] = common.ProgressCell{Total: req.FileSize, Current: 0, Rate: 0.0}
+		c.PM.SetProgress(filename, 0, req.FileSize)
 		partitions, err := c.uploadFileByMultiReplica(filename, req, rsp)
 		if err != nil {
 			return err
@@ -214,12 +212,12 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 			log.Infof("file %s need split to %d blocks", fname, len(fileSlices))
 			for _, fs := range fileSlices {
 				log.Debugf("erasure block files %s index %d", fs.FileName, fs.SliceIndex)
-				c.PartitionToOriginMap[fs.FileName] = filename
+				c.PM.SetPartitionMap(fs.FileName, filename)
 				realSizeAfterRS += fs.FileSize
 			}
-			c.PartitionToOriginMap[fname] = filename
+			c.PM.SetPartitionMap(fname, filename)
 		}
-		c.Progress[filename] = common.ProgressCell{Total: uint64(realSizeAfterRS), Current: 0, Rate: 0.0}
+		c.PM.SetProgress(filename, 0, uint64(realSizeAfterRS))
 
 		ufpr := &mpb.UploadFilePrepareReq{}
 		ufpr.Version = Version
@@ -287,7 +285,9 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 			for _, slice := range partInfo.Pieces {
 				deleteTemporaryFile(log, slice.FileName)
 			}
-			deleteTemporaryFile(log, partInfo.FileName)
+			if len(fileInfos) != 1 {
+				deleteTemporaryFile(log, partInfo.FileName)
+			}
 		}
 		return c.UploadFileDone(req, partitions)
 
@@ -392,20 +392,31 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 		return nil, err
 	}
 
-	checksum := false
+	var errResult []error
+
+	wg := sync.WaitGroup{}
+	var mutex sync.Mutex
 	for i, pro := range providers {
-		log.Infof("provider %d %s:%d", i, pro.GetServer(), pro.GetPort())
-		if i < dataShards {
-			checksum = false
-		} else {
-			checksum = true
-		}
-		block, err := c.uploadFileToErasureProvider(pro, rspPartition.GetTimestamp(), hashFiles[i], checksum)
-		if err != nil {
-			return nil, err
-		}
-		partition.Block = append(partition.Block, block)
-		log.Debugf("privider %s:%d has %d blocks", pro.GetServer(), pro.GetPort(), len(partition.GetBlock()))
+		checksum := i >= dataShards
+		wg.Add(1)
+		go func(i int, pro *mpb.BlockProviderAuth, checksum bool, tm uint64, hf common.HashFile) {
+			defer wg.Done()
+			log.Infof("provider %d %s:%d", i, pro.GetServer(), pro.GetPort())
+			block, err := c.uploadFileToErasureProvider(pro, tm, hf, checksum)
+			mutex.Lock()
+			defer mutex.Unlock()
+			if err != nil {
+				log.Errorf("upload file %s error %v", hf.FileName, err)
+				errResult = append(errResult, err)
+				return
+			}
+			partition.Block = append(partition.Block, block)
+			log.Debugf("%s upload to privider %s:%d success", hf.FileName, pro.GetServer(), pro.GetPort())
+		}(i, pro, checksum, rspPartition.GetTimestamp(), hashFiles[i])
+	}
+	wg.Wait()
+	if len(errResult) != 0 {
+		return partition, errResult[0]
 	}
 	return partition, nil
 }
@@ -430,7 +441,7 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 	pclient := pb.NewProviderServiceClient(conn)
 
 	ha := onePartition.GetHashAuth()[0]
-	err = client.StorePiece(log, pclient, fileInfo, ha.GetAuth(), ha.GetTicket(), tm, c.Progress, c.PartitionToOriginMap)
+	err = client.StorePiece(log, pclient, fileInfo, ha.GetAuth(), ha.GetTicket(), tm, c.PM)
 	if err != nil {
 		return nil, err
 	}
@@ -457,7 +468,7 @@ func (c *ClientManager) uploadFileToReplicaProvider(pro *mpb.ReplicaProvider, fi
 	pclient := pb.NewProviderServiceClient(conn)
 	log.Debugf("upload file %s hash %x size %d to %s", fileInfo.FileName, fileInfo.FileHash, fileInfo.FileSize, server)
 
-	err = client.StorePiece(log, pclient, fileInfo, pro.GetAuth(), pro.GetTicket(), pro.GetTimestamp(), c.Progress, c.PartitionToOriginMap)
+	err = client.StorePiece(log, pclient, fileInfo, pro.GetAuth(), pro.GetTicket(), pro.GetTimestamp(), c.PM)
 	if err != nil {
 		log.Errorf("upload error %v", err)
 		return nil, err
@@ -482,7 +493,7 @@ func (c *ClientManager) uploadFileByMultiReplica(filename string, req *mpb.Check
 	block.BlockSeq = uint32(fileInfo.SliceIndex)
 	block.Checksum = false
 	block.StoreNodeId = [][]byte{}
-	c.PartitionToOriginMap[filename] = filename
+	c.PM.SetPartitionMap(filename, filename)
 	for _, pro := range rsp.GetProvider() {
 		proID, err := c.uploadFileToReplicaProvider(pro, fileInfo)
 		if err != nil {
@@ -635,7 +646,8 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 	if err != nil {
 		return err
 	}
-	c.Progress[downFileName] = common.ProgressCell{Total: req.FileSize, Current: 0, Rate: 0.0}
+	c.PM.SetProgress(downFileName, 0, req.FileSize)
+
 	ctx := context.Background()
 	log.Infof("download file request hash:%x, size %d", fileHash, fileSize)
 	rsp, err := c.mclient.RetrieveFile(ctx, req)
@@ -649,7 +661,7 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 	// tiny file
 	if filedata := rsp.GetFileData(); filedata != nil {
 		saveFile(downFileName, filedata)
-		c.Progress[downFileName] = common.ProgressCell{Total: req.FileSize, Current: req.FileSize, Rate: 1.0}
+		c.PM.SetProgress(downFileName, req.FileSize, req.FileSize)
 		log.Infof("download tiny file %s", downFileName)
 		return nil
 	}
@@ -663,7 +675,7 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 			log.Infof("file %s is multi replication files", downFileName)
 			// for progress stats
 			for _, block := range partitions[0].GetBlock() {
-				c.PartitionToOriginMap[hex.EncodeToString(block.GetHash())] = downFileName
+				c.PM.SetPartitionMap(hex.EncodeToString(block.GetHash()), downFileName)
 			}
 			_, _, _, err := c.saveFileByPartition(downFileName, partitions[0], rsp.GetTimestamp(), true)
 			return err
@@ -676,12 +688,12 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 	realSizeAfterRS := uint64(0)
 	for i, partition := range partitions {
 		for j, block := range partition.GetBlock() {
-			c.PartitionToOriginMap[hex.EncodeToString(block.GetHash())] = downFileName
+			c.PM.SetPartitionMap(hex.EncodeToString(block.GetHash()), downFileName)
 			realSizeAfterRS += block.GetSize()
 			fmt.Printf("partition %d block %d hash %x size %d checksum %v seq %d\n", i, j, block.Hash, block.Size, block.Checksum, block.BlockSeq)
 		}
 	}
-	c.Progress[downFileName] = common.ProgressCell{Total: realSizeAfterRS, Current: 0, Rate: 0.0}
+	c.PM.SetProgress(downFileName, 0, realSizeAfterRS)
 
 	if len(partitions) == 1 {
 		partition := partitions[0]
@@ -765,7 +777,7 @@ func (c *ClientManager) saveFileByPartition(filename string, partition *mpb.Retr
 			tempFileName = filename
 		}
 		log.Infof("[part file] %s, hash %x retrieve from %s", tempFileName, block.GetHash(), server)
-		err = client.Retrieve(log, pclient, tempFileName, node.GetAuth(), node.GetTicket(), block.GetHash(), block.GetSize(), tm, c.Progress, c.PartitionToOriginMap)
+		err = client.Retrieve(log, pclient, tempFileName, node.GetAuth(), node.GetTicket(), block.GetHash(), block.GetSize(), tm, c.PM)
 		if err != nil {
 			return 0, 0, nil, err
 		}
@@ -827,18 +839,5 @@ func (c *ClientManager) RemoveFile(target string, recursive bool, isPath bool) e
 
 // GetProgress returns progress rate
 func (c *ClientManager) GetProgress(files []string) (map[string]float64, error) {
-	a := map[string]float64{}
-	for k, v := range c.Progress {
-		if v.Total != 0 {
-			rate := fmt.Sprintf("%0.2f", float64(v.Current)/float64(v.Total))
-			x, err := strconv.ParseFloat(rate, 10)
-			if err != nil {
-				return a, err
-			}
-			a[k] = x
-		} else {
-			a[k] = 0.0
-		}
-	}
-	return a, nil
+	return c.PM.GetProgress(files)
 }

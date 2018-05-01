@@ -27,7 +27,7 @@ func UpdateStoreReqAuth(obj *pb.StoreReq) *pb.StoreReq {
 	return obj
 }
 
-func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, fileInfo common.HashFile, auth []byte, ticket string, tm uint64, progress map[string]common.ProgressCell, fileMap map[string]string) error {
+func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, fileInfo common.HashFile, auth []byte, ticket string, tm uint64, pm *common.ProgressManager) error {
 	filePath := fileInfo.FileName
 	fileSize := uint64(fileInfo.FileSize)
 	file, err := os.Open(filePath)
@@ -43,7 +43,7 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, fileInf
 	}
 	defer stream.CloseSend()
 	buf := make([]byte, stream_data_size)
-	realfile, ok := fileMap[filePath]
+	realfile, ok := pm.PartitionToOriginMap[filePath]
 	if !ok {
 		log.Errorf("file %s not in reverse partition map", filePath)
 	}
@@ -77,10 +77,7 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, fileInf
 		}
 		// for progress
 		if realfile != "" {
-			if cell, ok := progress[realfile]; ok {
-				cell.Current = cell.Current + uint64(bytesRead)
-				progress[realfile] = cell
-			} else {
+			if err := pm.SetIncrement(realfile, uint64(bytesRead)); err != nil {
 				log.Errorf("file %s not in progress map", realfile)
 			}
 		}
@@ -88,7 +85,6 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, fileInf
 			break
 		}
 	}
-	log.Infof("file %s %+v", filePath, progress)
 	storeResp, err := stream.CloseAndRecv()
 	if err != nil {
 		log.Errorf("RPC CloseAndRecv failed: %s\n", err.Error())
@@ -110,7 +106,7 @@ func updateRetrieveReqAuth(obj *pb.RetrieveReq) *pb.RetrieveReq {
 }
 
 // Retrieve download file from provider piece by piece
-func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, key []byte, fileSize, tm uint64, progress map[string]common.ProgressCell, fileMap map[string]string) error {
+func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, key []byte, fileSize, tm uint64, pm *common.ProgressManager) error {
 	fileHashString := hex.EncodeToString(key)
 	file, err := os.OpenFile(filePath,
 		os.O_WRONLY|os.O_TRUNC|os.O_CREATE,
@@ -120,7 +116,7 @@ func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath 
 		return err
 	}
 	defer file.Close()
-	realfile, ok := fileMap[fileHashString]
+	realfile, ok := pm.PartitionToOriginMap[fileHashString]
 	if !ok {
 		log.Errorf("file %s not in reverse partition map", fileHashString)
 	}
@@ -138,10 +134,7 @@ func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath 
 			break
 		}
 		if realfile != "" {
-			if cell, ok := progress[realfile]; ok {
-				cell.Current = cell.Current + uint64(len(resp.Data))
-				progress[realfile] = cell
-			} else {
+			if err := pm.SetIncrement(realfile, uint64(len(resp.Data))); err != nil {
 				log.Errorf("file %s not in progress map", realfile)
 			}
 		}

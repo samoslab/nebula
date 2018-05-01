@@ -5,10 +5,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
+	"strconv"
+	"sync"
 	"time"
 )
 
@@ -82,4 +85,55 @@ type HashFile struct {
 	FileName   string
 	FileHash   []byte
 	SliceIndex int
+}
+
+// ProgressManager progress stats
+
+type ProgressManager struct {
+	Progress             map[string]ProgressCell
+	PartitionToOriginMap map[string]string // a.txt.1 -> a.txt ; a.txt.2 -> a.txt for progress
+	Mutex                sync.Mutex
+}
+
+func NewProgressManager() *ProgressManager {
+	pm := &ProgressManager{}
+	pm.Progress = map[string]ProgressCell{}
+	pm.PartitionToOriginMap = map[string]string{}
+	return pm
+}
+
+func (pm *ProgressManager) SetProgress(fileName string, currentSize, totalSize uint64) {
+	pm.Progress[fileName] = ProgressCell{Total: totalSize, Current: currentSize, Rate: 0.0}
+}
+
+func (pm *ProgressManager) SetPartitionMap(fileName, originFile string) {
+	pm.PartitionToOriginMap[fileName] = originFile
+}
+
+func (pm *ProgressManager) SetIncrement(fileName string, increment uint64) error {
+	pm.Mutex.Lock()
+	defer pm.Mutex.Unlock()
+	if cell, ok := pm.Progress[fileName]; ok {
+		cell.Current = cell.Current + increment
+		pm.Progress[fileName] = cell
+		return nil
+	}
+	return errors.New("not in progress map")
+}
+
+func (pm *ProgressManager) GetProgress(files []string) (map[string]float64, error) {
+	a := map[string]float64{}
+	for k, v := range pm.Progress {
+		if v.Total != 0 {
+			rate := fmt.Sprintf("%0.2f", float64(v.Current)/float64(v.Total))
+			x, err := strconv.ParseFloat(rate, 10)
+			if err != nil {
+				return a, err
+			}
+			a[k] = x
+		} else {
+			a[k] = 0.0
+		}
+	}
+	return a, nil
 }
