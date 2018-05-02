@@ -78,3 +78,16 @@ func GenGetFragmentAuth(publicKeyBytes []byte, hash []byte, size uint32, timesta
 func GenRemoveAuth(publicKeyBytes []byte, hash []byte, size uint64, timestamp uint64) []byte {
 	return genAuth(publicKeyBytes, method_remove, nil, 0, hash, size, timestamp, "")
 }
+
+func (self *StoreReq) GenAuth(publicKeyBytes []byte) {
+	self.Auth = genAuth(publicKeyBytes, method_store, self.FileKey, self.FileSize, self.BlockKey, self.BlockSize, self.Timestamp, self.Ticket)
+}
+func (self *RetrieveReq) GenAuth(publicKeyBytes []byte) {
+	self.Auth = genAuth(publicKeyBytes, method_retrieve, self.FileKey, self.FileSize, self.BlockKey, self.BlockSize, self.Timestamp, self.Ticket)
+}
+func (self *RemoveReq) GenAuth(publicKeyBytes []byte) {
+	self.Auth = genAuth(publicKeyBytes, method_remove, nil, 0, self.Key, self.Size, self.Timestamp, "")
+}
+func (self *GetFragmentReq) GenAuth(publicKeyBytes []byte) {
+	self.Auth = genAuth(publicKeyBytes, method_get_fragment, nil, 0, self.Key, uint64(self.Size), self.Timestamp, "")
+}
