@@ -23,10 +23,12 @@ message ActionLog{
     uint32 type=1;// 1:Store,  2:Retrieve
     string ticket=2;
     bool success=3;
-    bytes hash=4;
-    uint64 size=5;
-    uint64 beginTime=6;
-    uint64 endTime=7;
-    uint64 transportSize=8;
-    string info=9;// error info
+    bytes fileHash=4;
+    uint64 fileSize=5;
+    bytes blockHash=6;
+    uint64 blockSize=7;
+    uint64 beginTime=8;
+    uint64 endTime=9;
+    uint64 transportSize=10;
+    string info=11;// error info
 }

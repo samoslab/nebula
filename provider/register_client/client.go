@@ -79,13 +79,47 @@ func ResendVerifyCode(client pb.ProviderRegisterServiceClient) (success bool, er
 	return resp.Success, nil
 }
 
-func GetTrackerServer(client pb.ProviderRegisterServiceClient, nodeId []byte, timestamp uint64,
-	sign []byte) (server map[string]uint32, err error) {
+func AddExtraStorage(client pb.ProviderRegisterServiceClient, volume uint64) (success bool, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	resp, err := client.GetTrackerServer(ctx, &pb.GetTrackerServerReq{NodeId: nodeId,
-		Timestamp: timestamp,
-		Sign:      sign})
+	node := node.LoadFormConfig()
+	req := &pb.AddExtraStorageReq{NodeId: node.NodeId,
+		Timestamp: uint64(time.Now().Unix()),
+		Volume:    volume}
+	req.SignReq(node.PriKey)
+	resp, err := client.AddExtraStorage(ctx, req)
+	if err != nil {
+		return false, err
+	}
+	return resp.Success, nil
+}
+
+func GetTrackerServer(client pb.ProviderRegisterServiceClient) (server map[string]uint32, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	node := node.LoadFormConfig()
+	req := &pb.GetTrackerServerReq{NodeId: node.NodeId,
+		Timestamp: uint64(time.Now().Unix())}
+	req.SignReq(node.PriKey)
+	resp, err := client.GetTrackerServer(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	res := make(map[string]uint32, len(resp.Server))
+	for _, s := range resp.Server {
+		res[s.Server] = s.Port
+	}
+	return res, nil
+}
+
+func GetCollectorServer(client pb.ProviderRegisterServiceClient) (server map[string]uint32, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	node := node.LoadFormConfig()
+	req := &pb.GetCollectorServerReq{NodeId: node.NodeId,
+		Timestamp: uint64(time.Now().Unix())}
+	req.SignReq(node.PriKey)
+	resp, err := client.GetCollectorServer(ctx, req)
 	if err != nil {
 		return nil, err
 	}

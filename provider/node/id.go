@@ -3,13 +3,13 @@ package node
 import (
 	"crypto/rand"
 	"crypto/rsa"
-	"crypto/sha1"
 	"crypto/x509"
 	"encoding/hex"
 	"strconv"
 
-	log "github.com/sirupsen/logrus"
 	"github.com/samoslab/nebula/provider/config"
+	util_hash "github.com/samoslab/nebula/util/hash"
+	log "github.com/sirupsen/logrus"
 )
 
 type AesKey []byte // AesKey[0] is version, AesKey[1:] is real AES key
@@ -22,39 +22,13 @@ type Node struct {
 }
 
 func LoadFormConfig() *Node {
-	conf := config.GetProviderConfig()
-	pubKeyBytes, err := hex.DecodeString(conf.PublicKey)
+	node := &Node{}
+	var err error
+	node.NodeId, node.PubKey, node.PriKey, node.PubKeyBytes, node.EncryptKey, err = config.ParseNode()
 	if err != nil {
-		log.Fatalf("DecodeString Public Key failed: %s", err)
+		log.Fatalln(err)
 	}
-	if conf.NodeId != hex.EncodeToString(sha1Sum(pubKeyBytes)) {
-		log.Fatalln("NodeId is not match PublicKey")
-	}
-	pubK, err := x509.ParsePKCS1PublicKey(pubKeyBytes)
-	if err != nil {
-		log.Fatalf("ParsePKCS1PublicKey failed: %s", err)
-	}
-	priKeyBytes, err := hex.DecodeString(conf.PrivateKey)
-	if err != nil {
-		log.Fatalf("DecodeString Private Key failed: %s", err)
-	}
-	priK, err := x509.ParsePKCS1PrivateKey(priKeyBytes)
-	if err != nil {
-		log.Fatalf("ParsePKCS1PrivateKey failed: %s", err)
-	}
-	m := make(map[string][]byte, len(conf.EncryptKey))
-	for k, v := range conf.EncryptKey {
-		m[k], err = hex.DecodeString(v)
-		if err != nil {
-			log.Fatalf("DecodeString EncryptKey %s failed: %s", v, err)
-		}
-	}
-	nodeId, err := hex.DecodeString(conf.NodeId)
-	if err != nil {
-		log.Fatalf("DecodeString node id hex string failed: %s", err)
-	}
-
-	return &Node{NodeId: nodeId, PubKey: pubK, PriKey: priK, PubKeyBytes: pubKeyBytes, EncryptKey: m}
+	return node
 }
 
 const RSA_KEY_BYTES = 256
@@ -69,8 +43,8 @@ func NewNode(difficulty int) *Node {
 		n.PriKey = pk
 		n.PubKey = &pk.PublicKey
 		n.PubKeyBytes = x509.MarshalPKCS1PublicKey(n.PubKey)
-		n.NodeId = sha1Sum(n.PubKeyBytes)
-		if count_preceding_zero_bits(sha1Sum(n.NodeId)) < difficulty {
+		n.NodeId = util_hash.Sha1(n.PubKeyBytes)
+		if count_preceding_zero_bits(util_hash.Sha1(n.NodeId)) < difficulty {
 			break
 		}
 	}
@@ -103,12 +77,6 @@ func count_preceding_zero_bits(nodeIdHash []byte) int {
 		}
 	}
 	return res
-}
-
-func sha1Sum(content []byte) []byte {
-	h := sha1.New()
-	h.Write(content)
-	return h.Sum(nil)
 }
 
 func (self *Node) NodeIdStr() string {
