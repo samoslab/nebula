@@ -141,7 +141,7 @@ func NewStorage(path string, index byte) (storage *Storage, err error) {
 	if err != nil {
 		return nil, err
 	}
-	s := &Storage{Path: path, Index: 0, Volume: free}
+	s := &Storage{Path: path, Index: index, Volume: free}
 	if err = s.initStorage(); err != nil {
 		return nil, err
 	}

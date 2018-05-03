@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
-	"strconv"
 
 	"github.com/koding/multiconfig"
 	"github.com/robfig/cron"
@@ -40,8 +39,8 @@ type ProviderConfig struct {
 	MainStorageVolume uint64
 	UpBandwidth       uint64
 	DownBandwidth     uint64
-	EncryptKey        map[string]string           // key: version, eg: 0, 1, 2
-	ExtraStorage      map[string]ExtraStorageInfo `json:",omitempty"` //key:storage index, 1-based eg: 1, 2, 3
+	EncryptKey        map[string]string  // key: version, eg: 0, 1, 2
+	ExtraStorage      []ExtraStorageInfo `json:",omitempty"` //key:storage index, 1-based eg: 1, 2, 3
 }
 
 var providerConfig *ProviderConfig
@@ -52,6 +51,10 @@ var configFilePath string
 var configFileModTs int64
 
 var cronRunner *cron.Cron
+
+func ConfigExists(configDir string) bool {
+	return util_file.Exists(configDir + string(os.PathSeparator) + config_filename)
+}
 
 func LoadConfig(configDir string) error {
 	configFilePath = configDir + string(os.PathSeparator) + config_filename
@@ -66,16 +69,17 @@ func LoadConfig(configDir string) error {
 		return ConfVerifyErr
 	}
 	providerConfig = pc
-	checkStorageAvailableSpaceOfConf()
 	return nil
 }
 
 func verifyConfig(pc *ProviderConfig) (err error) {
 	if len(pc.ExtraStorage) > 0 {
-		for k, v := range pc.ExtraStorage {
-			if k == "0" || k != strconv.Itoa(int(v.Index)) {
+		var i byte = 1
+		for _, v := range pc.ExtraStorage {
+			if v.Index != i {
 				return errors.New("extraStorage index error")
 			}
+			i++
 		}
 	}
 	_, _, _, _, _, err = parseNodeFromConf(pc)
@@ -129,6 +133,7 @@ func parseNodeFromConf(conf *ProviderConfig) (nodeId []byte, pubKey *rsa.PublicK
 }
 
 func StartAutoCheck() {
+	checkStorageAvailableSpaceOfConf()
 	cronRunner = cron.New()
 	cronRunner.AddFunc("0,15,30,45 * * * * *", checkAndReload)
 	cronRunner.AddFunc("7 */3 * * * *", checkStorageAvailableSpace)

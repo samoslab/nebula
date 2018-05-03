@@ -214,8 +214,7 @@ func daemon(configDir string, trackerServer string, listen string) {
 func register(configDir string, trackerServer string, listen string, walletAddress string, billEmail string,
 	availability string, upBandwidth uint, downBandwidth uint, port uint, host string, dynamicDomain string,
 	mainStoragePath string, mainStorageVolume string, extraStorageFlag string) {
-	err := config.LoadConfig(configDir)
-	if err == nil {
+	if config.ConfigExists(configDir) {
 		fmt.Println("config file is adready exsits: " + configDir)
 		os.Exit(2)
 	}
@@ -505,7 +504,7 @@ func addStorage(configDir string, trackerServer string, path string, volumeStr s
 	}
 	pc := config.GetProviderConfig()
 	if len(pc.ExtraStorage) == 0 {
-		pc.ExtraStorage = make(map[string]config.ExtraStorageInfo, 1)
+		pc.ExtraStorage = make([]config.ExtraStorageInfo, 0, 1)
 	} else if len(pc.ExtraStorage) == 255 {
 		fmt.Println("do not support more than 255 extra storage")
 		os.Exit(6)
@@ -520,10 +519,10 @@ func addStorage(configDir string, trackerServer string, path string, volumeStr s
 			os.Exit(8)
 		}
 	}
-	idx := byte(len(pc.ExtraStorage))
-	pc.ExtraStorage[strconv.FormatInt(int64(idx), 10)] = config.ExtraStorageInfo{Path: path,
+	idx := byte(len(pc.ExtraStorage) + 1)
+	pc.ExtraStorage = append(pc.ExtraStorage, config.ExtraStorageInfo{Path: path,
 		Volume: volume,
-		Index:  idx}
+		Index:  idx})
 	config.SaveProviderConfig()
 	fmt.Println("add storage success")
 }
@@ -542,16 +541,13 @@ func newProviderConfig(no *node.Node, walletAddress string, billEmail string,
 		MainStorageVolume: mainStorageVolume,
 		UpBandwidth:       upBandwidth,
 		DownBandwidth:     downBandwidth,
+		ExtraStorage:      extraStorage,
 	}
 	m := make(map[string]string, len(no.EncryptKey))
 	for k, v := range no.EncryptKey {
 		m[k] = hex.EncodeToString(v)
 	}
 	pc.EncryptKey = m
-	pc.ExtraStorage = make(map[string]config.ExtraStorageInfo, len(extraStorage))
-	for _, esi := range extraStorage {
-		pc.ExtraStorage[strconv.FormatInt(int64(esi.Index), 10)] = esi
-	}
 	return pc
 }
 

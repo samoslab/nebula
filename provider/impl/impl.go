@@ -151,7 +151,7 @@ func (self *ProviderService) Store(stream pb.ProviderService_StoreServer) (er er
 			al = newActionLogFromStoreReq(req)
 			defer client.Collect(al)
 			first, blockKey, blockSize = false, req.BlockKey, req.BlockSize
-			if req.BlockSize < small_file_limit {
+			if blockSize < small_file_limit {
 				er = fmt.Errorf("check data size failed, blockKey: %x", blockKey)
 				logWarnAndSetActionLog(er, al)
 				al.TransportSize += uint64(len(req.Data))
@@ -170,9 +170,9 @@ func (self *ProviderService) Store(stream pb.ProviderService_StoreServer) (er er
 				al.TransportSize += uint64(len(req.Data))
 				return os.ErrExist
 			}
-			storage = config.GetWriteStorage(req.BlockSize)
+			storage = config.GetWriteStorage(blockSize)
 			if storage == nil {
-				er = fmt.Errorf("available disk space of this provider is not enlough, blockKey: %s blockSize: %d", blockKey, req.BlockSize)
+				er = fmt.Errorf("available disk space of this provider is not enlough, blockKey: %s blockSize: %d", blockKey, blockSize)
 				logWarnAndSetActionLog(er, al)
 				al.TransportSize += uint64(len(req.Data))
 				return

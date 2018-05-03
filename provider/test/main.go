@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -32,11 +33,11 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	}
-	var path string
-	var hash []byte
+	var path, getPath string
+	var hash, getHash []byte
 	var fileInfo os.FileInfo
-	fmt.Println("==========test Big File Store RPC==========")
-	path = "/home/lijt/go/bin/godoc"
+	fmt.Println("==========test Big File 1 Store RPC==========")
+	path = "/bin/bash"
 	hash, err = util_hash.Sha1File(path)
 	if err != nil {
 		panic(err)
@@ -49,10 +50,72 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	}
-	fmt.Println("==========test Big File Retrieve RPC==========")
-	err = Retrieve(psc, "/tmp/godoc", "mock-ticket", hash, uint64(fileInfo.Size()))
+	fmt.Println("==========test Big File 1 Retrieve RPC==========")
+	getPath = "/tmp/bash"
+	err = Retrieve(psc, getPath, "mock-ticket", hash, uint64(fileInfo.Size()))
 	if err != nil {
 		fmt.Println(err)
+	}
+	getHash, err = util_hash.Sha1File(getPath)
+	if err != nil {
+		fmt.Println(err)
+	}
+	if !bytes.Equal(hash, getHash) {
+		fmt.Printf("error: hash: %x getHash: %x", hash, getHash)
+	}
+	fmt.Println("==========test Big File 2 Store RPC==========")
+	path = "/bin/ip"
+	hash, err = util_hash.Sha1File(path)
+	if err != nil {
+		panic(err)
+	}
+	fileInfo, err = os.Stat(path)
+	if err != nil {
+		panic(err)
+	}
+	err = Store(psc, path, "mock-ticket", hash, uint64(fileInfo.Size()))
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println("==========test Big File 2 Retrieve RPC==========")
+	getPath = "/tmp/ip"
+	err = Retrieve(psc, getPath, "mock-ticket", hash, uint64(fileInfo.Size()))
+	if err != nil {
+		fmt.Println(err)
+	}
+	getHash, err = util_hash.Sha1File(getPath)
+	if err != nil {
+		fmt.Println(err)
+	}
+	if !bytes.Equal(hash, getHash) {
+		fmt.Printf("error: hash: %x getHash: %x", hash, getHash)
+	}
+	fmt.Println("==========test Big File 3 Store RPC==========")
+	path = "/bin/awk"
+	hash, err = util_hash.Sha1File(path)
+	if err != nil {
+		panic(err)
+	}
+	fileInfo, err = os.Stat(path)
+	if err != nil {
+		panic(err)
+	}
+	err = Store(psc, path, "mock-ticket", hash, uint64(fileInfo.Size()))
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println("==========test Big File 3 Retrieve RPC==========")
+	getPath = "/tmp/awk"
+	err = Retrieve(psc, getPath, "mock-ticket", hash, uint64(fileInfo.Size()))
+	if err != nil {
+		fmt.Println(err)
+	}
+	getHash, err = util_hash.Sha1File(getPath)
+	if err != nil {
+		fmt.Println(err)
+	}
+	if !bytes.Equal(hash, getHash) {
+		fmt.Printf("error: hash: %x getHash: %x", hash, getHash)
 	}
 	fmt.Println("==========test Small File 1 Store RPC==========")
 	path = "/bin/ls"
@@ -69,9 +132,17 @@ func main() {
 		fmt.Println(err)
 	}
 	fmt.Println("==========test Small File 1 Retrieve RPC==========")
-	err = Retrieve(psc, "/tmp/ls", "mock-ticket", hash, uint64(fileInfo.Size()))
+	getPath = "/tmp/ls"
+	err = Retrieve(psc, getPath, "mock-ticket", hash, uint64(fileInfo.Size()))
 	if err != nil {
 		fmt.Println(err)
+	}
+	getHash, err = util_hash.Sha1File(getPath)
+	if err != nil {
+		fmt.Println(err)
+	}
+	if !bytes.Equal(hash, getHash) {
+		fmt.Printf("error: hash: %x getHash: %x", hash, getHash)
 	}
 	fmt.Println("==========test Small File 2 Store RPC==========")
 	path = "/bin/touch"
@@ -88,9 +159,17 @@ func main() {
 		fmt.Println(err)
 	}
 	fmt.Println("==========test Small File 2 Retrieve RPC==========")
-	err = Retrieve(psc, "/tmp/touch", "mock-ticket", hash, uint64(fileInfo.Size()))
+	getPath = "/tmp/touch"
+	err = Retrieve(psc, getPath, "mock-ticket", hash, uint64(fileInfo.Size()))
 	if err != nil {
 		fmt.Println(err)
+	}
+	getHash, err = util_hash.Sha1File(getPath)
+	if err != nil {
+		fmt.Println(err)
+	}
+	if !bytes.Equal(hash, getHash) {
+		fmt.Printf("error: hash: %x getHash: %x", hash, getHash)
 	}
 	fmt.Println("==========test Small File 3 Store RPC==========")
 	path = "/bin/tar"
@@ -107,9 +186,17 @@ func main() {
 		fmt.Println(err)
 	}
 	fmt.Println("==========test Small File 3 Retrieve RPC==========")
-	err = Retrieve(psc, "/tmp/tar", "mock-ticket", hash, uint64(fileInfo.Size()))
+	getPath = "/tmp/tar"
+	err = Retrieve(psc, getPath, "mock-ticket", hash, uint64(fileInfo.Size()))
 	if err != nil {
 		fmt.Println(err)
+	}
+	getHash, err = util_hash.Sha1File(getPath)
+	if err != nil {
+		fmt.Println(err)
+	}
+	if !bytes.Equal(hash, getHash) {
+		fmt.Printf("error: hash: %x getHash: %x", hash, getHash)
 	}
 	fmt.Println("==========test Small File 4 Store RPC==========")
 	path = "/etc/apt/sources.list"
@@ -126,9 +213,17 @@ func main() {
 		fmt.Println(err)
 	}
 	fmt.Println("==========test Small File 4 Retrieve RPC==========")
-	err = Retrieve(psc, "/tmp/sources.list", "mock-ticket", hash, uint64(fileInfo.Size()))
+	getPath = "/tmp/sources.list"
+	err = Retrieve(psc, getPath, "mock-ticket", hash, uint64(fileInfo.Size()))
 	if err != nil {
 		fmt.Println(err)
+	}
+	getHash, err = util_hash.Sha1File(getPath)
+	if err != nil {
+		fmt.Println(err)
+	}
+	if !bytes.Equal(hash, getHash) {
+		fmt.Printf("error: hash: %x getHash: %x", hash, getHash)
 	}
 	fmt.Println("==========test Small File 5 Store RPC==========")
 	path = "/etc/sysctl.conf"
@@ -145,9 +240,17 @@ func main() {
 		fmt.Println(err)
 	}
 	fmt.Println("==========test Small File 5 Retrieve RPC==========")
-	err = Retrieve(psc, "/tmp/sysctl.conf", "mock-ticket", hash, uint64(fileInfo.Size()))
+	getPath = "/tmp/sysctl.conf"
+	err = Retrieve(psc, getPath, "mock-ticket", hash, uint64(fileInfo.Size()))
 	if err != nil {
 		fmt.Println(err)
+	}
+	getHash, err = util_hash.Sha1File(getPath)
+	if err != nil {
+		fmt.Println(err)
+	}
+	if !bytes.Equal(hash, getHash) {
+		fmt.Printf("error: hash: %x getHash: %x", hash, getHash)
 	}
 }
 
