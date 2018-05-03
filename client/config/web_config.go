@@ -2,8 +2,12 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"io/ioutil"
+	"log"
 	"os"
+	"os/user"
+	"path/filepath"
 	"time"
 )
 
@@ -23,6 +27,30 @@ type Config struct {
 	APIEnabled       bool          `json:"api_enabled"`
 }
 
+func (cfg *Config) SetDefault() {
+	if cfg.TrackerServer == "" {
+		cfg.TrackerServer = "127.0.0.1:6677"
+	}
+	if cfg.ConfigDir == "" {
+		usr, err := user.Current()
+		if err != nil {
+			log.Fatalf("Get OS current user failed: %s", err)
+		}
+		defaultAppDir := filepath.Join(usr.HomeDir, ".spo-nebula-client/config.json")
+		cfg.ConfigDir = defaultAppDir
+	}
+}
+
+func (cfg *Config) Validate() error {
+	if cfg.TrackerServer == "" {
+		return errors.New("need tracker server")
+	}
+	if cfg.ConfigDir == "" {
+		return errors.New("need config dir")
+	}
+	return nil
+}
+
 func LoadWebConfig(configFilePath string) (*Config, error) {
 	// Open our jsonFile
 	jsonFile, err := os.Open(configFilePath)
@@ -37,6 +65,10 @@ func LoadWebConfig(configFilePath string) (*Config, error) {
 	cc := new(Config)
 	err = json.Unmarshal(byteValue, cc)
 	if err != nil {
+		return nil, err
+	}
+	cc.SetDefault()
+	if err := cc.Validate(); err != nil {
 		return nil, err
 	}
 	return cc, nil

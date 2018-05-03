@@ -19,7 +19,7 @@ func RsEncoder(log logrus.FieldLogger, outDir, fname string, dataShards, parShar
 		return nil, err
 	}
 
-	log.Infof("[reedsolomon] Opening %s", fname)
+	log.Debugf("[reedsolomon] Opening %s", fname)
 	f, err := os.Open(fname)
 	if err != nil {
 		return nil, err
@@ -40,7 +40,7 @@ func RsEncoder(log logrus.FieldLogger, outDir, fname string, dataShards, parShar
 	}
 	for i := range out {
 		outfn := fmt.Sprintf("%s.%d", file, i)
-		log.Infof("[reedsolomon] Creating %s", outfn)
+		log.Debugf("[reedsolomon] Creating %s", outfn)
 		out[i], err = os.Create(filepath.Join(dir, outfn))
 		if err != nil {
 			return nil, err
@@ -131,7 +131,7 @@ func RsDecoder(log logrus.FieldLogger, fname, outfname string, dataShards, parSh
 		for i := range out {
 			if shards[i] == nil {
 				outfn := fmt.Sprintf("%s.%d", fname, i)
-				log.Infof("[reedsolomon] Creating %s", outfn)
+				log.Debugf("[reedsolomon] Creating %s", outfn)
 				out[i], err = os.Create(outfn)
 				if err != nil {
 					return err
@@ -192,7 +192,7 @@ func openInput(log logrus.FieldLogger, dataShards, parShards int, fname string) 
 	shards := make([]io.Reader, dataShards+parShards)
 	for i := range shards {
 		infn := fmt.Sprintf("%s.%d", fname, i)
-		log.Infof("[reedsolomon] Opening %s", infn)
+		log.Debugf("[reedsolomon] Opening %s", infn)
 		f, err := os.Open(infn)
 		if err != nil {
 			log.Info("Error reading file", err)

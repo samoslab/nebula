@@ -21,6 +21,7 @@ URI:/store/register
 Method:POST
 Request Body: {
    email:string
+   resend:bool (default false)
    }
 ```
 
@@ -37,7 +38,7 @@ Request Body: {
 ## 3. store create folder
 
 ```
-URI:/store/mkfolder
+URI:/store/folder/add
 Method: POST
 Request Body: {
   "parent":"/"
@@ -48,19 +49,27 @@ Request Body: {
 
 ## 4. store upload file
 
-if filename is not empty , then upload this file, else if filename is empty but parent not empty, then upload  this directory
 ```
 URI:/store/upload
 Method: POST
 Request Body: {
-  "parent":/tmp
   "filename":"/tmp/abc.txt"
   "interactive":true
   "newversion" :false
   }
 ```
 
-## 5. store list files
+## 5. store upload directory
+
+```
+URI:/store/uploaddir
+Method: POST
+Request Body: {
+  "parent":/tmp
+  }
+```
+
+## 6. store list files
 
 ```
 
@@ -103,7 +112,7 @@ curl -X POST -H "Content-Type:application/json" -d '{"path":"/tmp/ok", "pagesize
 
 ```
 
-## store download files
+## 7 store download files
 
 filehash and filehash is from /store/list result
 download directory if parent isn't empty but others is empty , or download filename
@@ -115,11 +124,20 @@ Request Body: {
   filehash:string
   filesize:uint64
   filename:string
-  folder:string
   }
 ```
 
-## 7. storeremove files
+## 8 store download directory
+
+```
+URI:/store/downloaddir
+Method: POST
+Request Body: {
+  parent:string
+  }
+```
+
+## 9. store remove files
 
 ```
 URI:/store/remove post
@@ -131,7 +149,7 @@ Request Body: {
    }
 ```
 
-## 8. storeprogress 
+## 10. storeprogress 
 returns all progress info if files is empty
 ```
 URI:/store/porgress post

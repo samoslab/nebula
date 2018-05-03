@@ -122,7 +122,7 @@ func (c *ClientManager) ConnectProvider() error {
 	return nil
 }
 
-// UploadFile upload all files in dir to provider
+// UploadDir upload all files in dir to provider
 func (c *ClientManager) UploadDir(parent string, interactive, newVersion bool) error {
 	log := c.Log
 	if !filepath.IsAbs(parent) {
@@ -359,7 +359,7 @@ func (c *ClientManager) MkFolder(filepath string, folders []string, interactive 
 	if err != nil {
 		return false, err
 	}
-	log.Infof("make folder req:%+v, parent:%x", req.GetFolder(), filepath)
+	log.Infof("make folder :%+v, parent:%s", req.GetFolder(), filepath)
 	rsp, err := c.mclient.MkFolder(ctx, req)
 	if rsp.GetCode() != 0 {
 		if strings.Contains(rsp.GetErrMsg(), "System error: pq: duplicate key value") {
