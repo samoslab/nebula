@@ -5,5 +5,6 @@ import (
 )
 
 func Collect(al *pb.ActionLog) {
+	// fmt.Println(al)
 	// TODO
 }

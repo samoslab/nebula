@@ -157,10 +157,32 @@ func cleanPath(path string) string {
 	return path
 }
 
-func GetWriteStorage() *Storage {
-	defer incrementStorageIdx()
+func GetWriteStorage(size uint64) *Storage {
 	sl := storageSlice
-	return sl[currentStorageIdx%uint64(len(sl))]
+	l := len(sl)
+	if l == 0 {
+		return nil
+	}
+	defer incrementStorageIdx()
+	//104857600 = 100M
+	if size < 104857600 {
+		return sl[currentStorageIdx%uint64(l)]
+	} else {
+		first := int(currentStorageIdx % uint64(l))
+		for i := first; i < first+l; i++ {
+			s := sl[i%l]
+			_, free, err := disk.Space(s.Path)
+			if err != nil {
+				log.Warnf("get storage %s free space error:%s", s.Path, err)
+				continue
+			} else if free > min_available_volume+size {
+				return s
+			} else {
+				continue
+			}
+		}
+		return nil
+	}
 }
 
 func GetStoragePath(index byte, subPath string) string {

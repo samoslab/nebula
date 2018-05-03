@@ -108,7 +108,13 @@ func (self *ProviderService) StoreSmall(ctx context.Context, req *pb.StoreReq) (
 		logWarnAndSetActionLog(fmt.Errorf("hash point file exist, blockKey: %x", req.BlockKey), al)
 		return nil, os.ErrExist
 	}
-	storage := config.GetWriteStorage()
+	storage := config.GetWriteStorage(req.BlockSize)
+	if storage == nil {
+		err = fmt.Errorf("available disk space of this provider is not enlough, blockKey: %s blockSize: %d", req.BlockKey, req.BlockSize)
+		logWarnAndSetActionLog(err, al)
+		al.TransportSize += uint64(len(req.Data))
+		return
+	}
 	if err = storage.SmallFileDb.Put(req.BlockKey, req.Data, nil); err != nil {
 		err = fmt.Errorf("save to small file db failed, blockKey: %x error: %s", req.BlockKey, err)
 		logWarnAndSetActionLog(err, al)
@@ -137,7 +143,7 @@ func (self *ProviderService) Store(stream pb.ProviderService_StoreServer) (er er
 			if err == io.EOF {
 				break
 			}
-			er = fmt.Errorf("RPC Recv failed unexpectadely while reading chunks from stream, blockKey: %x error: %s", req.BlockKey, err)
+			er = fmt.Errorf("RPC Recv failed unexpectadely while reading chunks from stream, blockKey: %x error: %s", blockKey, err)
 			logWarnAndSetActionLog(er, al)
 			return
 		}
@@ -146,38 +152,38 @@ func (self *ProviderService) Store(stream pb.ProviderService_StoreServer) (er er
 			defer client.Collect(al)
 			first, blockKey, blockSize = false, req.BlockKey, req.BlockSize
 			if req.BlockSize < small_file_limit {
-				er = fmt.Errorf("check data size failed, blockKey: %x", req.BlockKey)
-				logWarnAndSetActionLog(er, al)
-				al.TransportSize += uint64(len(req.Data))
-				return
-			}
-			if !bytes.Equal(req.BlockKey, util_hash.Sha1(req.Data)) {
-				er = fmt.Errorf("check data hash failed, blockKey: %x", req.BlockKey)
+				er = fmt.Errorf("check data size failed, blockKey: %x", blockKey)
 				logWarnAndSetActionLog(er, al)
 				al.TransportSize += uint64(len(req.Data))
 				return
 			}
 			if !skip_check_auth {
 				if err = req.CheckAuth(self.node.PubKeyBytes); err != nil {
-					er = fmt.Errorf("check auth failed, blockKey: %x error: %s", req.BlockKey, err)
+					er = fmt.Errorf("check auth failed, blockKey: %x error: %s", blockKey, err)
 					logWarnAndSetActionLog(er, al)
 					al.TransportSize += uint64(len(req.Data))
 					return
 				}
 			}
-			if found, _, _, _ := self.querySubPath(req.BlockKey); found {
-				logWarnAndSetActionLog(fmt.Errorf("hash point file exist, blockKey: %x", req.BlockKey), al)
+			if found, _, _, _ := self.querySubPath(blockKey); found {
+				logWarnAndSetActionLog(fmt.Errorf("hash point file exist, blockKey: %x", blockKey), al)
 				al.TransportSize += uint64(len(req.Data))
 				return os.ErrExist
 			}
-			storage = config.GetWriteStorage()
-			tempFilePath = storage.TempFilePath(req.BlockKey)
+			storage = config.GetWriteStorage(req.BlockSize)
+			if storage == nil {
+				er = fmt.Errorf("available disk space of this provider is not enlough, blockKey: %s blockSize: %d", blockKey, req.BlockSize)
+				logWarnAndSetActionLog(er, al)
+				al.TransportSize += uint64(len(req.Data))
+				return
+			}
+			tempFilePath = storage.TempFilePath(blockKey)
 			file, err = os.OpenFile(
 				tempFilePath,
 				os.O_WRONLY|os.O_TRUNC|os.O_CREATE,
 				0600)
 			if err != nil {
-				er = fmt.Errorf("open temp write file failed, blockKey: %x error: %s", req.BlockKey, err)
+				er = fmt.Errorf("open temp write file failed, blockKey: %x error: %s", blockKey, err)
 				logWarnAndSetActionLog(er, al)
 				al.TransportSize += uint64(len(req.Data))
 				return
@@ -188,13 +194,13 @@ func (self *ProviderService) Store(stream pb.ProviderService_StoreServer) (er er
 			break
 		}
 		al.TransportSize += uint64(len(req.Data))
-		if al.TransportSize > req.BlockSize {
-			er = fmt.Errorf("transport data size exceed, blockKey: %x", req.BlockKey)
+		if al.TransportSize > blockSize {
+			er = fmt.Errorf("transport data size exceed: %d, blockKey: %x blockSize: %d", al.TransportSize, blockKey, blockSize)
 			logWarnAndSetActionLog(er, al)
 			return
 		}
 		if _, err = file.Write(req.Data); err != nil {
-			er = fmt.Errorf("write file failed, blockKey: %x error: %s", req.BlockKey, err)
+			er = fmt.Errorf("write file failed, blockKey: %x error: %s", blockKey, err)
 			logWarnAndSetActionLog(er, al)
 			return
 		}

@@ -356,6 +356,9 @@ func parseStorageVolume(volStr string) (volume uint64, err error) {
 		if err != nil {
 			return 0, err
 		}
+		if val <= 10 {
+			return 0, errors.New("storage volume must more than 10G")
+		}
 		return uint64(val) * 1000 * 1000 * 1000, nil
 	} else if volStr[len(volStr)-1] == 'T' {
 		val, err := strconv.ParseInt(volStr[:len(volStr)-1], 10, 64)
