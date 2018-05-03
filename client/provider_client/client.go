@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
+	"io/ioutil"
 	"os"
 	"time"
 
@@ -21,11 +22,6 @@ func Ping(client pb.ProviderServiceClient) error {
 	_, err := client.Ping(ctx, &pb.PingReq{})
 	return err
 }
-func UpdateStoreReqAuth(obj *pb.StoreReq) *pb.StoreReq {
-	// TODO
-	//obj.Auth = []byte("mock-auth")
-	return obj
-}
 
 func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, fileInfo common.HashFile, auth []byte, ticket string, tm uint64, pm *common.ProgressManager) error {
 	filePath := fileInfo.FileName
@@ -36,6 +32,33 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, fileInf
 		return err
 	}
 	defer file.Close()
+	realfile, ok := pm.PartitionToOriginMap[filePath]
+	if !ok {
+		log.Errorf("file %s not in reverse partition map", filePath)
+	}
+	req := &pb.StoreReq{Ticket: ticket, Auth: auth, Timestamp: tm, FileKey: fileInfo.FileHash, FileSize: fileSize, BlockKey: fileInfo.FileHash, BlockSize: fileSize}
+	if fileSize < 512*1024 {
+		req.Data, err = ioutil.ReadAll(file)
+		if err != nil {
+			return err
+		}
+		resp, err := client.StoreSmall(context.Background(), req)
+		if err != nil {
+			return err
+		}
+		if !resp.Success {
+			log.Errorf("RPC return false")
+			return errors.New("RPC return false")
+		}
+		// for progress
+		if realfile != "" {
+			if err := pm.SetIncrement(realfile, uint64(len(req.Data))); err != nil {
+				log.Errorf("file %s not in progress map", realfile)
+			}
+		}
+		return nil
+	}
+
 	stream, err := client.Store(context.Background())
 	if err != nil {
 		log.Errorf("RPC Store failed: %s\n", err.Error())
@@ -43,10 +66,6 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, fileInf
 	}
 	defer stream.CloseSend()
 	buf := make([]byte, stream_data_size)
-	realfile, ok := pm.PartitionToOriginMap[filePath]
-	if !ok {
-		log.Errorf("file %s not in reverse partition map", filePath)
-	}
 	first := true
 	for {
 		bytesRead, err := file.Read(buf)
@@ -59,7 +78,8 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, fileInf
 		}
 		if first {
 			first = false
-			if err := stream.Send(UpdateStoreReqAuth(&pb.StoreReq{Data: buf[:bytesRead], Ticket: ticket, Auth: auth, Timestamp: tm, Key: fileInfo.FileHash, FileSize: fileSize})); err != nil {
+			req.Data = buf[:bytesRead]
+			if err := stream.Send(req); err != nil {
 				log.Errorf("RPC Send StoreReq failed: %s\n", err.Error())
 				//if err.Error() == "EOF" {
 				//continue
@@ -67,7 +87,7 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, fileInf
 				return err
 			}
 		} else {
-			if err := stream.Send(UpdateStoreReqAuth(&pb.StoreReq{Data: buf[:bytesRead]})); err != nil {
+			if err := stream.Send(&pb.StoreReq{Data: buf[:bytesRead]}); err != nil {
 				log.Errorf("RPC Send StoreReq failed: %s\n", err.Error())
 				//if err.Error() == "EOF" {
 				//continue
@@ -98,15 +118,8 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, fileInf
 	return nil
 }
 
-func updateRetrieveReqAuth(obj *pb.RetrieveReq) *pb.RetrieveReq {
-	// TODO
-	//obj.Auth = []byte("mock-auth")
-	return obj
-
-}
-
 // Retrieve download file from provider piece by piece
-func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, key []byte, fileSize, tm uint64, pm *common.ProgressManager) error {
+func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, tm uint64, key []byte, fileSize uint64, pm *common.ProgressManager) error {
 	fileHashString := hex.EncodeToString(key)
 	file, err := os.OpenFile(filePath,
 		os.O_WRONLY|os.O_TRUNC|os.O_CREATE,
@@ -120,7 +133,24 @@ func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath 
 	if !ok {
 		log.Errorf("file %s not in reverse partition map", fileHashString)
 	}
-	stream, err := client.Retrieve(context.Background(), updateRetrieveReqAuth(&pb.RetrieveReq{Ticket: ticket, Key: key, Auth: auth, FileSize: fileSize, Timestamp: tm}))
+	req := &pb.RetrieveReq{Ticket: ticket, FileKey: key, Auth: auth, FileSize: fileSize, Timestamp: tm, BlockKey: key, BlockSize: fileSize}
+	if fileSize < 512*1024 {
+		resp, err := client.RetrieveSmall(context.Background(), req)
+		if err != nil {
+			return err
+		}
+		if _, err = file.Write(resp.Data); err != nil {
+			log.Errorf("write file %d bytes failed : %s", len(resp.Data), err.Error())
+			return err
+		}
+		if realfile != "" {
+			if err := pm.SetIncrement(realfile, uint64(len(resp.Data))); err != nil {
+				log.Errorf("file %s not in progress map", realfile)
+			}
+		}
+		return nil
+	}
+	stream, err := client.Retrieve(context.Background(), req)
 	for {
 		resp, err := stream.Recv()
 		if err == io.EOF {

@@ -26,7 +26,7 @@ func main() {
 		fmt.Printf("load config error %v\n", err)
 		return
 	}
-	fmt.Printf("webcfg %+v", webcfg)
+	fmt.Printf("webcfg %+v\n", webcfg)
 	server := service.NewHTTPServer(log, *webcfg)
 
 	defer server.Shutdown()
