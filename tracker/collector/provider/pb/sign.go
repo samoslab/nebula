@@ -24,8 +24,10 @@ func (self *CollectReq) hash() []byte {
 		} else {
 			hasher.Write(byte_slice_false)
 		}
-		hasher.Write(al.Hash)
-		hasher.Write(util_bytes.FromUint64(al.Size))
+		hasher.Write(al.FileHash)
+		hasher.Write(util_bytes.FromUint64(al.FileSize))
+		hasher.Write(al.BlockHash)
+		hasher.Write(util_bytes.FromUint64(al.BlockSize))
 		hasher.Write(util_bytes.FromUint64(al.BeginTime))
 		hasher.Write(util_bytes.FromUint64(al.EndTime))
 		hasher.Write(util_bytes.FromUint64(al.TransportSize))

@@ -2,17 +2,21 @@ package config
 
 import (
 	"bytes"
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"os"
-	"sync"
+	"strconv"
 
 	"github.com/koding/multiconfig"
 	"github.com/robfig/cron"
-	log "github.com/sirupsen/logrus"
 	util_file "github.com/samoslab/nebula/util/file"
-	util_num "github.com/samoslab/nebula/util/num"
+	util_hash "github.com/samoslab/nebula/util/hash"
+	log "github.com/sirupsen/logrus"
 )
 
 var NoConfErr = errors.New("not found config file")
@@ -62,25 +66,79 @@ func LoadConfig(configDir string) error {
 		return ConfVerifyErr
 	}
 	providerConfig = pc
-	checkAllStorageAvailableSpace()
+	checkStorageAvailableSpaceOfConf()
 	return nil
 }
 
-func verifyConfig(pc *ProviderConfig) error {
-	//TODO
-	// TODO verify ExtraStorage map key equals Index
-	return nil
+func verifyConfig(pc *ProviderConfig) (err error) {
+	if len(pc.ExtraStorage) > 0 {
+		for k, v := range pc.ExtraStorage {
+			if k == "0" || k != strconv.Itoa(int(v.Index)) {
+				return errors.New("extraStorage index error")
+			}
+		}
+	}
+	_, _, _, _, _, err = parseNodeFromConf(pc)
+	return err
+}
+
+func ParseNode() (nodeId []byte, pubKey *rsa.PublicKey, priKey *rsa.PrivateKey, pubKeyBytes []byte, encryptKey map[string][]byte, err error) {
+	return parseNodeFromConf(GetProviderConfig())
+}
+
+func parseNodeFromConf(conf *ProviderConfig) (nodeId []byte, pubKey *rsa.PublicKey, priKey *rsa.PrivateKey, pubKeyBytes []byte, encryptKey map[string][]byte, er error) {
+	var err error
+	pubKeyBytes, err = hex.DecodeString(conf.PublicKey)
+	if err != nil {
+		er = fmt.Errorf("DecodeString Public Key failed: %s", err)
+		return
+	}
+	if conf.NodeId != hex.EncodeToString(util_hash.Sha1(pubKeyBytes)) {
+		er = fmt.Errorf("NodeId is not match PublicKey")
+		return
+	}
+	pubKey, err = x509.ParsePKCS1PublicKey(pubKeyBytes)
+	if err != nil {
+		er = fmt.Errorf("ParsePKCS1PublicKey failed: %s", err)
+		return
+	}
+	priKeyBytes, err := hex.DecodeString(conf.PrivateKey)
+	if err != nil {
+		er = fmt.Errorf("DecodeString Private Key failed: %s", err)
+		return
+	}
+	priKey, err = x509.ParsePKCS1PrivateKey(priKeyBytes)
+	if err != nil {
+		er = fmt.Errorf("ParsePKCS1PrivateKey failed: %s", err)
+		return
+	}
+	encryptKey = make(map[string][]byte, len(conf.EncryptKey))
+	for k, v := range conf.EncryptKey {
+		encryptKey[k], err = hex.DecodeString(v)
+		if err != nil {
+			er = fmt.Errorf("DecodeString EncryptKey %s failed: %s", v, err)
+			return
+		}
+	}
+	nodeId, err = hex.DecodeString(conf.NodeId)
+	if err != nil {
+		er = fmt.Errorf("DecodeString node id hex string failed: %s", err)
+		return
+	}
+	return
 }
 
 func StartAutoCheck() {
 	cronRunner = cron.New()
 	cronRunner.AddFunc("0,15,30,45 * * * * *", checkAndReload)
-	cronRunner.AddFunc("7 */3 * * * *", checkAllStorageAvailableSpace)
+	cronRunner.AddFunc("7 */3 * * * *", checkStorageAvailableSpace)
+	cronRunner.AddFunc("37 1,31 * * * *", checkStorageAvailableSpaceOfConf)
 	cronRunner.Start()
 }
 
 func StopAutoCheck() {
 	cronRunner.Stop()
+	stopStorage()
 }
 
 func checkAndReload() {
@@ -93,8 +151,13 @@ func checkAndReload() {
 		pc, err := readConfig()
 		if err != nil {
 			log.Errorf("readConfig Error: %s", err)
-		} else if verifyConfig(pc) == nil {
-			providerConfig = pc
+		} else {
+			err = verifyConfig(pc)
+			if err == nil {
+				providerConfig = pc
+			} else {
+				log.Warnln(err)
+			}
 		}
 
 	}
@@ -109,7 +172,7 @@ func getConfigFileModTime() (int64, error) {
 }
 
 func readConfig() (*ProviderConfig, error) {
-	m := multiconfig.NewWithPath(configFilePath) // supports TOML, JSON and YAML
+	m := multiconfig.NewWithPath(configFilePath)
 	pc := new(ProviderConfig)
 	err := m.Load(pc) // Check for error
 	if err != nil {
@@ -160,101 +223,4 @@ func SaveProviderConfig() {
 	if err := saveProviderConfig(configFilePath, providerConfig); err != nil {
 		log.Errorf("save config file err: %s", err)
 	}
-}
-
-type Storage struct {
-	Path               string
-	Index              byte // 0 as Main Storage
-	Volume             uint64
-	SmallFileMutex     sync.Mutex
-	CurrCombinePath    string
-	CurrCombineSubPath string
-	CurrCombineIdx     uint32
-}
-
-var storageSlice []*Storage
-
-const max_combine_file_size = 1024 * 1024 * 1024 // cannot more than max uint32 value: 4294967295
-const combine_filename_suffix = ".blks"
-const combine_folder = "combine"
-const ModFactorExp = 13
-const ModFactor = 1 << ModFactorExp
-const slash = "/"
-
-func (self *Storage) getFolderAndFileName(idx uint32) (string, string) {
-	return util_num.FixLength(idx&(ModFactor-1), 4), util_num.FixLength(idx, 8) + combine_filename_suffix
-}
-func (self *Storage) findOrTouchCombinePath() {
-	self.findOrTouchCombinePathFormIdx(0)
-}
-func (self *Storage) findOrTouchCombinePathFormIdx(i uint32) {
-	errTimes := 0
-	for ; i < 4294967295; i++ {
-		folder, filename := self.getFolderAndFileName(i)
-		folderPath := self.Path + string(os.PathSeparator) + combine_folder + string(os.PathSeparator) + folder
-		filePath := folderPath + string(os.PathSeparator) + filename
-		fileInfo, err := os.Stat(filePath)
-		if err != nil && os.IsNotExist(err) {
-			self.CurrCombineIdx = i
-			self.CurrCombinePath = filePath
-			self.CurrCombineSubPath = slash + combine_folder + slash + folder + slash + filename
-			if err = self.touchCombineFile(folderPath, filePath); err != nil {
-				if errTimes > 10 {
-					panic(err)
-				}
-				errTimes++
-				continue
-			}
-			break
-		}
-		if fileInfo != nil && fileInfo.Size() < max_combine_file_size {
-			self.CurrCombineIdx = i
-			self.CurrCombinePath = filePath
-			self.CurrCombineSubPath = slash + combine_folder + slash + folder + slash + filename
-			break
-		}
-	}
-}
-
-func (self *Storage) touchCombineFile(folderPath string, filePath string) error {
-	if err := os.MkdirAll(folderPath, 0700); err != nil {
-		log.Errorf("mkdir folder: %s failed: %s", folderPath, err)
-		return err
-	}
-	_, err := os.Create(filePath)
-	if err != nil {
-		log.Errorf("create file: %s failed: %s", filePath, err)
-		return err
-	}
-	return nil
-}
-
-func (self *Storage) CurrCombineSize() uint32 {
-	fileInfo, err := os.Stat(self.CurrCombinePath)
-	if err != nil {
-		log.Fatalf("Stat file: %s failed: %s", self.CurrCombinePath, err)
-	}
-	return uint32(fileInfo.Size())
-}
-
-func (self *Storage) NextCombinePath(currCombineSize uint32, fileSize uint32) {
-	if currCombineSize+fileSize > max_combine_file_size {
-		self.findOrTouchCombinePathFormIdx(self.CurrCombineIdx + 1)
-	}
-}
-
-func checkAllStorageAvailableSpace() {
-	if storageSlice == nil {
-		sl := make([]*Storage, 0, 1)
-		s := &Storage{Path: providerConfig.MainStoragePath, Index: 0}
-		s.findOrTouchCombinePath()
-		sl = append(sl, s)
-		storageSlice = sl
-	}
-	// TODO  Available Space less than 1G will not to store.
-}
-
-func GetStoragePath() *Storage {
-	// TODO rotate store all Available storage path
-	return storageSlice[0]
 }

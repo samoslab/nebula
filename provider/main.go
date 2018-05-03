@@ -4,6 +4,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/hex"
+	"errors"
 	"flag"
 	"fmt"
 	"net"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/prestonTao/upnp"
 	"github.com/samoslab/nebula/provider/config"
+	"github.com/samoslab/nebula/provider/disk"
 	"github.com/samoslab/nebula/provider/impl"
 	"github.com/samoslab/nebula/provider/node"
 	pb "github.com/samoslab/nebula/provider/pb"
@@ -22,7 +24,6 @@ import (
 	trp_pb "github.com/samoslab/nebula/tracker/register/provider/pb"
 	util_rsa "github.com/samoslab/nebula/util/rsa"
 	"github.com/skycoin/skycoin/src/cipher"
-	"github.com/samoslab/nebula/provider/disk"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
@@ -33,7 +34,7 @@ func main() {
 	usr, err := user.Current()
 	if err != nil {
 		fmt.Println("Get OS current user failed: ", err.Error())
-		return
+		os.Exit(100)
 	}
 
 	daemonCommand := flag.NewFlagSet("daemon", flag.ExitOnError)
@@ -52,7 +53,7 @@ func main() {
 	downBandwidthFlag := registerCommand.Uint("downBandwidth", 0, "download bandwidth, unit: Mbps, eg: 100, 20")
 	mainStoragePathFlag := registerCommand.String("mainStoragePath", "", "main storage path")
 	mainStorageVolumeFlag := registerCommand.String("mainStorageVolume", "", "main storage volume size, unit TB or GB, eg: 2TB or 500GB")
-	extraStorageFlag := registerCommand.String("extraStorage", "", "extra storage, format:path1:volume1,path2:volume2, eg: /mnt/sde1:1TB,/mnt/sdf1:800GB,/mnt/sdg1:500GB")
+	extraStorageFlag := registerCommand.String("extraStorage", "", "extra storage, format:path1:volume1,path2:volume2, path can not contain comma, eg: /mnt/sde1:1TB,/mnt/sdf1:800GB,/mnt/sdg1:500GB")
 	portFlag := registerCommand.Uint("port", 6666, "outer network port for client to connect, eg:6666")
 	hostFlag := registerCommand.String("host", "", "outer ip or domain for client to connect, eg: 123.123.123.123")
 	dynamicDomainFlag := registerCommand.String("dynamicDomain", "", "dynamic domain for client to connect, eg: mydomain.xicp.net")
@@ -84,7 +85,7 @@ func main() {
 		daemonCommand.PrintDefaults()
 		fmt.Println(" addStorage [-configDir config-dir] [-trackerServer tracker-server-and-port] -path storage-path -volume storage-volume")
 		addStorageCommand.PrintDefaults()
-		return
+		os.Exit(101)
 	}
 
 	switch os.Args[1] {
@@ -106,7 +107,7 @@ func main() {
 		resendVerifyCode(*resendVerifyCodeConfigDirFlag, *resendVerifyCodeTrackerServerFlag)
 	default:
 		fmt.Printf("%q is not valid command.\n", os.Args[1])
-		os.Exit(2)
+		os.Exit(102)
 	}
 }
 func verifyEmail(configDir string, trackerServer string, verifyCode string) {
@@ -114,33 +115,33 @@ func verifyEmail(configDir string, trackerServer string, verifyCode string) {
 	if err != nil {
 		if err == config.NoConfErr {
 			fmt.Printf("Config file is not ready, please run \"%s register\" to register first\n", os.Args[0])
-			return
+			os.Exit(200)
 		} else if err == config.ConfVerifyErr {
 			fmt.Println("Config file wrong, can not verify email.")
-			return
+			os.Exit(201)
 		}
 		fmt.Println("failed to load config, can not verify email: " + err.Error())
-		return
+		os.Exit(202)
 	}
 	if verifyCode == "" {
 		fmt.Printf("verifyCode is required.\n")
-		os.Exit(9)
+		os.Exit(7)
 	}
 	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
 	if err != nil {
 		fmt.Printf("RPC Dial failed: %s\n", err.Error())
-		return
+		os.Exit(8)
 	}
 	defer conn.Close()
 	prsc := trp_pb.NewProviderRegisterServiceClient(conn)
 	code, errMsg, err := client.VerifyBillEmail(prsc, verifyCode)
 	if err != nil {
 		fmt.Printf("verifyEmail failed: %s\n", err.Error())
-		return
+		os.Exit(9)
 	}
 	if code != 0 {
 		fmt.Println(errMsg)
-		return
+		os.Exit(10)
 	}
 	fmt.Println("verifyEmail success, you can start daemon now.")
 }
@@ -150,29 +151,29 @@ func resendVerifyCode(configDir string, trackerServer string) {
 	if err != nil {
 		if err == config.NoConfErr {
 			fmt.Printf("Config file is not ready, please run \"%s register\" to register first\n", os.Args[0])
-			return
+			os.Exit(200)
 		} else if err == config.ConfVerifyErr {
 			fmt.Println("Config file wrong, can not resend verify code email.")
-			return
+			os.Exit(201)
 		}
 		fmt.Println("failed to load config, can not resend verify code email: " + err.Error())
-		return
+		os.Exit(202)
 	}
 	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
 	if err != nil {
 		fmt.Printf("RPC Dial failed: %s\n", err.Error())
-		return
+		os.Exit(8)
 	}
 	defer conn.Close()
 	prsc := trp_pb.NewProviderRegisterServiceClient(conn)
 	success, err := client.ResendVerifyCode(prsc)
 	if err != nil {
 		fmt.Printf("resendVerifyCode failed: %s\n", err.Error())
-		return
+		os.Exit(9)
 	}
 	if !success {
 		fmt.Println("resendVerifyCode failed, please retry")
-		return
+		os.Exit(10)
 	}
 	fmt.Println("resendVerifyCode success, you can verify bill email.")
 }
@@ -182,27 +183,28 @@ func daemon(configDir string, trackerServer string, listen string) {
 	if err != nil {
 		if err == config.NoConfErr {
 			fmt.Printf("Config file is not ready, please run \"%s register\" to register first\n", os.Args[0])
-			return
+			os.Exit(200)
 		} else if err == config.ConfVerifyErr {
 			fmt.Println("Config file wrong, can not start daemon.")
-			return
+			os.Exit(201)
 		}
 		fmt.Println("failed to load config, can not start daemon: " + err.Error())
-		return
+		os.Exit(202)
 	}
 	config.StartAutoCheck()
 	defer config.StopAutoCheck()
 	port, err := strconv.Atoi(strings.Split(listen, ":")[1])
 	if err != nil {
-		fmt.Println("listen addr or port error: " + err.Error())
+		fmt.Println("parse listen port error: " + err.Error())
+		os.Exit(2)
 	}
 	portMapping(port)
 	lis, err := net.Listen("tcp", listen)
 	if err != nil {
 		fmt.Printf("failed to listen: %s, error: %s\n", listen, err.Error())
-		return
+		os.Exit(3)
 	}
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(520 * 1024))
 	providerServer := impl.NewProviderService()
 	defer providerServer.Close()
 	pb.RegisterProviderServiceServer(grpcServer, providerServer)
@@ -267,58 +269,110 @@ func register(configDir string, trackerServer string, listen string, walletAddre
 		os.Exit(13)
 	}
 	if port < 1 || port > 65535 {
-		fmt.Println("port must between 1 to 65535.")
+		fmt.Println("port must between 1 and 65535.")
 		os.Exit(14)
 	}
-	origMainStorageVolume := mainStorageVolume
-	mainStorageVolume = strings.ToUpper(mainStorageVolume)
-	if mainStorageVolume[len(mainStorageVolume)-1] == 'B' {
-		mainStorageVolume = mainStorageVolume[:len(mainStorageVolume)-1]
-	}
-	var mainStorageVolumeByte uint64
-	if mainStorageVolume[len(mainStorageVolume)-1] == 'G' {
-		val, err := strconv.ParseInt(mainStorageVolume[:len(mainStorageVolume)-1], 10, 64)
-		if err != nil {
-			fmt.Printf("mainStorageVolume: %s is not valid:%s\n", origMainStorageVolume, err)
-			os.Exit(21)
-		}
-		mainStorageVolumeByte = uint64(val) * 1000 * 1000 * 1000
-	} else if mainStorageVolume[len(mainStorageVolume)-1] == 'T' {
-		val, err := strconv.ParseInt(mainStorageVolume[:len(mainStorageVolume)-1], 10, 64)
-		if err != nil {
-			fmt.Printf("mainStorageVolume: %s is not valid:%s\n", origMainStorageVolume, err)
-			os.Exit(22)
-		}
-		mainStorageVolumeByte = uint64(val) * 1000 * 1000 * 1000 * 1000
-	} else {
-		fmt.Printf("mainStorageVolume: %s is not valid\n", origMainStorageVolume)
-		os.Exit(23)
+	mainStorageVolumeByte, err := parseStorageVolume(mainStorageVolume)
+	if err != nil {
+		fmt.Println("mainStorageVolume parse error: " + err.Error())
+		os.Exit(15)
 	}
 	total, free, err := disk.Space(mainStoragePath)
 	if err != nil {
 		fmt.Printf("read free space of path [%s] failed: %s\n", mainStoragePath, err.Error())
-		os.Exit(24)
+		os.Exit(16)
 	}
 	if total < mainStorageVolumeByte {
 		fmt.Printf("path [%s] total space [%d] is less than %s\n", mainStoragePath, total, mainStorageVolume)
-		os.Exit(25)
+		os.Exit(17)
 	}
 	if free < mainStorageVolumeByte {
 		fmt.Printf("path [%s] free space [%d] is less than %s\n", mainStoragePath, free, mainStorageVolume)
-		os.Exit(26)
+		os.Exit(18)
 	}
-	// TODO support extra storage
+	extraStorage := make([]config.ExtraStorageInfo, 0, 8)
+	if len(extraStorageFlag) > 0 {
+		arr := strings.Split(extraStorageFlag, ",")
+		if len(arr) == 0 {
+			fmt.Printf("extraStorage format error: %s\n", extraStorageFlag)
+			os.Exit(19)
+		}
+		if len(arr) > 255 {
+			fmt.Println("do not support more than 255 extra storage")
+			os.Exit(20)
+		}
+		var index byte = 1
+		for _, str := range arr {
+			unit := strings.Split(str, ":")
+			if len(unit) != 2 {
+				fmt.Printf("extraStorage format error: %s, wrong unit: %s\n", extraStorageFlag, str)
+				os.Exit(21)
+			}
+			volume, err := parseStorageVolume(unit[1])
+			if err != nil {
+				fmt.Printf("extraStorage path %s parse error: %s\n", unit[0], err.Error())
+				os.Exit(22)
+			}
+			total, free, err = disk.Space(unit[0])
+			if err != nil {
+				fmt.Printf("read free space of extraStorage path [%s] failed: %s\n", unit[0], err.Error())
+				os.Exit(23)
+			}
+			if total < volume {
+				fmt.Printf("extraStorage path [%s] total space [%d] is less than %d\n", unit[0], total, volume)
+				os.Exit(24)
+			}
+			if free < volume {
+				fmt.Printf("extraStorage path [%s] free space [%d] is less than %d\n", unit[0], free, volume)
+				os.Exit(25)
+			}
+			if strings.Index(unit[0], mainStoragePath) == 0 {
+				fmt.Printf("can not use %s as storage path, %s is already as storage path\n", unit[0], mainStoragePath)
+				os.Exit(26)
+			}
+			for _, esi := range extraStorage {
+				if strings.Index(unit[0], esi.Path) == 0 {
+					fmt.Printf("can not use %s as storage path, %s is already as storage path\n", unit[0], esi.Path)
+					os.Exit(27)
+				}
+			}
+			extraStorage = append(extraStorage, config.ExtraStorageInfo{Path: unit[0], Volume: volume, Index: index})
+			index++
+		}
+	}
 	// TODO speed test
 	testUpBandwidthBps := upBandwidthBps
 	testDownBandwidthBps := downBandwidthBps
-	doRegister(configDir, trackerServer, listen, walletAddress, billEmail, availFloat, upBandwidthBps, downBandwidthBps, testUpBandwidthBps, testDownBandwidthBps, uint32(port), host, dynamicDomain, mainStoragePath, mainStorageVolumeByte, nil)
+	doRegister(configDir, trackerServer, listen, walletAddress, billEmail, availFloat, upBandwidthBps, downBandwidthBps, testUpBandwidthBps, testDownBandwidthBps, uint32(port), host, dynamicDomain, mainStoragePath, mainStorageVolumeByte, extraStorage)
+}
+
+func parseStorageVolume(volStr string) (volume uint64, err error) {
+	volStr = strings.ToUpper(volStr)
+	if volStr[len(volStr)-1] == 'B' {
+		volStr = volStr[:len(volStr)-1]
+	}
+	if volStr[len(volStr)-1] == 'G' {
+		val, err := strconv.ParseInt(volStr[:len(volStr)-1], 10, 64)
+		if err != nil {
+			return 0, err
+		}
+		return uint64(val) * 1000 * 1000 * 1000, nil
+	} else if volStr[len(volStr)-1] == 'T' {
+		val, err := strconv.ParseInt(volStr[:len(volStr)-1], 10, 64)
+		if err != nil {
+			return 0, err
+		}
+		return uint64(val) * 1000 * 1000 * 1000 * 1000, nil
+	} else {
+		return 0, errors.New("not valid, must end with G,T or GB,TB")
+	}
 }
 
 func encrypt(pubKey *rsa.PublicKey, data []byte) []byte {
 	res, err := util_rsa.EncryptLong(pubKey, data, node.RSA_KEY_BYTES)
 	if err != nil {
 		fmt.Println("public key encrypt error: " + err.Error())
-		os.Exit(16)
+		os.Exit(300)
 	}
 	return res
 }
@@ -326,29 +380,29 @@ func encrypt(pubKey *rsa.PublicKey, data []byte) []byte {
 func doRegister(configDir string, trackerServer string, listen string, walletAddress string, billEmail string,
 	availability float64, upBandwidth uint64, downBandwidth uint64,
 	testUpBandwidth uint64, testDownBandwidth uint64, port uint32, host string,
-	dynamicDomain string, mainStoragePath string, mainStorageVolume uint64, extraStorage map[string]uint64) {
+	dynamicDomain string, mainStoragePath string, mainStorageVolume uint64, extraStorage []config.ExtraStorageInfo) {
 	no := node.NewNode(10)
-	pc := newProviderConfig(no, walletAddress, billEmail, availability, upBandwidth, downBandwidth, mainStoragePath, mainStorageVolume)
+	pc := newProviderConfig(no, walletAddress, billEmail, availability, upBandwidth, downBandwidth, mainStoragePath, mainStorageVolume, extraStorage)
 	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
 	if err != nil {
 		fmt.Printf("RPC Dial failed: %s\n", err.Error())
-		return
+		os.Exit(52)
 	}
 	defer conn.Close()
 	prsc := trp_pb.NewProviderRegisterServiceClient(conn)
 	pubKeyBytes, clientIp, err := client.GetPublicKey(prsc)
 	if err != nil {
 		fmt.Printf("GetPublicKey failed: %s\n", err.Error())
-		return
+		os.Exit(53)
 	}
 	pubKey, err := x509.ParsePKCS1PublicKey(pubKeyBytes)
 	if err != nil {
 		fmt.Printf("Parse PublicKey failed: %s\n", err.Error())
-		return
+		os.Exit(54)
 	}
 	extraStorageSlice := make([]uint64, 0, len(extraStorage))
 	for _, v := range extraStorage {
-		extraStorageSlice = append(extraStorageSlice, v)
+		extraStorageSlice = append(extraStorageSlice, v.Volume)
 	}
 	portMapping(int(port))
 	externalIp, err := externalIpAddr()
@@ -370,11 +424,11 @@ func doRegister(configDir string, trackerServer string, listen string, walletAdd
 		testUpBandwidth, testDownBandwidth, availability, port, encrypt(pubKey, []byte(host)), encrypt(pubKey, []byte(dynamicDomain)), extraStorageSlice, no.PriKey)
 	if err != nil {
 		fmt.Println("Register failed: " + err.Error())
-		return
+		os.Exit(55)
 	}
 	if code != 0 {
 		fmt.Println(errMsg)
-		return
+		os.Exit(56)
 	}
 	path := config.CreateProviderConfig(configDir, pc)
 	fmt.Println("Register success, please recieve verify code email to verify bill email and backup your config file: " + path)
@@ -384,7 +438,7 @@ func startPingServer(listen string, grpcServer *grpc.Server) {
 	lis, err := net.Listen("tcp", listen)
 	if err != nil {
 		fmt.Printf("failed to listen: %s, error: %s\n", listen, err.Error())
-		return
+		os.Exit(57)
 	}
 	pb.RegisterProviderServiceServer(grpcServer, &pingProviderService{})
 	grpcServer.Serve(lis)
@@ -396,12 +450,17 @@ type pingProviderService struct {
 func (self *pingProviderService) Ping(ctx context.Context, req *pb.PingReq) (*pb.PingResp, error) {
 	return &pb.PingResp{}, nil
 }
-
 func (self *pingProviderService) Store(stream pb.ProviderService_StoreServer) error {
 	return nil
 }
+func (self *pingProviderService) StoreSmall(ctx context.Context, req *pb.StoreReq) (*pb.StoreResp, error) {
+	return nil, nil
+}
 func (self *pingProviderService) Retrieve(req *pb.RetrieveReq, stream pb.ProviderService_RetrieveServer) error {
 	return nil
+}
+func (self *pingProviderService) RetrieveSmall(ctx context.Context, req *pb.RetrieveReq) (*pb.RetrieveResp, error) {
+	return nil, nil
 }
 func (self *pingProviderService) Remove(ctx context.Context, req *pb.RemoveReq) (*pb.RemoveResp, error) {
 	return nil, nil
@@ -410,14 +469,65 @@ func (self *pingProviderService) GetFragment(ctx context.Context, req *pb.GetFra
 	return nil, nil
 }
 
-func addStorage(configDir string, trackerServer string, path string, volume string) {
-	fmt.Printf("addStorage path:%s, volume:%s\n", path, volume)
-	//TODO
+func addStorage(configDir string, trackerServer string, path string, volumeStr string) {
+	volume, err := parseStorageVolume(volumeStr)
+	if err != nil {
+		fmt.Printf("storage path %s parse error: %s\n", path, err.Error())
+		os.Exit(2)
+	}
+	total, free, err := disk.Space(path)
+	if err != nil {
+		fmt.Printf("read free space of storage path [%s] failed: %s\n", path, err.Error())
+		os.Exit(3)
+	}
+	if total < volume {
+		fmt.Printf("storage path [%s] total space [%d] is less than %d\n", path, total, volume)
+		os.Exit(4)
+	}
+	if free < volume {
+		fmt.Printf("storage path [%s] free space [%d] is less than %d\n", path, free, volume)
+		os.Exit(5)
+	}
+	err = config.LoadConfig(configDir)
+	if err != nil {
+		if err == config.NoConfErr {
+			fmt.Printf("Config file is not ready, please run \"%s register\" to register first\n", os.Args[0])
+			os.Exit(200)
+		} else if err == config.ConfVerifyErr {
+			fmt.Println("Config file wrong, can not add storage.")
+			os.Exit(201)
+		}
+		fmt.Println("failed to load config, can not add storage: " + err.Error())
+		os.Exit(202)
+	}
+	pc := config.GetProviderConfig()
+	if len(pc.ExtraStorage) == 0 {
+		pc.ExtraStorage = make(map[string]config.ExtraStorageInfo, 1)
+	} else if len(pc.ExtraStorage) == 255 {
+		fmt.Println("do not support more than 255 extra storage")
+		os.Exit(6)
+	}
+	if strings.Index(path, pc.MainStoragePath) == 0 {
+		fmt.Printf("can not use %s as storage path, %s is already as storage path\n", path, pc.MainStoragePath)
+		os.Exit(7)
+	}
+	for _, v := range pc.ExtraStorage {
+		if strings.Index(path, v.Path) == 0 {
+			fmt.Printf("can not use %s as storage path, %s is already as storage path\n", path, v.Path)
+			os.Exit(8)
+		}
+	}
+	idx := byte(len(pc.ExtraStorage))
+	pc.ExtraStorage[strconv.FormatInt(int64(idx), 10)] = config.ExtraStorageInfo{Path: path,
+		Volume: volume,
+		Index:  idx}
+	config.SaveProviderConfig()
+	fmt.Println("add storage success")
 }
 
 func newProviderConfig(no *node.Node, walletAddress string, billEmail string,
 	availability float64, upBandwidth uint64, downBandwidth uint64,
-	mainStoragePath string, mainStorageVolume uint64) *config.ProviderConfig {
+	mainStoragePath string, mainStorageVolume uint64, extraStorage []config.ExtraStorageInfo) *config.ProviderConfig {
 	pc := &config.ProviderConfig{
 		NodeId:            no.NodeIdStr(),
 		WalletAddress:     walletAddress,
@@ -435,6 +545,10 @@ func newProviderConfig(no *node.Node, walletAddress string, billEmail string,
 		m[k] = hex.EncodeToString(v)
 	}
 	pc.EncryptKey = m
+	pc.ExtraStorage = make(map[string]config.ExtraStorageInfo, len(extraStorage))
+	for _, esi := range extraStorage {
+		pc.ExtraStorage[strconv.FormatInt(int64(esi.Index), 10)] = esi
+	}
 	return pc
 }
 

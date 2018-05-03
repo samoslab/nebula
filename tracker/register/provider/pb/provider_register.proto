@@ -10,8 +10,12 @@ service ProviderRegisterService {
     rpc VerifyBillEmail(VerifyBillEmailReq) returns (VerifyBillEmailResp){}
 
     rpc ResendVerifyCode(ResendVerifyCodeReq) returns (ResendVerifyCodeResp){}
+
+    rpc AddExtraStorage(AddExtraStorageReq)returns(AddExtraStorageResp){}
     
     rpc GetTrackerServer(GetTrackerServerReq)returns (GetTrackerServerResp){}
+
+    rpc GetCollectorServer(GetCollectorServerReq)returns (GetCollectorServerResp){}
 
 }
 message GetPublicKeyReq {
@@ -73,6 +77,18 @@ message ResendVerifyCodeResp{
     bool success=1;
 }
 
+message AddExtraStorageReq{
+    uint32 version = 1;
+    bytes nodeId = 2;
+    uint64 timestamp=3;
+    uint64 volume=4;
+    bytes sign = 5;
+}
+
+message AddExtraStorageResp{
+    bool success=1;
+}
+
 message GetTrackerServerReq{
     uint32 version=1;
     bytes nodeId=2;
@@ -85,6 +101,22 @@ message GetTrackerServerResp{
 }
 
 message TrackerServer{
+    string server=1;
+    uint32 port=2;
+}
+
+message GetCollectorServerReq{
+    uint32 version=1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    bytes sign = 4; 
+}
+
+message GetCollectorServerResp{
+    repeated CollectorServer server=1;
+}
+
+message CollectorServer{
     string server=1;
     uint32 port=2;
 }
