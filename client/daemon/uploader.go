@@ -777,7 +777,7 @@ func (c *ClientManager) saveFileByPartition(filename string, partition *mpb.Retr
 			tempFileName = filename
 		}
 		log.Infof("[part file] %s, hash %x retrieve from %s", tempFileName, block.GetHash(), server)
-		err = client.Retrieve(log, pclient, tempFileName, node.GetAuth(), node.GetTicket(), block.GetHash(), block.GetSize(), tm, c.PM)
+		err = client.Retrieve(log, pclient, tempFileName, node.GetAuth(), node.GetTicket(), tm, block.GetHash(), block.GetSize(), c.PM)
 		if err != nil {
 			return 0, 0, nil, err
 		}
