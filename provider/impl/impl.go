@@ -53,7 +53,7 @@ func (self *ProviderService) Ping(ctx context.Context, req *pb.PingReq) (*pb.Pin
 }
 
 func now() uint64 {
-	return uint64(time.Now().Unix())
+	return uint64(time.Now().UnixNano())
 }
 
 func logWarnAndSetActionLog(err error, al *tcppb.ActionLog) {
