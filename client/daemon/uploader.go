@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -92,30 +93,50 @@ func fping(ips []string) ([]string, error) {
 	return aliveIps, nil
 }
 
-// PingProvider ping provider
-func (c *ClientManager) PingProvider(pro []*mpb.BlockProviderAuth) ([]*mpb.BlockProviderAuth, error) {
-	//todo if provider ip is same
-	allIPMap := map[string]*mpb.BlockProviderAuth{}
-	allIps := []string{}
-	for _, bpa := range pro {
-		serverIP := bpa.GetServer()
-		if _, ok := allIPMap[serverIP]; !ok {
-			allIPMap[serverIP] = bpa
-			allIps = append(allIps, serverIP)
-		}
-	}
-
-	availableIps, err := fping(allIps)
+func (c *ClientManager) getPingTime(pro *mpb.BlockProviderAuth) int {
+	server := fmt.Sprintf("%s:%d", pro.GetServer(), pro.GetPort())
+	timeStart := time.Now().Unix()
+	conn, err := grpc.Dial(server, grpc.WithInsecure())
 	if err != nil {
-		return nil, err
+		c.Log.Errorf("RPC Dial failed: %s", err.Error())
+		return 99999
+	}
+	defer conn.Close()
+	pclient := pb.NewProviderServiceClient(conn)
+	req := &pb.PingReq{Version: 1}
+	_, err = pclient.Ping(context.Background(), req)
+	if err != nil {
+		return 99999
+	}
+	timeEnd := time.Now().Unix()
+	return int(timeEnd - timeStart)
+}
+
+// PingProvider ping provider
+func (c *ClientManager) PingProvider(pros []*mpb.BlockProviderAuth, needNum int) ([]*mpb.BlockProviderAuth, error) {
+	//todo if provider ip is same
+	type SortablePro struct {
+		Pro   *mpb.BlockProviderAuth
+		Delay int
 	}
 
-	availableProvider := []*mpb.BlockProviderAuth{}
-	for _, ip := range availableIps {
-		provider, _ := allIPMap[ip]
-		availableProvider = append(availableProvider, provider)
+	sortPros := []SortablePro{}
+	// TODO can ping concurrent
+	for _, bpa := range pros {
+		pingTime := c.getPingTime(bpa)
+		fmt.Printf("ping time is %d\n", pingTime)
+		sortPros = append(sortPros, SortablePro{Pro: bpa, Delay: pingTime})
 	}
-	return pro, nil
+
+	sort.Slice(sortPros, func(i, j int) bool { return sortPros[i].Delay < sortPros[j].Delay })
+
+	availablePros := []*mpb.BlockProviderAuth{}
+	for _, proInfo := range sortPros {
+		fmt.Printf("pro info %+v\n", proInfo)
+		availablePros = append(availablePros, proInfo.Pro)
+	}
+
+	return availablePros[0:needNum], nil
 }
 
 func (c *ClientManager) ConnectProvider() error {
@@ -387,7 +408,7 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 	partition := &mpb.StorePartition{}
 	partition.Block = []*mpb.StoreBlock{}
 	phas := rspPartition.GetProviderAuth()
-	providers, err := c.PingProvider(phas)
+	providers, err := c.PingProvider(phas, len(phas))
 	if err != nil {
 		return nil, err
 	}
@@ -413,8 +434,8 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 			partition.Block = append(partition.Block, block)
 			log.Debugf("%s upload to privider %s:%d success", hf.FileName, pro.GetServer(), pro.GetPort())
 		}(i, pro, checksum, rspPartition.GetTimestamp(), hashFiles[i])
+		wg.Wait()
 	}
-	wg.Wait()
 	if len(errResult) != 0 {
 		return partition, errResult[0]
 	}
@@ -434,7 +455,7 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 	log.Infof("[file %s hash %x size %d] upload to server %s", fileInfo.FileName, fileInfo.FileHash, fileInfo.FileSize, server)
 	conn, err := grpc.Dial(server, grpc.WithInsecure())
 	if err != nil {
-		fmt.Printf("RPC Dial failed: %s", err.Error())
+		log.Errorf("RPC Dial failed: %s", err.Error())
 		return nil, err
 	}
 	defer conn.Close()

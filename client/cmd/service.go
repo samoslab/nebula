@@ -23,9 +23,13 @@ func main() {
 	}
 	webcfg, err := config.LoadWebConfig("./config.json")
 	if err != nil {
-		fmt.Printf("load config error %v\n", err)
-		return
+		fmt.Printf("load config error  %v\n", err)
+		//return
 	}
+
+	webcfg = &config.Config{}
+	webcfg.HTTPAddr = "127.0.0.1:7788"
+
 	fmt.Printf("webcfg %+v\n", webcfg)
 	server := service.NewHTTPServer(log, *webcfg)
 
