@@ -225,7 +225,7 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 
 		realSizeAfterRS := int64(0)
 		for _, fname := range partFiles {
-			fileSlices, err := c.OnlyFileSplit(fname, dataShards, verifyShards)
+			fileSlices, err := c.onlyFileSplit(fname, dataShards, verifyShards)
 			if err != nil {
 				return err
 			}
@@ -393,7 +393,7 @@ func (c *ClientManager) MkFolder(filepath string, folders []string, interactive 
 	return true, nil
 }
 
-func (c *ClientManager) OnlyFileSplit(filename string, dataNum, verifyNum int) ([]common.HashFile, error) {
+func (c *ClientManager) onlyFileSplit(filename string, dataNum, verifyNum int) ([]common.HashFile, error) {
 	fileSlices, err := RsEncoder(c.Log, "", filename, dataNum, verifyNum)
 	if err != nil {
 		c.Log.Errorf("reed se error %v", err)
@@ -408,7 +408,7 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 	partition := &mpb.StorePartition{}
 	partition.Block = []*mpb.StoreBlock{}
 	phas := rspPartition.GetProviderAuth()
-	providers, err := c.PingProvider(phas, len(phas))
+	providers, err := c.PingProvider(phas, len(hashFiles))
 	if err != nil {
 		return nil, err
 	}
