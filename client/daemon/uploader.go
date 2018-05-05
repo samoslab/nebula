@@ -743,7 +743,7 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 			for _, block := range partitions[0].GetBlock() {
 				c.PM.SetPartitionMap(hex.EncodeToString(block.GetHash()), downFileName)
 			}
-			_, _, _, err := c.saveFileByPartition(downFileName, partitions[0], rsp.GetTimestamp(), true)
+			_, _, _, err := c.saveFileByPartition(downFileName, partitions[0], rsp.GetTimestamp(), req.FileHash, req.FileSize, true)
 			return err
 		}
 	}
@@ -763,7 +763,7 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 
 	if len(partitions) == 1 {
 		partition := partitions[0]
-		datas, paritys, middleFiles, err := c.saveFileByPartition(downFileName, partition, rsp.GetTimestamp(), false)
+		datas, paritys, middleFiles, err := c.saveFileByPartition(downFileName, partition, rsp.GetTimestamp(), req.FileHash, req.FileSize, false)
 		if err != nil {
 			log.Errorf("save file by partition error %v", err)
 			return err
@@ -788,7 +788,7 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 	partFiles := []string{}
 	for i, partition := range partitions {
 		partFileName := fmt.Sprintf("%s.part.%d", downFileName, i)
-		datas, paritys, middleFiles, err := c.saveFileByPartition(partFileName, partition, rsp.GetTimestamp(), false)
+		datas, paritys, middleFiles, err := c.saveFileByPartition(partFileName, partition, rsp.GetTimestamp(), req.FileHash, req.FileSize, false)
 		if err != nil {
 			log.Errorf("save file by partition error %v", err)
 			return err
@@ -820,7 +820,7 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 	return nil
 }
 
-func (c *ClientManager) saveFileByPartition(filename string, partition *mpb.RetrievePartition, tm uint64, multiReplica bool) (int, int, []string, error) {
+func (c *ClientManager) saveFileByPartition(filename string, partition *mpb.RetrievePartition, tm uint64, fileHash []byte, fileSize uint64, multiReplica bool) (int, int, []string, error) {
 	log := c.Log
 	log.Infof("there is %d blocks", len(partition.GetBlock()))
 	dataShards := 0
@@ -848,7 +848,7 @@ func (c *ClientManager) saveFileByPartition(filename string, partition *mpb.Retr
 			tempFileName = filename
 		}
 		log.Infof("[part file] %s, hash %x retrieve from %s", tempFileName, block.GetHash(), server)
-		err = client.Retrieve(log, pclient, tempFileName, node.GetAuth(), node.GetTicket(), tm, block.GetHash(), block.GetSize(), c.PM)
+		err = client.Retrieve(log, pclient, tempFileName, node.GetAuth(), node.GetTicket(), tm, fileHash, block.GetHash(), fileSize, block.GetSize(), c.PM)
 		if err != nil {
 			return 0, 0, nil, err
 		}

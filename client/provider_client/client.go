@@ -116,12 +116,13 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadP
 		log.Error("RPC return false")
 		return errors.New("RPC return false")
 	}
+	time.Sleep(time.Second)
 	return nil
 }
 
 // Retrieve download file from provider piece by piece
-func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, tm uint64, key []byte, fileSize uint64, pm *common.ProgressManager) error {
-	fileHashString := hex.EncodeToString(key)
+func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, tm uint64, fileKey, blockKey []byte, fileSize, blockSize uint64, pm *common.ProgressManager) error {
+	fileHashString := hex.EncodeToString(blockKey)
 	file, err := os.OpenFile(filePath,
 		os.O_WRONLY|os.O_TRUNC|os.O_CREATE,
 		0666)
@@ -134,7 +135,7 @@ func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath 
 	if !ok {
 		log.Errorf("file %s not in reverse partition map", fileHashString)
 	}
-	req := &pb.RetrieveReq{Ticket: ticket, FileKey: key, Auth: auth, FileSize: fileSize, Timestamp: tm, BlockKey: key, BlockSize: fileSize}
+	req := &pb.RetrieveReq{Ticket: ticket, FileKey: fileKey, Auth: auth, FileSize: fileSize, Timestamp: tm, BlockKey: blockKey, BlockSize: blockSize}
 	if fileSize < 512*1024 {
 		resp, err := client.RetrieveSmall(context.Background(), req)
 		if err != nil {
