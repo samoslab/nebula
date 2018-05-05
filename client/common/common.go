@@ -79,6 +79,23 @@ func SendRequest(method, url, token string, reqBody io.Reader) (*http.Response, 
 	return rsp, err
 }
 
+// MyPart partition for upload file prepare
+type MyPart struct {
+	OriginFileName string
+	OriginFileHash []byte
+	OriginFileSize uint64
+	FileName       string
+	Pieces         []HashFile
+}
+
+// UploadParameter parameter for stream store
+type UploadParameter struct {
+	OriginFileHash []byte
+	OriginFileSize uint64
+	HF             HashFile
+	Checksum       bool
+}
+
 // HashFile file info for reedsolomon
 type HashFile struct {
 	FileSize   int64

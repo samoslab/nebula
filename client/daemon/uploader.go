@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/samoslab/nebula/client/common"
@@ -221,7 +222,7 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 
 		log.Infof("prepare response gave %d dataShards, %d verifyShards", dataShards, verifyShards)
 
-		fileInfos := []MyPart{}
+		fileInfos := []common.MyPart{}
 
 		realSizeAfterRS := int64(0)
 		for _, fname := range partFiles {
@@ -229,7 +230,13 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 			if err != nil {
 				return err
 			}
-			fileInfos = append(fileInfos, MyPart{FileName: fname, Pieces: fileSlices})
+			fileInfos = append(fileInfos, common.MyPart{
+				FileName:       fname,
+				Pieces:         fileSlices,
+				OriginFileName: req.FileName,
+				OriginFileHash: req.FileHash,
+				OriginFileSize: req.FileSize,
+			})
 			log.Infof("file %s need split to %d blocks", fname, len(fileSlices))
 			for _, fs := range fileSlices {
 				log.Debugf("erasure block files %s index %d", fs.FileName, fs.SliceIndex)
@@ -307,7 +314,7 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 		partitions := []*mpb.StorePartition{}
 		for i, partInfo := range fileInfos {
 
-			partition, err := c.uploadFileBatchByErasure(ufpr, rspPartitions[i], partInfo.Pieces, dataShards)
+			partition, err := c.uploadFileBatchByErasure(ufpr, rspPartitions[i], partInfo, dataShards)
 			if err != nil {
 				return err
 			}
@@ -411,56 +418,64 @@ func (c *ClientManager) onlyFileSplit(filename string, dataNum, verifyNum int) (
 
 }
 
-func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, rspPartition *mpb.ErasureCodePartition, hashFiles []common.HashFile, dataShards int) (*mpb.StorePartition, error) {
+func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, rspPartition *mpb.ErasureCodePartition, partFile common.MyPart, dataShards int) (*mpb.StorePartition, error) {
 	log := c.Log
 	partition := &mpb.StorePartition{}
 	partition.Block = []*mpb.StoreBlock{}
-	//phas := rspPartition.GetProviderAuth()
-	//providers, err := c.PingProvider(phas, len(hashFiles))
+	phas := rspPartition.GetProviderAuth()
+	providers, err := c.PingProvider(phas, len(phas))
+	if err != nil {
+		return nil, err
+	}
+
+	//for i, pro := range providers {
+	//server := fmt.Sprintf("%s:%d", pro.GetServer(), pro.GetPort())
+	//checksum := i >= dataShards
+	//uploadParas := &common.UploadParameter{
+	//OriginFileHash: partFile.OriginFileHash,
+	//OriginFileSize: partFile.OriginFileSize,
+	//HF:             partFile.Pieces[i],
+	//Checksum:       checksum,
+	//}
+	//block, err := c.uploadFileToErasureProvider(pro, rspPartition.GetTimestamp(), uploadParas)
 	//if err != nil {
+	//log.Errorf("upload file %s error %v", uploadParas.HF.FileName, err)
 	//return nil, err
 	//}
-	providers := rspPartition.GetProviderAuth()
-
-	//}(i, pro, checksum, rspPartition.GetTimestamp(), hashFiles[i])
-	for i, pro := range providers {
-		hf := hashFiles[i]
-		server := fmt.Sprintf("%s:%d", pro.GetServer(), pro.GetPort())
-		checksum := i >= dataShards
-		log.Infof("provider %d %s", i, server)
-		block, err := c.uploadFileToErasureProvider(pro, rspPartition.GetTimestamp(), hf, checksum)
-		if err != nil {
-			log.Errorf("upload file %s error %v", hf.FileName, err)
-			return nil, err
-		}
-		partition.Block = append(partition.Block, block)
-		log.Debugf("%s upload to privider %s success", hf.FileName, server)
-	}
-	//var errResult []error
-	//wg := sync.WaitGroup{}
-	//var mutex sync.Mutex
-	//for i, pro := range providers {
-	//checksum := i >= dataShards
-	//wg.Add(1)
-	//go func(i int, pro *mpb.BlockProviderAuth, checksum bool, tm uint64, hf common.HashFile) {
-	//defer wg.Done()
-	//log.Infof("provider %d %s:%d", i, pro.GetServer(), pro.GetPort())
-	//block, err := c.uploadFileToErasureProvider(pro, tm, hf, checksum)
-	//mutex.Lock()
-	//defer mutex.Unlock()
-	//if err != nil {
-	//log.Errorf("upload file %s error %v", hf.FileName, err)
-	//errResult = append(errResult, err)
-	//return
-	//}
 	//partition.Block = append(partition.Block, block)
-	//log.Debugf("%s upload to privider %s:%d success", hf.FileName, pro.GetServer(), pro.GetPort())
-	//}(i, pro, checksum, rspPartition.GetTimestamp(), hashFiles[i])
+	//log.Debugf("%s upload to privider %s success", uploadParas.HF.FileName, server)
 	//}
-	//wg.Wait()
-	//if len(errResult) != 0 {
-	//return partition, errResult[0]
-	//}
+	var errResult []error
+	wg := sync.WaitGroup{}
+	var mutex sync.Mutex
+	for i, pro := range providers {
+		wg.Add(1)
+		checksum := i >= dataShards
+		uploadParas := &common.UploadParameter{
+			OriginFileHash: partFile.OriginFileHash,
+			OriginFileSize: partFile.OriginFileSize,
+			HF:             partFile.Pieces[i],
+			Checksum:       checksum,
+		}
+		go func(pro *mpb.BlockProviderAuth, tm uint64, uploadPara *common.UploadParameter) {
+			defer wg.Done()
+			server := fmt.Sprintf("%s:%d", pro.GetServer(), pro.GetPort())
+			block, err := c.uploadFileToErasureProvider(pro, tm, uploadParas)
+			mutex.Lock()
+			defer mutex.Unlock()
+			if err != nil {
+				log.Errorf("upload file %s error %v", uploadPara.HF.FileName, err)
+				errResult = append(errResult, err)
+				return
+			}
+			partition.Block = append(partition.Block, block)
+			log.Debugf("%s upload to privider %s success", uploadParas.HF.FileName, server)
+		}(pro, rspPartition.GetTimestamp(), uploadParas)
+	}
+	wg.Wait()
+	if len(errResult) != 0 {
+		return partition, errResult[0]
+	}
 	return partition, nil
 }
 
@@ -469,11 +484,10 @@ func getOneOfPartition(pro *mpb.ErasureCodePartition) *mpb.BlockProviderAuth {
 	return pa
 }
 
-func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, tm uint64, fileInfo common.HashFile, checksum bool) (*mpb.StoreBlock, error) {
+func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, tm uint64, uploadPara *common.UploadParameter) (*mpb.StoreBlock, error) {
 	log := c.Log
-	onePartition := pro
-	server := fmt.Sprintf("%s:%d", onePartition.GetServer(), onePartition.GetPort())
-	log.Infof("[file %s hash %x size %d] upload to server %s", fileInfo.FileName, fileInfo.FileHash, fileInfo.FileSize, server)
+	server := fmt.Sprintf("%s:%d", pro.GetServer(), pro.GetPort())
+	//log.Infof("[file %s hash %x ] upload to server %s", fileInfo.FileName, fileInfo.FileHash, server)
 	conn, err := grpc.Dial(server, grpc.WithInsecure())
 	if err != nil {
 		log.Errorf("RPC Dial failed: %s", err.Error())
@@ -482,26 +496,26 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 	defer conn.Close()
 	pclient := pb.NewProviderServiceClient(conn)
 
-	ha := onePartition.GetHashAuth()[0]
-	err = client.StorePiece(log, pclient, fileInfo, ha.GetAuth(), ha.GetTicket(), tm, c.PM)
+	ha := pro.GetHashAuth()[0]
+	err = client.StorePiece(log, pclient, uploadPara, ha.GetAuth(), ha.GetTicket(), tm, c.PM)
 	if err != nil {
 		return nil, err
 	}
 	block := &mpb.StoreBlock{
-		Hash:        fileInfo.FileHash,
-		Size:        uint64(fileInfo.FileSize),
-		BlockSeq:    uint32(fileInfo.SliceIndex),
-		Checksum:    checksum,
+		Hash:        uploadPara.HF.FileHash,
+		Size:        uint64(uploadPara.HF.FileSize),
+		BlockSeq:    uint32(uploadPara.HF.SliceIndex),
+		Checksum:    uploadPara.Checksum,
 		StoreNodeId: [][]byte{},
 	}
-	block.StoreNodeId = append(block.StoreNodeId, []byte(onePartition.GetNodeId()))
-	log.Debugf("block file %s, block storeNodeId %x", fileInfo.FileName, onePartition.GetNodeId())
+	block.StoreNodeId = append(block.StoreNodeId, []byte(pro.GetNodeId()))
 
 	return block, nil
 }
 
-func (c *ClientManager) uploadFileToReplicaProvider(pro *mpb.ReplicaProvider, fileInfo common.HashFile) ([]byte, error) {
+func (c *ClientManager) uploadFileToReplicaProvider(pro *mpb.ReplicaProvider, uploadPara *common.UploadParameter) ([]byte, error) {
 	log := c.Log
+	fileInfo := uploadPara.HF
 	server := fmt.Sprintf("%s:%d", pro.GetServer(), pro.GetPort())
 	conn, err := grpc.Dial(server, grpc.WithInsecure())
 	if err != nil {
@@ -512,7 +526,7 @@ func (c *ClientManager) uploadFileToReplicaProvider(pro *mpb.ReplicaProvider, fi
 	pclient := pb.NewProviderServiceClient(conn)
 	log.Debugf("upload file %s hash %x size %d to %s", fileInfo.FileName, fileInfo.FileHash, fileInfo.FileSize, server)
 
-	err = client.StorePiece(log, pclient, fileInfo, pro.GetAuth(), pro.GetTicket(), pro.GetTimestamp(), c.PM)
+	err = client.StorePiece(log, pclient, uploadPara, pro.GetAuth(), pro.GetTicket(), pro.GetTimestamp(), c.PM)
 	if err != nil {
 		log.Errorf("upload error %v", err)
 		return nil, err
@@ -531,6 +545,11 @@ func (c *ClientManager) uploadFileByMultiReplica(filename string, req *mpb.Check
 		FileHash:   req.FileHash,
 		SliceIndex: 0,
 	}
+	uploadPara := &common.UploadParameter{
+		OriginFileHash: req.FileHash,
+		OriginFileSize: req.FileSize,
+		HF:             fileInfo,
+	}
 
 	block := &mpb.StoreBlock{
 		Hash:        fileInfo.FileHash,
@@ -541,7 +560,7 @@ func (c *ClientManager) uploadFileByMultiReplica(filename string, req *mpb.Check
 	}
 	c.PM.SetPartitionMap(filename, filename)
 	for _, pro := range rsp.GetProvider() {
-		proID, err := c.uploadFileToReplicaProvider(pro, fileInfo)
+		proID, err := c.uploadFileToReplicaProvider(pro, uploadPara)
 		if err != nil {
 			return nil, err
 		}

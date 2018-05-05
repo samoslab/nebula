@@ -3,7 +3,6 @@ package provider_client
 import (
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -24,7 +23,8 @@ func Ping(client pb.ProviderServiceClient) error {
 	return err
 }
 
-func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, fileInfo common.HashFile, auth []byte, ticket string, tm uint64, pm *common.ProgressManager) error {
+func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadPara *common.UploadParameter, auth []byte, ticket string, tm uint64, pm *common.ProgressManager) error {
+	fileInfo := uploadPara.HF
 	filePath := fileInfo.FileName
 	fileSize := uint64(fileInfo.FileSize)
 	file, err := os.Open(filePath)
@@ -37,13 +37,7 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, fileInf
 	if !ok {
 		log.Errorf("file %s not in reverse partition map", filePath)
 	}
-	fmt.Printf("auth %x\n", auth)
-	fmt.Printf("ticket %x\n", ticket)
-	fmt.Printf("filehash %x\n", fileInfo.FileHash)
-	fmt.Printf("blockhash %x\n", fileInfo.FileHash)
-	fmt.Printf("tm %d\n", tm)
-	fmt.Printf("size %d\n", fileInfo.FileSize)
-	req := &pb.StoreReq{Ticket: ticket, Auth: auth, Timestamp: tm, FileKey: fileInfo.FileHash, FileSize: fileSize, BlockKey: fileInfo.FileHash, BlockSize: fileSize}
+	req := &pb.StoreReq{Ticket: ticket, Auth: auth, Timestamp: tm, FileKey: uploadPara.OriginFileHash, FileSize: uploadPara.OriginFileSize, BlockKey: fileInfo.FileHash, BlockSize: fileSize}
 	if fileSize < 512*1024 {
 		req.Data, err = ioutil.ReadAll(file)
 		if err != nil {
