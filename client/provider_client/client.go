@@ -87,13 +87,13 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, fileInf
 				return err
 			}
 		} else {
-			req := &pb.StoreReq{Ticket: ticket, Auth: auth, Timestamp: tm, FileKey: fileInfo.FileHash, FileSize: fileSize, BlockKey: fileInfo.FileHash, BlockSize: fileSize}
-			req.Data = buf[:bytesRead]
-			if err := stream.Send(req); err != nil {
-				//if err := stream.Send(&pb.StoreReq{Data: buf[:bytesRead]}); err != nil {
+			//req := &pb.StoreReq{Ticket: ticket, Auth: auth, Timestamp: tm, FileKey: fileInfo.FileHash, FileSize: fileSize, BlockKey: fileInfo.FileHash, BlockSize: fileSize}
+			//req.Data = buf[:bytesRead]
+			//if err := stream.Send(req); err != nil {
+			if err := stream.Send(&pb.StoreReq{Data: buf[:bytesRead]}); err != nil {
 				log.Errorf("RPC Send StoreReq failed: %s\n", err.Error())
 				//if err.Error() == "EOF" {
-				//continue
+				//break
 				//}
 				return err
 			}
