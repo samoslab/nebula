@@ -19,7 +19,7 @@ import (
 func main() {
 	conn, err := grpc.Dial("127.0.0.1:6666", grpc.WithInsecure())
 	if err != nil {
-		fmt.Printf("RPC Dial failed: %s", err.Error())
+		fmt.Printf("RPC Dial failed: %s\n", err.Error())
 		return
 	}
 	defer conn.Close()
@@ -61,7 +61,15 @@ func main() {
 		fmt.Println(err)
 	}
 	if !bytes.Equal(hash, getHash) {
-		fmt.Printf("error: hash: %x getHash: %x", hash, getHash)
+		fmt.Printf("error: hash: %x getHash: %x\n", hash, getHash)
+	}
+	err = Store(psc, path, "mock-ticket", hash, uint64(fileInfo.Size()))
+	if err != nil {
+		fmt.Println(err)
+	}
+	err = Remove(psc, hash, uint64(fileInfo.Size()))
+	if err != nil {
+		fmt.Println(err)
 	}
 	fmt.Println("==========test Big File 2 Store RPC==========")
 	path = "/bin/ip"
@@ -88,7 +96,11 @@ func main() {
 		fmt.Println(err)
 	}
 	if !bytes.Equal(hash, getHash) {
-		fmt.Printf("error: hash: %x getHash: %x", hash, getHash)
+		fmt.Printf("error: hash: %x getHash: %x\n", hash, getHash)
+	}
+	err = Remove(psc, hash, uint64(fileInfo.Size()))
+	if err != nil {
+		fmt.Println(err)
 	}
 	fmt.Println("==========test Big File 3 Store RPC==========")
 	path = "/bin/awk"
@@ -115,7 +127,12 @@ func main() {
 		fmt.Println(err)
 	}
 	if !bytes.Equal(hash, getHash) {
-		fmt.Printf("error: hash: %x getHash: %x", hash, getHash)
+		fmt.Printf("error: hash: %x getHash: %x\n", hash, getHash)
+	}
+	GetFragment(psc, hash)
+	err = Remove(psc, hash, uint64(fileInfo.Size()))
+	if err != nil {
+		fmt.Println(err)
 	}
 	fmt.Println("==========test Small File 1 Store RPC==========")
 	path = "/bin/ls"
@@ -142,7 +159,15 @@ func main() {
 		fmt.Println(err)
 	}
 	if !bytes.Equal(hash, getHash) {
-		fmt.Printf("error: hash: %x getHash: %x", hash, getHash)
+		fmt.Printf("error: hash: %x getHash: %x\n", hash, getHash)
+	}
+	err = Store(psc, path, "mock-ticket", hash, uint64(fileInfo.Size()))
+	if err != nil {
+		fmt.Println(err)
+	}
+	err = Remove(psc, hash, uint64(fileInfo.Size()))
+	if err != nil {
+		fmt.Println(err)
 	}
 	fmt.Println("==========test Small File 2 Store RPC==========")
 	path = "/bin/touch"
@@ -169,7 +194,11 @@ func main() {
 		fmt.Println(err)
 	}
 	if !bytes.Equal(hash, getHash) {
-		fmt.Printf("error: hash: %x getHash: %x", hash, getHash)
+		fmt.Printf("error: hash: %x getHash: %x\n", hash, getHash)
+	}
+	err = Remove(psc, hash, uint64(fileInfo.Size()))
+	if err != nil {
+		fmt.Println(err)
 	}
 	fmt.Println("==========test Small File 3 Store RPC==========")
 	path = "/bin/tar"
@@ -196,7 +225,12 @@ func main() {
 		fmt.Println(err)
 	}
 	if !bytes.Equal(hash, getHash) {
-		fmt.Printf("error: hash: %x getHash: %x", hash, getHash)
+		fmt.Printf("error: hash: %x getHash: %x\n", hash, getHash)
+	}
+	GetFragment(psc, hash)
+	err = Remove(psc, hash, uint64(fileInfo.Size()))
+	if err != nil {
+		fmt.Println(err)
 	}
 	fmt.Println("==========test Small File 4 Store RPC==========")
 	path = "/etc/apt/sources.list"
@@ -223,7 +257,11 @@ func main() {
 		fmt.Println(err)
 	}
 	if !bytes.Equal(hash, getHash) {
-		fmt.Printf("error: hash: %x getHash: %x", hash, getHash)
+		fmt.Printf("error: hash: %x getHash: %x\n", hash, getHash)
+	}
+	err = Remove(psc, hash, uint64(fileInfo.Size()))
+	if err != nil {
+		fmt.Println(err)
 	}
 	fmt.Println("==========test Small File 5 Store RPC==========")
 	path = "/etc/sysctl.conf"
@@ -250,7 +288,11 @@ func main() {
 		fmt.Println(err)
 	}
 	if !bytes.Equal(hash, getHash) {
-		fmt.Printf("error: hash: %x getHash: %x", hash, getHash)
+		fmt.Printf("error: hash: %x getHash: %x\n", hash, getHash)
+	}
+	err = Remove(psc, hash, uint64(fileInfo.Size()))
+	if err != nil {
+		fmt.Println(err)
 	}
 }
 
@@ -268,7 +310,7 @@ func Ping(client pb.ProviderServiceClient) error {
 func Store(client pb.ProviderServiceClient, filePath string, ticket string, key []byte, size uint64) error {
 	file, err := os.Open(filePath)
 	if err != nil {
-		fmt.Printf("open file failed: %s", err.Error())
+		fmt.Printf("open file failed: %s\n", err.Error())
 		return err
 	}
 	defer file.Close()
@@ -291,7 +333,7 @@ func Store(client pb.ProviderServiceClient, filePath string, ticket string, key 
 	}
 	stream, err := client.Store(context.Background())
 	if err != nil {
-		fmt.Printf("RPC Store failed: %s", err.Error())
+		fmt.Printf("RPC Store failed: %s\n", err.Error())
 		return err
 	}
 	defer stream.CloseSend()
@@ -303,19 +345,25 @@ func Store(client pb.ProviderServiceClient, filePath string, ticket string, key 
 			if err == io.EOF {
 				break
 			}
-			fmt.Printf("read file failed: %s", err.Error())
+			fmt.Printf("read file failed: %s\n", err.Error())
 			return err
 		}
 		if first {
 			first = false
 			req.Data = buf[:bytesRead]
 			if err := stream.Send(req); err != nil {
-				fmt.Printf("RPC Send StoreReq failed: %s", err.Error())
+				if err == io.EOF {
+					break
+				}
+				fmt.Printf("RPC Send StoreReq failed: %s\n", err.Error())
 				return err
 			}
 		} else {
 			if err := stream.Send(&pb.StoreReq{Data: buf[:bytesRead]}); err != nil {
-				fmt.Printf("RPC Send StoreReq failed: %s", err.Error())
+				if err == io.EOF {
+					break
+				}
+				fmt.Printf("RPC Send StoreReq failed: %s\n", err.Error())
 				return nil
 			}
 		}
@@ -325,7 +373,7 @@ func Store(client pb.ProviderServiceClient, filePath string, ticket string, key 
 	}
 	storeResp, err := stream.CloseAndRecv()
 	if err != nil {
-		fmt.Printf("RPC CloseAndRecv failed: %s", err.Error())
+		fmt.Printf("RPC CloseAndRecv failed: %s\n", err.Error())
 		return err
 	}
 	if !storeResp.Success {
@@ -340,7 +388,7 @@ func Retrieve(client pb.ProviderServiceClient, filePath string, ticket string, k
 		os.O_WRONLY|os.O_TRUNC|os.O_CREATE,
 		0666)
 	if err != nil {
-		fmt.Printf("open file failed: %s", err.Error())
+		fmt.Printf("open file failed: %s\n", err.Error())
 		return err
 	}
 	defer file.Close()
@@ -352,7 +400,7 @@ func Retrieve(client pb.ProviderServiceClient, filePath string, ticket string, k
 			return err
 		}
 		if _, err = file.Write(resp.Data); err != nil {
-			fmt.Printf("write file %d bytes failed : %s", len(resp.Data), err.Error())
+			fmt.Printf("write file %d bytes failed : %s\n", len(resp.Data), err.Error())
 			return err
 		}
 		return nil
@@ -367,16 +415,44 @@ func Retrieve(client pb.ProviderServiceClient, filePath string, ticket string, k
 			break
 		}
 		if err != nil {
-			fmt.Printf("RPC Recv failed: %s", err.Error())
+			fmt.Printf("RPC Recv failed: %s\n", err.Error())
 			return err
 		}
 		if len(resp.Data) == 0 {
 			break
 		}
 		if _, err = file.Write(resp.Data); err != nil {
-			fmt.Printf("write file %d bytes failed : %s", len(resp.Data), err.Error())
+			fmt.Printf("write file %d bytes failed : %s\n", len(resp.Data), err.Error())
 			return err
 		}
 	}
+	return nil
+}
+
+func Remove(client pb.ProviderServiceClient, key []byte, size uint64) error {
+	req := &pb.RemoveReq{Key: key, Size: size, Timestamp: uint64(time.Now().Unix())}
+	req.GenAuth(authPublicKeyBytes)
+	resp, err := client.Remove(context.Background(), req)
+	if err != nil {
+		return err
+	}
+	if !resp.Success {
+		return errors.New("failed")
+	}
+	return nil
+}
+
+func GetFragment(client pb.ProviderServiceClient, key []byte) error {
+	req := &pb.GetFragmentReq{Key: key, Positions: []byte{25, 50, 75}, Size: 64, Timestamp: uint64(time.Now().Unix())}
+	req.GenAuth(authPublicKeyBytes)
+	resp, err := client.GetFragment(context.Background(), req)
+	if err != nil {
+		return err
+	}
+	for _, v := range resp.Data {
+		fmt.Print(v)
+		fmt.Print(" ")
+	}
+	fmt.Println()
 	return nil
 }

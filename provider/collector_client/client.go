@@ -1,19 +1,26 @@
 package collector_client
 
 import (
+	"context"
 	"fmt"
-	"sync"
+	"time"
 
 	"github.com/robfig/cron"
+	"github.com/samoslab/nebula/provider/node"
 	pb "github.com/samoslab/nebula/tracker/collector/provider/pb"
-	// log "github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
 
 func Collect(al *pb.ActionLog) {
-	queue <- al
-	if len(queue) > send_immediate_min {
-		send()
+	l := len(queue)
+	if l < cap(queue)*9/10 {
+		queue <- al
+	} else {
+		log.Warnf("queue will be full, abandon action log, ticket: %s", al.Ticket)
+	}
+	if l > send_immediate_min {
+		go send()
 	}
 }
 
@@ -22,15 +29,20 @@ const send_immediate_min = 20
 
 var queue = make(chan *pb.ActionLog, 2000)
 var cronRunner *cron.Cron
-var sendLock *sync.Mutex = &sync.Mutex{}
+var sendLock = make(chan bool, 1)
 var conn *grpc.ClientConn
+var no *node.Node
 
+func sendLockOff() {
+	sendLock <- false
+}
 func Start() {
+	no = node.LoadFormConfig()
+	sendLockOff()
 	var err error
 	conn, err = grpc.Dial("127.0.0.1:6688", grpc.WithInsecure())
 	if err != nil {
-		fmt.Printf("RPC Dial failed: %s\n", err.Error())
-		panic(err)
+		log.Fatalf("dial collector failed: %s", err)
 	}
 
 	cronRunner = cron.New()
@@ -44,8 +56,23 @@ func Stop() {
 }
 
 func send() {
-	sendLock.Lock()
-	defer sendLock.Unlock()
+	select {
+	case _ = <-sendLock:
+		defer sendLockOff()
+		if err := doSend(); err != nil {
+			log.Warnf("send action log to collector error: %s", err)
+		}
+	default:
+	}
+}
+
+func doSend() error {
+	pcsc := pb.NewProviderCollectorServiceClient(conn)
+	stream, err := pcsc.Collect(context.Background())
+	if err != nil {
+		fmt.Printf("RPC Collect failed: %s", err.Error())
+		return err
+	}
 	for {
 		if len(queue) == 0 {
 			break
@@ -54,21 +81,22 @@ func send() {
 		if size > batch_max {
 			size = batch_max
 		}
+		if err = stream.Send(buildReq(size)); err != nil {
+			return err
+		}
 	}
+	_, err = stream.CloseAndRecv()
+	return err
 }
 
-func sendBatch(size int) {
-
-}
-
-func sendToCollector(req *pb.CollectReq) {
-	// pcsc := pb.NewProviderCollectorServiceClient(conn)
-	// ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	// defer cancel()
-	// node := node.LoadFormConfig()
-	// req.SignReq(node.PriKey)
-	// _, err := pcsc.Collect(ctx, req)
-	// if err != nil {
-	// 	log.Warnf("send to collector failed, error: %s", err)
-	// }
+func buildReq(size int) *pb.CollectReq {
+	bs := make([]*pb.ActionLog, 0, size)
+	for i := 0; i < size; i++ {
+		bs = append(bs, <-queue)
+	}
+	req := &pb.CollectReq{NodeId: no.NodeId,
+		Timestamp: uint64(time.Now().UnixNano()),
+		ActionLog: bs}
+	req.SignReq(no.PriKey)
+	return req
 }

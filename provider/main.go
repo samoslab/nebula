@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/prestonTao/upnp"
+	collector "github.com/samoslab/nebula/provider/collector_client"
 	"github.com/samoslab/nebula/provider/config"
 	"github.com/samoslab/nebula/provider/disk"
 	"github.com/samoslab/nebula/provider/impl"
@@ -193,6 +194,8 @@ func daemon(configDir string, trackerServer string, listen string) {
 	}
 	config.StartAutoCheck()
 	defer config.StopAutoCheck()
+	collector.Start()
+	defer collector.Stop()
 	port, err := strconv.Atoi(strings.Split(listen, ":")[1])
 	if err != nil {
 		fmt.Println("parse listen port error: " + err.Error())

@@ -21,14 +21,19 @@ type Node struct {
 	EncryptKey  map[string][]byte
 }
 
+var nodeFromConfig *Node
+
 func LoadFormConfig() *Node {
-	node := &Node{}
-	var err error
-	node.NodeId, node.PubKey, node.PriKey, node.PubKeyBytes, node.EncryptKey, err = config.ParseNode()
-	if err != nil {
-		log.Fatalln(err)
+	if nodeFromConfig == nil {
+		no := &Node{}
+		var err error
+		no.NodeId, no.PubKey, no.PriKey, no.PubKeyBytes, no.EncryptKey, err = config.ParseNode()
+		if err != nil {
+			log.Fatalln(err)
+		}
+		nodeFromConfig = no
 	}
-	return node
+	return nodeFromConfig
 }
 
 const RSA_KEY_BYTES = 256
