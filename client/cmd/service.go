@@ -28,6 +28,7 @@ func main() {
 	}
 
 	webcfg = &config.Config{}
+	webcfg.SetDefault()
 	webcfg.HTTPAddr = "127.0.0.1:7788"
 
 	fmt.Printf("webcfg %+v\n", webcfg)

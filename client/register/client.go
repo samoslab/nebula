@@ -47,11 +47,12 @@ func DoRegister(registClient pb.ClientRegisterServiceClient, cfg *config.ClientC
 	if err != nil {
 		return nil, err
 	}
-	registerReq := pb.RegisterReq{}
-	registerReq.Version = 1
-	registerReq.NodeId = cfg.Node.NodeId
-	registerReq.PublicKeyEnc = pubkeyEnc
-	registerReq.ContactEmailEnc = contactEmailEnc
+	registerReq := pb.RegisterReq{
+		Version:         1,
+		NodeId:          cfg.Node.NodeId,
+		PublicKeyEnc:    pubkeyEnc,
+		ContactEmailEnc: contactEmailEnc,
+	}
 
 	rsp, err := registClient.Register(ctx, &registerReq)
 	if err != nil {
@@ -69,8 +70,6 @@ func VerifyContactEmail(client pb.ClientRegisterServiceClient, verifyCode string
 		Timestamp:  uint64(time.Now().Unix()),
 		VerifyCode: verifyCode}
 
-	fmt.Printf("nodeid:%x\n", node.NodeId)
-	fmt.Printf("prikey:%v\n", node.PriKey)
 	err = req.SignReq(node.PriKey)
 	if err != nil {
 		return 0, "", err
@@ -85,8 +84,10 @@ func VerifyContactEmail(client pb.ClientRegisterServiceClient, verifyCode string
 func resendVerifyCode(client pb.ClientRegisterServiceClient, node *node.Node) (success bool, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	req := &pb.ResendVerifyCodeReq{NodeId: node.NodeId,
-		Timestamp: uint64(time.Now().Unix())}
+	req := &pb.ResendVerifyCodeReq{
+		NodeId:    node.NodeId,
+		Timestamp: uint64(time.Now().Unix()),
+	}
 	err = req.SignReq(node.PriKey)
 	if err != nil {
 		return false, err
@@ -114,13 +115,14 @@ func RegisterClient(log logrus.FieldLogger, configDir, trackerServer, emailAddre
 		fmt.Printf("load config error %v\n", err)
 		fmt.Printf("generate config\n")
 		no := node.NewNode(10)
-		cc = &config.ClientConfig{}
-		cc.PublicKey = no.PublicKeyStr()
-		cc.PrivateKey = no.PrivateKeyStr()
-		cc.NodeId = no.NodeIdStr()
-		cc.Email = emailAddress
-		cc.TrackerServer = trackerServer
-		cc.Node = no
+		cc = &config.ClientConfig{
+			PublicKey:     no.PublicKeyStr(),
+			PrivateKey:    no.PrivateKeyStr(),
+			NodeId:        no.NodeIdStr(),
+			Email:         emailAddress,
+			TrackerServer: trackerServer,
+			Node:          no,
+		}
 		err = config.SaveClientConfig(configDir, cc)
 		if err != nil {
 			log.Infof("create config failed %v\n", err)
