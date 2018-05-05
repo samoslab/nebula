@@ -28,7 +28,7 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, fileInf
 	fileSize := uint64(fileInfo.FileSize)
 	file, err := os.Open(filePath)
 	if err != nil {
-		log.Errorf("open file failed: %s\n", err.Error())
+		log.Errorf("open file failed: %s", err.Error())
 		return err
 	}
 	defer file.Close()
@@ -61,7 +61,7 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, fileInf
 
 	stream, err := client.Store(context.Background())
 	if err != nil {
-		log.Errorf("RPC Store failed: %s\n", err.Error())
+		log.Errorf("RPC Store failed: %s", err.Error())
 		return err
 	}
 	defer stream.CloseSend()
@@ -73,28 +73,26 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, fileInf
 			if err == io.EOF {
 				break
 			}
-			log.Errorf("read file failed: %s\n", err.Error())
+			log.Errorf("read file failed: %s", err.Error())
 			return err
 		}
 		if first {
 			first = false
 			req.Data = buf[:bytesRead]
 			if err := stream.Send(req); err != nil {
-				log.Errorf("RPC First Send StoreReq failed: %s\n", err.Error())
-				//if err.Error() == "EOF" {
-				//continue
-				//}
+				log.Errorf("RPC First Send StoreReq failed: %s", err.Error())
+				if err == io.EOF {
+					break
+				}
 				return err
 			}
+			log.Infof("RPC First Send StoreReq SUCCESS")
 		} else {
-			//req := &pb.StoreReq{Ticket: ticket, Auth: auth, Timestamp: tm, FileKey: fileInfo.FileHash, FileSize: fileSize, BlockKey: fileInfo.FileHash, BlockSize: fileSize}
-			//req.Data = buf[:bytesRead]
-			//if err := stream.Send(req); err != nil {
 			if err := stream.Send(&pb.StoreReq{Data: buf[:bytesRead]}); err != nil {
-				log.Errorf("RPC Send StoreReq failed: %s\n", err.Error())
-				//if err.Error() == "EOF" {
-				//break
-				//}
+				log.Errorf("RPC not first Send StoreReq failed: %s", err.Error())
+				if err == io.EOF {
+					break
+				}
 				return err
 			}
 		}
@@ -110,7 +108,7 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, fileInf
 	}
 	storeResp, err := stream.CloseAndRecv()
 	if err != nil {
-		log.Errorf("RPC CloseAndRecv failed: %s\n", err.Error())
+		log.Errorf("RPC CloseAndRecv failed: %s", err.Error())
 		return err
 	}
 	if !storeResp.Success {
@@ -128,7 +126,7 @@ func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath 
 		os.O_WRONLY|os.O_TRUNC|os.O_CREATE,
 		0666)
 	if err != nil {
-		log.Errorf("open file failed: %s\n", err.Error())
+		log.Errorf("open file failed: %s", err.Error())
 		return err
 	}
 	defer file.Close()
@@ -160,7 +158,7 @@ func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath 
 			break
 		}
 		if err != nil {
-			log.Errorf("RPC Recv failed: %s\n", err.Error())
+			log.Errorf("RPC Recv failed: %s", err.Error())
 			return err
 		}
 		if len(resp.Data) == 0 {
@@ -172,7 +170,7 @@ func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath 
 			}
 		}
 		if _, err = file.Write(resp.Data); err != nil {
-			log.Errorf("write file %d bytes failed : %s\n", len(resp.Data), err.Error())
+			log.Errorf("write file %d bytes failed : %s", len(resp.Data), err.Error())
 			return err
 		}
 	}

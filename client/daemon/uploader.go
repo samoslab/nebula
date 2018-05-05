@@ -136,7 +136,8 @@ func (c *ClientManager) PingProvider(pros []*mpb.BlockProviderAuth, needNum int)
 		availablePros = append(availablePros, proInfo.Pro)
 	}
 
-	return availablePros[0:needNum], nil
+	//return availablePros[0:needNum], nil
+	return pros, nil
 }
 
 func (c *ClientManager) ConnectProvider() error {
