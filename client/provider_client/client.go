@@ -3,6 +3,7 @@ package provider_client
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -36,6 +37,12 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, fileInf
 	if !ok {
 		log.Errorf("file %s not in reverse partition map", filePath)
 	}
+	fmt.Printf("auth %x\n", auth)
+	fmt.Printf("ticket %x\n", ticket)
+	fmt.Printf("filehash %x\n", fileInfo.FileHash)
+	fmt.Printf("blockhash %x\n", fileInfo.FileHash)
+	fmt.Printf("tm %d\n", tm)
+	fmt.Printf("size %d\n", fileInfo.FileSize)
 	req := &pb.StoreReq{Ticket: ticket, Auth: auth, Timestamp: tm, FileKey: fileInfo.FileHash, FileSize: fileSize, BlockKey: fileInfo.FileHash, BlockSize: fileSize}
 	if fileSize < 512*1024 {
 		req.Data, err = ioutil.ReadAll(file)
@@ -89,10 +96,10 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, fileInf
 			log.Infof("RPC First Send StoreReq SUCCESS")
 		} else {
 			if err := stream.Send(&pb.StoreReq{Data: buf[:bytesRead]}); err != nil {
-				log.Errorf("RPC not first Send StoreReq failed: %s", err.Error())
-				if err == io.EOF {
-					break
-				}
+				log.Errorf("RPC Send non-first StoreReq failed: %s", err.Error())
+				//if err == io.EOF {
+				//break
+				//}
 				return err
 			}
 		}
@@ -115,7 +122,6 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, fileInf
 		log.Error("RPC return false")
 		return errors.New("RPC return false")
 	}
-	time.Sleep(time.Second)
 	return nil
 }
 
