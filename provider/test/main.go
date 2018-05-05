@@ -234,7 +234,7 @@ func main() {
 		fmt.Println(err)
 	}
 	fmt.Println("==========test Small File 4 Store RPC==========")
-	path = "/etc/apt/sources.list"
+	path = "/bin/cat"
 	hash, err = util_hash.Sha1File(path)
 	if err != nil {
 		panic(err)
@@ -248,7 +248,7 @@ func main() {
 		fmt.Println(err)
 	}
 	fmt.Println("==========test Small File 4 Retrieve RPC==========")
-	getPath = "/tmp/sources.list"
+	getPath = "/tmp/cat"
 	err = Retrieve(psc, getPath, "mock-ticket", hash, uint64(fileInfo.Size()))
 	if err != nil {
 		fmt.Println(err)
@@ -265,7 +265,7 @@ func main() {
 		fmt.Println(err)
 	}
 	fmt.Println("==========test Small File 5 Store RPC==========")
-	path = "/etc/sysctl.conf"
+	path = "/bin/sed"
 	hash, err = util_hash.Sha1File(path)
 	if err != nil {
 		panic(err)
@@ -279,7 +279,7 @@ func main() {
 		fmt.Println(err)
 	}
 	fmt.Println("==========test Small File 5 Retrieve RPC==========")
-	getPath = "/tmp/sysctl.conf"
+	getPath = "/tmp/sed"
 	err = Retrieve(psc, getPath, "mock-ticket", hash, uint64(fileInfo.Size()))
 	if err != nil {
 		fmt.Println(err)

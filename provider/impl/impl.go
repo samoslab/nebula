@@ -2,7 +2,6 @@ package impl
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"os"
 	"time"
@@ -18,6 +17,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/syndtr/goleveldb/leveldb"
 	leveldb_errors "github.com/syndtr/goleveldb/leveldb/errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const stream_data_size = 32 * 1024
@@ -88,40 +89,41 @@ func (self *ProviderService) StoreSmall(ctx context.Context, req *pb.StoreReq) (
 	al.TransportSize = uint64(len(req.Data))
 	defer client.Collect(al)
 	if req.BlockSize >= small_file_limit || int(req.BlockSize) != len(req.Data) {
-		err = fmt.Errorf("check data size failed, blockKey: %x", req.BlockKey)
+		err = status.Errorf(codes.InvalidArgument, "check data size failed, blockKey: %x", req.BlockKey)
 		logWarnAndSetActionLog(err, al)
 		return
 	}
 	if !bytes.Equal(req.BlockKey, util_hash.Sha1(req.Data)) {
-		err = fmt.Errorf("check data hash failed, blockKey: %x", req.BlockKey)
+		err = status.Errorf(codes.InvalidArgument, "check data hash failed, blockKey: %x", req.BlockKey)
 		logWarnAndSetActionLog(err, al)
 		return
 	}
 	if !skip_check_auth {
 		if err = req.CheckAuth(self.node.PubKeyBytes); err != nil {
-			err = fmt.Errorf("check auth failed, blockKey: %x error: %s", req.BlockKey, err)
+			err = status.Errorf(codes.Unauthenticated, "check auth failed, blockKey: %x error: %s", req.BlockKey, err)
 			logWarnAndSetActionLog(err, al)
 			return
 		}
 	}
 	if found, _, _, _ := self.querySubPath(req.BlockKey); found {
-		logWarnAndSetActionLog(fmt.Errorf("hash point file exist, blockKey: %x", req.BlockKey), al)
-		return nil, os.ErrExist
+		err = status.Errorf(codes.AlreadyExists, "hash point file exist, blockKey: %x", req.BlockKey)
+		logWarnAndSetActionLog(err, al)
+		return
 	}
 	storage := config.GetWriteStorage(req.BlockSize)
 	if storage == nil {
-		err = fmt.Errorf("available disk space of this provider is not enlough, blockKey: %s blockSize: %d", req.BlockKey, req.BlockSize)
+		err = status.Errorf(codes.ResourceExhausted, "available disk space of this provider is not enlough, blockKey: %s blockSize: %d", req.BlockKey, req.BlockSize)
 		logWarnAndSetActionLog(err, al)
 		al.TransportSize += uint64(len(req.Data))
 		return
 	}
 	if err = storage.SmallFileDb.Put(req.BlockKey, req.Data, nil); err != nil {
-		err = fmt.Errorf("save to small file db failed, blockKey: %x error: %s", req.BlockKey, err)
+		err = status.Errorf(codes.Internal, "save to small file db failed, blockKey: %x error: %s", req.BlockKey, err)
 		logWarnAndSetActionLog(err, al)
 		return
 	}
 	if err = self.providerDb.Put(req.BlockKey, []byte{storage.Index}, nil); err != nil {
-		err = fmt.Errorf("save to provider db failed, blockKey: %x error: %s", req.BlockKey, err)
+		err = status.Errorf(codes.Internal, "save to provider db failed, blockKey: %x error: %s", req.BlockKey, err)
 		logWarnAndSetActionLog(err, al)
 		return
 	}
@@ -143,7 +145,7 @@ func (self *ProviderService) Store(stream pb.ProviderService_StoreServer) (er er
 			if err == io.EOF {
 				break
 			}
-			er = fmt.Errorf("RPC Recv failed unexpectadely while reading chunks from stream, blockKey: %x error: %s", blockKey, err)
+			er = status.Errorf(codes.Unknown, "RPC Recv failed unexpectadely while reading chunks from stream, blockKey: %x error: %s", blockKey, err)
 			logWarnAndSetActionLog(er, al)
 			return
 		}
@@ -152,27 +154,28 @@ func (self *ProviderService) Store(stream pb.ProviderService_StoreServer) (er er
 			defer client.Collect(al)
 			first, blockKey, blockSize = false, req.BlockKey, req.BlockSize
 			if blockSize < small_file_limit {
-				er = fmt.Errorf("check data size failed, blockKey: %x", blockKey)
+				er = status.Errorf(codes.InvalidArgument, "check data size failed, blockKey: %x", blockKey)
 				logWarnAndSetActionLog(er, al)
 				al.TransportSize += uint64(len(req.Data))
 				return
 			}
 			if !skip_check_auth {
 				if err = req.CheckAuth(self.node.PubKeyBytes); err != nil {
-					er = fmt.Errorf("check auth failed, blockKey: %x error: %s", blockKey, err)
+					er = status.Errorf(codes.Unauthenticated, "check auth failed, blockKey: %x error: %s", blockKey, err)
 					logWarnAndSetActionLog(er, al)
 					al.TransportSize += uint64(len(req.Data))
 					return
 				}
 			}
 			if found, _, _, _ := self.querySubPath(blockKey); found {
-				logWarnAndSetActionLog(fmt.Errorf("hash point file exist, blockKey: %x", blockKey), al)
+				er = status.Errorf(codes.AlreadyExists, "hash point file exist, blockKey: %x", blockKey)
+				logWarnAndSetActionLog(er, al)
 				al.TransportSize += uint64(len(req.Data))
-				return os.ErrExist
+				return
 			}
 			storage = config.GetWriteStorage(blockSize)
 			if storage == nil {
-				er = fmt.Errorf("available disk space of this provider is not enlough, blockKey: %s blockSize: %d", blockKey, blockSize)
+				er = status.Errorf(codes.ResourceExhausted, "available disk space of this provider is not enlough, blockKey: %s blockSize: %d", blockKey, blockSize)
 				logWarnAndSetActionLog(er, al)
 				al.TransportSize += uint64(len(req.Data))
 				return
@@ -183,7 +186,7 @@ func (self *ProviderService) Store(stream pb.ProviderService_StoreServer) (er er
 				os.O_WRONLY|os.O_TRUNC|os.O_CREATE,
 				0600)
 			if err != nil {
-				er = fmt.Errorf("open temp write file failed, blockKey: %x error: %s", blockKey, err)
+				er = status.Errorf(codes.Internal, "open temp write file failed, blockKey: %x error: %s", blockKey, err)
 				logWarnAndSetActionLog(er, al)
 				al.TransportSize += uint64(len(req.Data))
 				return
@@ -195,45 +198,45 @@ func (self *ProviderService) Store(stream pb.ProviderService_StoreServer) (er er
 		}
 		al.TransportSize += uint64(len(req.Data))
 		if al.TransportSize > blockSize {
-			er = fmt.Errorf("transport data size exceed: %d, blockKey: %x blockSize: %d", al.TransportSize, blockKey, blockSize)
+			er = status.Errorf(codes.InvalidArgument, "transport data size exceed: %d, blockKey: %x blockSize: %d", al.TransportSize, blockKey, blockSize)
 			logWarnAndSetActionLog(er, al)
 			return
 		}
 		if _, err = file.Write(req.Data); err != nil {
-			er = fmt.Errorf("write file failed, blockKey: %x error: %s", blockKey, err)
+			er = status.Errorf(codes.Internal, "write file failed, blockKey: %x error: %s", blockKey, err)
 			logWarnAndSetActionLog(er, al)
 			return
 		}
 	}
 	fileInfo, err := os.Stat(tempFilePath)
 	if err != nil {
-		er = fmt.Errorf("stat temp file failed, blockKey: %x error: %s", blockKey, err)
+		er = status.Errorf(codes.Internal, "stat temp file failed, blockKey: %x error: %s", blockKey, err)
 		logWarnAndSetActionLog(er, al)
 		return
 	}
 	if blockSize != uint64(fileInfo.Size()) {
-		er = fmt.Errorf("check data size failed, blockKey: %x", blockKey)
+		er = status.Errorf(codes.InvalidArgument, "check data size failed, blockKey: %x", blockKey)
 		logWarnAndSetActionLog(er, al)
 		return
 	}
 	hash, err := util_hash.Sha1File(tempFilePath)
 	if err != nil {
-		er = fmt.Errorf("sha1 sum file %s failed, blockKey: %x error: %s", tempFilePath, blockKey, err)
+		er = status.Errorf(codes.Internal, "sha1 sum file %s failed, blockKey: %x error: %s", tempFilePath, blockKey, err)
 		logWarnAndSetActionLog(er, al)
 		return
 	}
 	if !bytes.Equal(hash, blockKey) {
-		er = fmt.Errorf("hash verify failed, blockKey: %x error: %s", blockKey, err)
+		er = status.Errorf(codes.InvalidArgument, "hash verify failed, blockKey: %x error: %s", blockKey, err)
 		logWarnAndSetActionLog(er, al)
 		return
 	}
 	if err := self.saveFile(blockKey, blockSize, tempFilePath, storage); err != nil {
-		er = fmt.Errorf("save file failed, tempFilePath: %s blockKey: %x error: %s", tempFilePath, blockKey, err)
+		er = status.Errorf(codes.Internal, "save file failed, tempFilePath: %s blockKey: %x error: %s", tempFilePath, blockKey, err)
 		logWarnAndSetActionLog(er, al)
 		return
 	}
 	if err := stream.SendAndClose(&pb.StoreResp{Success: true}); err != nil {
-		er = fmt.Errorf("RPC SendAndClose failed, blockKey: %x error: %s", blockKey, err)
+		er = status.Errorf(codes.Unknown, "RPC SendAndClose failed, blockKey: %x error: %s", blockKey, err)
 		logWarnAndSetActionLog(er, al)
 		return
 	}
@@ -247,41 +250,42 @@ func (self *ProviderService) RetrieveSmall(ctx context.Context, req *pb.Retrieve
 	al := newActionLogFromRetrieveReq(req)
 	defer client.Collect(al)
 	if req.BlockSize >= small_file_limit {
-		err = fmt.Errorf("check data size failed, blockKey: %x", req.BlockKey)
+		err = status.Errorf(codes.InvalidArgument, "check data size failed, blockKey: %x", req.BlockKey)
 		logWarnAndSetActionLog(err, al)
 		return
 	}
 	if !skip_check_auth {
 		if err = req.CheckAuth(self.node.PubKeyBytes); err != nil {
-			err = fmt.Errorf("check auth failed, blockKey: %x error: %s", req.BlockKey, err)
+			err = status.Errorf(codes.Unauthenticated, "check auth failed, blockKey: %x error: %s", req.BlockKey, err)
 			logWarnAndSetActionLog(err, al)
 			return
 		}
 	}
 	found, smallFile, storageIdx, _ := self.querySubPath(req.BlockKey)
 	if !found {
-		logWarnAndSetActionLog(fmt.Errorf("file not exist, blockKey: %x", req.BlockKey), al)
-		return nil, os.ErrNotExist
+		err = status.Errorf(codes.NotFound, "file not exist, blockKey: %x", req.BlockKey)
+		logWarnAndSetActionLog(err, al)
+		return
 	}
 	if !smallFile {
-		err = fmt.Errorf("is not small file, blockKey: %x", req.BlockKey)
+		err = status.Errorf(codes.FailedPrecondition, "is not small file, blockKey: %x", req.BlockKey)
 		logWarnAndSetActionLog(err, al)
 		return
 	}
 	storage := config.GetStorage(storageIdx)
 	data, err := storage.SmallFileDb.Get(req.BlockKey, nil)
 	if err != nil {
-		err = fmt.Errorf("read small file error, blockKey: %x error: %s", req.BlockKey, err)
+		err = status.Errorf(codes.Internal, "read small file error, blockKey: %x error: %s", req.BlockKey, err)
 		logWarnAndSetActionLog(err, al)
 		return
 	}
 	if len(data) != int(req.BlockSize) {
-		err = fmt.Errorf("check data size failed, read length %d != request length %d, blockKey: %x", len(data), req.BlockSize, req.BlockKey)
+		err = status.Errorf(codes.InvalidArgument, "check data size failed, read length %d != request length %d, blockKey: %x", len(data), req.BlockSize, req.BlockKey)
 		logWarnAndSetActionLog(err, al)
 		return
 	}
 	if !bytes.Equal(util_hash.Sha1(data), req.BlockKey) {
-		err = fmt.Errorf("hash verify failed, blockKey: %x error: %s", req.BlockKey, err)
+		err = status.Errorf(codes.DataLoss, "hash verify failed, blockKey: %x error: %s", req.BlockKey, err)
 		logWarnAndSetActionLog(err, al)
 		return
 	}
@@ -293,42 +297,43 @@ func (self *ProviderService) Retrieve(req *pb.RetrieveReq, stream pb.ProviderSer
 	al := newActionLogFromRetrieveReq(req)
 	defer client.Collect(al)
 	if req.BlockSize < small_file_limit {
-		err = fmt.Errorf("check data size failed, blockKey: %x", req.BlockKey)
+		err = status.Errorf(codes.InvalidArgument, "check data size failed, blockKey: %x", req.BlockKey)
 		logWarnAndSetActionLog(err, al)
 		return
 	}
 	if !skip_check_auth {
 		if err = req.CheckAuth(self.node.PubKeyBytes); err != nil {
-			err = fmt.Errorf("check auth failed, blockKey: %x error: %s", req.BlockKey, err)
+			err = status.Errorf(codes.Unauthenticated, "check auth failed, blockKey: %x error: %s", req.BlockKey, err)
 			logWarnAndSetActionLog(err, al)
 			return
 		}
 	}
 	found, smallFile, storageIdx, subPath := self.querySubPath(req.BlockKey)
 	if !found {
-		logWarnAndSetActionLog(fmt.Errorf("file not exist, blockKey: %x", req.BlockKey), al)
-		return os.ErrNotExist
+		err = status.Errorf(codes.NotFound, "file not exist, blockKey: %x", req.BlockKey)
+		logWarnAndSetActionLog(err, al)
+		return
 	}
 	if smallFile {
-		err = fmt.Errorf("is small file, blockKey: %x", req.BlockKey)
+		err = status.Errorf(codes.FailedPrecondition, "is small file, blockKey: %x", req.BlockKey)
 		logWarnAndSetActionLog(err, al)
 		return
 	}
 	path := config.GetStoragePath(storageIdx, subPath)
 	hash, err := util_hash.Sha1File(path)
 	if err != nil {
-		err = fmt.Errorf("sha1 sum file %s failed, blockKey: %x error: %s", path, req.BlockKey, err)
+		err = status.Errorf(codes.Internal, "sha1 sum file %s failed, blockKey: %x error: %s", path, req.BlockKey, err)
 		logWarnAndSetActionLog(err, al)
 		return
 	}
 	if !bytes.Equal(hash, req.BlockKey) {
-		err = fmt.Errorf("hash verify failed, blockKey: %x error: %s", req.BlockKey, err)
+		err = status.Errorf(codes.DataLoss, "hash verify failed, blockKey: %x error: %s", req.BlockKey, err)
 		logWarnAndSetActionLog(err, al)
 		return
 	}
 	file, err := os.Open(path)
 	if err != nil {
-		err = fmt.Errorf("open file failed, blockKey: %x error: %s", req.BlockKey, err)
+		err = status.Errorf(codes.Internal, "open file failed, blockKey: %x error: %s", req.BlockKey, err)
 		logWarnAndSetActionLog(err, al)
 		return
 	}
@@ -348,7 +353,7 @@ func sendFileToStream(key []byte, path string, file *os.File, stream pb.Provider
 			if err == io.EOF {
 				break
 			}
-			er = fmt.Errorf("read file: %s failed, blockKey: %x error: %s", path, key, err)
+			er = status.Errorf(codes.Internal, "read file: %s failed, blockKey: %x error: %s", path, key, err)
 			logWarnAndSetActionLog(er, al)
 			return
 		}
@@ -366,32 +371,33 @@ func sendFileToStream(key []byte, path string, file *os.File, stream pb.Provider
 func (self *ProviderService) Remove(ctx context.Context, req *pb.RemoveReq) (resp *pb.RemoveResp, err error) {
 	if !skip_check_auth {
 		if err = req.CheckAuth(self.node.PubKeyBytes); err != nil {
-			err = fmt.Errorf("check auth failed, key: %x error: %s", req.Key, err)
+			err = status.Errorf(codes.Unauthenticated, "check auth failed, key: %x error: %s", req.Key, err)
 			log.Warnln(err)
 			return
 		}
 	}
 	found, smallFile, storageIdx, subPath := self.querySubPath(req.Key)
 	if !found {
-		log.Warnf("file not exist, key: %x", req.Key)
-		return nil, os.ErrNotExist
+		err = status.Errorf(codes.NotFound, "file not exist, key: %x", req.Key)
+		log.Warnln(err)
+		return
 	}
 	if err = self.providerDb.Delete(req.Key, nil); err != nil {
-		err = fmt.Errorf("delete from provider db failed, key: %x error: %s", req.Key, err)
+		err = status.Errorf(codes.Internal, "delete from provider db failed, key: %x error: %s", req.Key, err)
 		log.Warnln(err)
 		return
 	}
 	if smallFile {
 		storage := config.GetStorage(storageIdx)
 		if err = storage.SmallFileDb.Delete(req.Key, nil); err != nil {
-			err = fmt.Errorf("delete from small file db failed, key: %x error: %s", req.Key, err)
+			err = status.Errorf(codes.Internal, "delete from small file db failed, key: %x error: %s", req.Key, err)
 			log.Warnln(err)
 			return
 		}
 	} else {
 		path := config.GetStoragePath(storageIdx, subPath)
 		if err = os.Remove(path); err != nil {
-			err = fmt.Errorf("remove file failed, key: %x error: %s", req.Key, err)
+			err = status.Errorf(codes.Internal, "remove file failed, key: %x error: %s", req.Key, err)
 			log.Warnln(err)
 			return
 		}
@@ -401,35 +407,36 @@ func (self *ProviderService) Remove(ctx context.Context, req *pb.RemoveReq) (res
 
 func (self *ProviderService) GetFragment(ctx context.Context, req *pb.GetFragmentReq) (resp *pb.GetFragmentResp, err error) {
 	if len(req.Positions) == 0 || req.Size == 0 {
-		err = fmt.Errorf("invalid req, key: %x", req.Key)
+		err = status.Errorf(codes.InvalidArgument, "invalid req, key: %x", req.Key)
 		log.Warnln(err)
 		return
 	}
 	for i, b := range req.Positions {
 		if b >= 100 {
-			err = fmt.Errorf("posisiton out of bounds, Posistion[%d]=%d , key: %x", i, b, req.Key)
+			err = status.Errorf(codes.InvalidArgument, "posisiton out of bounds, Posistion[%d]=%d , key: %x", i, b, req.Key)
 			log.Warnln(err)
 			return
 		}
 	}
 	if !skip_check_auth {
 		if err = req.CheckAuth(self.node.PubKeyBytes); err != nil {
-			err = fmt.Errorf("check auth failed, key: %x error: %s", req.Key, err)
+			err = status.Errorf(codes.Unauthenticated, "check auth failed, key: %x error: %s", req.Key, err)
 			log.Warnln(err)
 			return
 		}
 	}
 	found, smallFile, storageIdx, subPath := self.querySubPath(req.Key)
 	if !found {
-		log.Warnf("file not exist, key: %x", req.Key)
-		return nil, os.ErrNotExist
+		err = status.Errorf(codes.NotFound, "file not exist, key: %x", req.Key)
+		log.Warnln(err)
+		return
 	}
 	var res [][]byte
 	if smallFile {
 		storage := config.GetStorage(storageIdx)
 		data, er := storage.SmallFileDb.Get(req.Key, nil)
 		if er != nil {
-			err = fmt.Errorf("read small file error, blockKey: %x error: %s", req.Key, er)
+			err = status.Errorf(codes.Internal, "read small file error, blockKey: %x error: %s", req.Key, er)
 			log.Warnln(err)
 			return
 		}
@@ -450,7 +457,7 @@ func getFragmentFromByteSlice(key []byte, data []byte, positions []byte, size ui
 	for _, posPercent := range positions {
 		pos := uint32(posPercent) * fileSize / 100
 		if pos+size > fileSize {
-			err = fmt.Errorf("file position %d%%+%d out of bounds, key: %x", posPercent, size, key)
+			err = status.Errorf(codes.InvalidArgument, "file position %d%%+%d out of bounds, key: %x", posPercent, size, key)
 			log.Warnln(err)
 			return
 		}
@@ -463,14 +470,14 @@ func getFragmentFromFile(key []byte, path string, positions []byte, size uint32)
 	res := make([][]byte, 0, len(positions))
 	fileInfo, er := os.Stat(path)
 	if er != nil {
-		err = fmt.Errorf("stat file failed, key: %x error: %s", key, er)
+		err = status.Errorf(codes.Internal, "stat file failed, key: %x error: %s", key, er)
 		log.Warnln(err)
 		return
 	}
 	fileSize := uint64(fileInfo.Size())
 	file, er := os.Open(path)
 	if er != nil {
-		err = fmt.Errorf("open file failed, key: %x error: %s", key, er)
+		err = status.Errorf(codes.Internal, "open file failed, key: %x error: %s", key, er)
 		log.Warnln(err)
 		return
 	}
@@ -478,19 +485,19 @@ func getFragmentFromFile(key []byte, path string, positions []byte, size uint32)
 	for _, posPercent := range positions {
 		pos := int64(posPercent) * int64(fileSize) / 100
 		if pos+int64(size) > int64(fileSize) {
-			err = fmt.Errorf("file position %d%%+%d out of bounds, key: %x", posPercent, size, key)
+			err = status.Errorf(codes.InvalidArgument, "file position %d%%+%d out of bounds, key: %x", posPercent, size, key)
 			log.Warnln(err)
 			return
 		}
 		buf := make([]byte, size)
 		_, err = file.Seek(pos, 0)
 		if err != nil {
-			err = fmt.Errorf("seek file %s to %d failed, key: %x error: %s", path, pos, key, err)
+			err = status.Errorf(codes.Internal, "seek file %s to %d failed, key: %x error: %s", path, pos, key, err)
 			log.Warnln(err)
 			return
 		}
 		if _, err = file.Read(buf); err != nil {
-			err = fmt.Errorf("read file failed, key: %x error: %s", key, err)
+			err = status.Errorf(codes.Internal, "read file failed, key: %x error: %s", key, err)
 			log.Warnln(err)
 			return
 		}
