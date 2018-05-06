@@ -79,8 +79,8 @@ func SendRequest(method, url, token string, reqBody io.Reader) (*http.Response, 
 	return rsp, err
 }
 
-// MyPart partition for upload file prepare
-type MyPart struct {
+// PartitionFile partition for upload file prepare
+type PartitionFile struct {
 	OriginFileName string
 	OriginFileHash []byte
 	OriginFileSize uint64

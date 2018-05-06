@@ -65,7 +65,15 @@ func NewClientManager(log logrus.FieldLogger, trackerServer string, cfg *config.
 
 	c.mclient = mpb.NewMatadataServiceClient(conn)
 	c.Log = log
-	c.TempDir = cfg.TempDir
+	c.TempDir = filepath.Join("/tmp", "nebula_client")
+	log.Infof("temp dir %s", c.TempDir)
+	if _, err := os.Stat(c.TempDir); os.IsNotExist(err) {
+		//create the dir.
+		if err := os.MkdirAll(c.TempDir, 0744); err != nil {
+			panic(err)
+		}
+	}
+
 	c.NodeId = cfg.Node.NodeId
 	c.cfg = cfg
 	c.PM = common.NewProgressManager()
@@ -207,7 +215,7 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 		if fileSize > PartitionMaxSize {
 			chunkNum := int(math.Ceil(float64(fileSize) / float64(PartitionMaxSize)))
 			chunkSize := fileSize / int64(chunkNum)
-			partFiles, err = FileSplit("", filename, fileSize, chunkSize, int64(chunkNum))
+			partFiles, err = FileSplit(c.TempDir, filename, fileSize, chunkSize, int64(chunkNum))
 			if err != nil {
 				return err
 			}
@@ -222,7 +230,7 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 
 		log.Infof("prepare response gave %d dataShards, %d verifyShards", dataShards, verifyShards)
 
-		fileInfos := []common.MyPart{}
+		fileInfos := []common.PartitionFile{}
 
 		realSizeAfterRS := int64(0)
 		for _, fname := range partFiles {
@@ -230,7 +238,7 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 			if err != nil {
 				return err
 			}
-			fileInfos = append(fileInfos, common.MyPart{
+			fileInfos = append(fileInfos, common.PartitionFile{
 				FileName:       fname,
 				Pieces:         fileSlices,
 				OriginFileName: req.FileName,
@@ -331,9 +339,9 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 
 func deleteTemporaryFile(log logrus.FieldLogger, filename string) {
 	log.Debugf("need delete file %s", filename)
-	if err := os.Remove(filename); err != nil {
-		log.Errorf("delete %s failed, error %v", filename, err)
-	}
+	//if err := os.Remove(filename); err != nil {
+	//log.Errorf("delete %s failed, error %v", filename, err)
+	//}
 }
 
 func (c *ClientManager) CheckFileExists(filename string, interactive, newVersion bool) (*mpb.CheckFileExistReq, *mpb.CheckFileExistResp, error) {
@@ -409,7 +417,7 @@ func (c *ClientManager) MkFolder(filepath string, folders []string, interactive 
 }
 
 func (c *ClientManager) onlyFileSplit(filename string, dataNum, verifyNum int) ([]common.HashFile, error) {
-	fileSlices, err := RsEncoder(c.Log, "", filename, dataNum, verifyNum)
+	fileSlices, err := RsEncoder(c.Log, c.TempDir, filename, dataNum, verifyNum)
 	if err != nil {
 		c.Log.Errorf("reed se error %v", err)
 		return nil, err
@@ -418,7 +426,7 @@ func (c *ClientManager) onlyFileSplit(filename string, dataNum, verifyNum int) (
 
 }
 
-func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, rspPartition *mpb.ErasureCodePartition, partFile common.MyPart, dataShards int) (*mpb.StorePartition, error) {
+func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, rspPartition *mpb.ErasureCodePartition, partFile common.PartitionFile, dataShards int) (*mpb.StorePartition, error) {
 	log := c.Log
 	partition := &mpb.StorePartition{}
 	partition.Block = []*mpb.StoreBlock{}
@@ -428,23 +436,6 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 		return nil, err
 	}
 
-	//for i, pro := range providers {
-	//server := fmt.Sprintf("%s:%d", pro.GetServer(), pro.GetPort())
-	//checksum := i >= dataShards
-	//uploadParas := &common.UploadParameter{
-	//OriginFileHash: partFile.OriginFileHash,
-	//OriginFileSize: partFile.OriginFileSize,
-	//HF:             partFile.Pieces[i],
-	//Checksum:       checksum,
-	//}
-	//block, err := c.uploadFileToErasureProvider(pro, rspPartition.GetTimestamp(), uploadParas)
-	//if err != nil {
-	//log.Errorf("upload file %s error %v", uploadParas.HF.FileName, err)
-	//return nil, err
-	//}
-	//partition.Block = append(partition.Block, block)
-	//log.Debugf("%s upload to privider %s success", uploadParas.HF.FileName, server)
-	//}
 	var errResult []error
 	wg := sync.WaitGroup{}
 	var mutex sync.Mutex
@@ -778,8 +769,18 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 
 		log.Infof("dataShards %d, parityShards %d", datas, paritys)
 
-		err = RsDecoder(log, downFileName, "", datas, paritys)
+		_, onlyFileName := filepath.Split(downFileName)
+		tempDownFileName := filepath.Join(c.TempDir, onlyFileName)
+		err = RsDecoder(log, tempDownFileName, "", datas, paritys)
 		if err != nil {
+			return err
+		}
+
+		defer func() {
+			deleteTemporaryFile(log, tempDownFileName)
+		}()
+
+		if err := os.Rename(tempDownFileName, downFileName); err != nil {
 			return err
 		}
 
@@ -794,11 +795,14 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 			return err
 		}
 		log.Infof("dataShards %d, parityShards %d", datas, paritys)
-		err = RsDecoder(log, partFileName, "", datas, paritys)
+		_, onlyFileName := filepath.Split(partFileName)
+		tempDownFileName := filepath.Join(c.TempDir, onlyFileName)
+		err = RsDecoder(log, tempDownFileName, "", datas, paritys)
 		if err != nil {
 			return err
 		}
-		partFiles = append(partFiles, partFileName)
+
+		partFiles = append(partFiles, tempDownFileName)
 		// delete middle files
 		for _, file := range middleFiles {
 			deleteTemporaryFile(log, file)
@@ -843,9 +847,10 @@ func (c *ClientManager) saveFileByPartition(filename string, partition *mpb.Retr
 		defer conn.Close()
 		pclient := pb.NewProviderServiceClient(conn)
 
-		tempFileName := fmt.Sprintf("%s.%d", filename, block.GetBlockSeq())
-		if multiReplica {
-			tempFileName = filename
+		tempFileName := filename
+		if !multiReplica {
+			_, onlyFileName := filepath.Split(filename)
+			tempFileName = filepath.Join(c.TempDir, fmt.Sprintf("%s.%d", onlyFileName, block.GetBlockSeq()))
 		}
 		log.Infof("[part file] %s, hash %x retrieve from %s", tempFileName, block.GetHash(), server)
 		err = client.Retrieve(log, pclient, tempFileName, node.GetAuth(), node.GetTicket(), tm, fileHash, block.GetHash(), fileSize, block.GetSize(), c.PM)

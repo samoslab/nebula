@@ -15,6 +15,7 @@ import (
 )
 
 const stream_data_size = 32 * 1024
+const small_file_size = 512 * 1024
 
 func Ping(client pb.ProviderServiceClient) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -38,7 +39,7 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadP
 		log.Errorf("file %s not in reverse partition map", filePath)
 	}
 	req := &pb.StoreReq{Ticket: ticket, Auth: auth, Timestamp: tm, FileKey: uploadPara.OriginFileHash, FileSize: uploadPara.OriginFileSize, BlockKey: fileInfo.FileHash, BlockSize: fileSize}
-	if fileSize < 512*1024 {
+	if fileSize < small_file_size {
 		req.Data, err = ioutil.ReadAll(file)
 		if err != nil {
 			return err
@@ -136,7 +137,7 @@ func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath 
 		log.Errorf("file %s not in reverse partition map", fileHashString)
 	}
 	req := &pb.RetrieveReq{Ticket: ticket, FileKey: fileKey, Auth: auth, FileSize: fileSize, Timestamp: tm, BlockKey: blockKey, BlockSize: blockSize}
-	if fileSize < 512*1024 {
+	if fileSize < small_file_size {
 		resp, err := client.RetrieveSmall(context.Background(), req)
 		if err != nil {
 			return err

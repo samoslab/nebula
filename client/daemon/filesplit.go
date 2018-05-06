@@ -59,6 +59,7 @@ func FileSplit(outDir, fileName string, fileSize int64, chunkSize, chunkNum int6
 	b := make([]byte, chunkSize)
 	partFiles := []string{}
 	var i int64 = 1
+	_, onlyFileName := filepath.Split(fileName)
 	for ; i <= int64(chunkNum); i++ {
 
 		fi.Seek((i-1)*(chunkSize), 0)
@@ -68,7 +69,7 @@ func FileSplit(outDir, fileName string, fileSize int64, chunkSize, chunkNum int6
 
 		fi.Read(b)
 
-		filename := fileName + ".part." + strconv.Itoa(int(i-1))
+		filename := filepath.Join(outDir, onlyFileName+".part."+strconv.Itoa(int(i-1)))
 		f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			fmt.Println(err)
