@@ -10,6 +10,8 @@ import (
 	"strings"
 	"sync"
 
+	"google.golang.org/grpc/status"
+
 	"time"
 
 	"github.com/rs/cors"
@@ -590,6 +592,10 @@ func UploadHandler(s *HTTPServer) http.HandlerFunc {
 
 		log.Infof("upload files %+v", upReq.Filename)
 		err := s.cm.UploadFile(upReq.Filename, upReq.Interactive, upReq.NewVersion)
+		st, ok := status.FromError(err)
+		if !ok {
+			log.Infof("err code %d msg %s", st.Code(), st.Message())
+		}
 		code := 0
 		errmsg := ""
 		result := "success"
@@ -647,6 +653,11 @@ func UploadDirHandler(s *HTTPServer) http.HandlerFunc {
 
 		log.Infof("upload parent %s", upReq.Parent)
 		err := s.cm.UploadDir(upReq.Parent, upReq.Interactive, upReq.NewVersion)
+		st, ok := status.FromError(err)
+		if !ok {
+			log.Infof("err code %d msg %s", st.Code(), st.Message())
+		}
+
 		code := 0
 		errmsg := ""
 		result := "success"

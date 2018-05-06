@@ -648,6 +648,7 @@ func (c *ClientManager) DownloadDir(path string) error {
 	if !filepath.IsAbs(path) {
 		return fmt.Errorf("path %s must absolute", path)
 	}
+	errResult := []error{}
 	page := uint32(1)
 	for {
 		// list 1 page 100 items order by name
@@ -665,7 +666,7 @@ func (c *ClientManager) DownloadDir(path string) error {
 			if fileInfo.Folder {
 				log.Infof("create folder %s", currentFile)
 				if _, err := os.Stat(currentFile); os.IsNotExist(err) {
-					os.Mkdir(currentFile, 0644)
+					os.Mkdir(currentFile, 0744)
 				}
 				err = c.DownloadDir(currentFile)
 				if err != nil {
@@ -677,10 +678,14 @@ func (c *ClientManager) DownloadDir(path string) error {
 				err = c.DownloadFile(currentFile, fileInfo.FileHash, fileInfo.FileSize)
 				if err != nil {
 					log.Errorf("download file %s error %v", currentFile, err)
-					return err
+					errResult = append(errResult, fmt.Errorf("%s %v", currentFile, err))
+					//return err
 				}
 			}
 		}
+	}
+	if len(errResult) > 0 {
+		return errResult[0]
 	}
 	return nil
 }

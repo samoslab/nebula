@@ -138,9 +138,24 @@ func (pm *ProgressManager) SetIncrement(fileName string, increment uint64) error
 	return errors.New("not in progress map")
 }
 
+func match(fileMap map[string]struct{}, file string) bool {
+	if len(fileMap) == 0 {
+		return true
+	}
+	_, ok := fileMap[file]
+	return ok
+}
+
 func (pm *ProgressManager) GetProgress(files []string) (map[string]float64, error) {
+	mp := map[string]struct{}{}
+	for _, file := range files {
+		mp[file] = struct{}{}
+	}
 	a := map[string]float64{}
 	for k, v := range pm.Progress {
+		if !match(mp, k) {
+			continue
+		}
 		if v.Total != 0 {
 			rate := fmt.Sprintf("%0.2f", float64(v.Current)/float64(v.Total))
 			x, err := strconv.ParseFloat(rate, 10)

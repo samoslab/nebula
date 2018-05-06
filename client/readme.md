@@ -8,14 +8,17 @@ Index
 | [/store/verifyemail](#storeverifyemail-post)                             | POST      |
 | [/store/resendemail](#storeresendemail-post)                             | POST      |
 | [/store/upload](#storeupload-post)                                   | POST      |
+| [/store/uploaddir](#storeuploaddir-post)                                   | POST      |
 | [/store/download](#storedownload-post)                             | POST      |
+| [/store/downloaddir](#storedownloaddir-post)                             | POST      |
 | [/store/remove](#storeremove-post)                             | POST      |
+| [/store/progress](#storeprogress-post)                             | POST      |
 
 
 统一说明 返回json object结构统一为： 成功：{"code":0, "data":object} 失败：{"code":1,"errmsg":"errmsg","data":object}  
 
   
-## 1. store register
+## /store/register [POST]
 ```
 URI:/store/register
 Method:POST
@@ -25,7 +28,7 @@ Request Body: {
    }
 ```
 
-## 2. store verify email
+## /store/verifyemail [POST]
 
 ```
 URI:/store/verifyemail
@@ -35,7 +38,7 @@ Request Body: {
    }
 ```
 
-## 3. store create folder
+## /store/folder/add [POST]
 
 ```
 URI:/store/folder/add
@@ -47,7 +50,7 @@ Request Body: {
 }
 ```
 
-## 4. store upload file
+## /store/upload [POST]
 
 ```
 URI:/store/upload
@@ -59,7 +62,7 @@ Request Body: {
   }
 ```
 
-## 5. store upload directory
+## /store/uploaddir [POST]
 
 ```
 URI:/store/uploaddir
@@ -69,7 +72,7 @@ Request Body: {
   }
 ```
 
-## 6. store list files
+## /store/list [POST]
 
 ```
 
@@ -112,7 +115,7 @@ curl -X POST -H "Content-Type:application/json" -d '{"path":"/tmp/ok", "pagesize
 
 ```
 
-## 7 store download files
+## /store/download [POST]
 
 filehash and filehash is from /store/list result
 download directory if parent isn't empty but others is empty , or download filename
@@ -120,14 +123,13 @@ download directory if parent isn't empty but others is empty , or download filen
 URI:/store/download
 Method: POST
 Request Body: {
-  parent:string
   filehash:string
   filesize:uint64
   filename:string
   }
 ```
 
-## 8 store download directory
+## /store/downloaddir [POST]
 
 ```
 URI:/store/downloaddir
@@ -137,7 +139,7 @@ Request Body: {
   }
 ```
 
-## 9. store remove files
+## /store/remove [POST]
 
 ```
 URI:/store/remove post
@@ -149,7 +151,8 @@ Request Body: {
    }
 ```
 
-## 10. storeprogress 
+## /store/progress [POST]
+
 returns all progress info if files is empty
 ```
 URI:/store/porgress post
