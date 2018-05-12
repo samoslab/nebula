@@ -24,6 +24,7 @@ func RsEncoder(log logrus.FieldLogger, outDir, fname string, dataShards, parShar
 	if err != nil {
 		return nil, err
 	}
+	defer f.Close()
 
 	instat, err := f.Stat()
 	if err != nil {
@@ -103,7 +104,7 @@ func RsEncoder(log logrus.FieldLogger, outDir, fname string, dataShards, parShar
 }
 
 // RsDecoder reedsolomon stream decoder file
-func RsDecoder(log logrus.FieldLogger, fname, outfname string, dataShards, parShards int) error {
+func RsDecoder(log logrus.FieldLogger, fname, outfname string, filesize int64, dataShards, parShards int) error {
 	// Create matrix
 	enc, err := reedsolomon.NewStream(dataShards, parShards)
 	if err != nil {
@@ -111,7 +112,7 @@ func RsDecoder(log logrus.FieldLogger, fname, outfname string, dataShards, parSh
 	}
 
 	// Open the inputs
-	shards, size, err := openInput(log, dataShards, parShards, fname)
+	shards, _, err := openInput(log, dataShards, parShards, fname)
 	if err != nil {
 		return err
 	}
@@ -122,7 +123,7 @@ func RsDecoder(log logrus.FieldLogger, fname, outfname string, dataShards, parSh
 		log.Info("No reconstruction needed")
 	} else {
 		log.Info("Verification failed. Reconstructing data")
-		shards, size, err = openInput(log, dataShards, parShards, fname)
+		shards, _, err = openInput(log, dataShards, parShards, fname)
 		if err != nil {
 			return err
 		}
@@ -150,7 +151,7 @@ func RsDecoder(log logrus.FieldLogger, fname, outfname string, dataShards, parSh
 				return err
 			}
 		}
-		shards, size, err = openInput(log, dataShards, parShards, fname)
+		shards, _, err = openInput(log, dataShards, parShards, fname)
 		ok, err = enc.Verify(shards)
 		if !ok {
 			log.Info("Verification failed after reconstruction, data likely corrupted:", err)
@@ -173,13 +174,14 @@ func RsDecoder(log logrus.FieldLogger, fname, outfname string, dataShards, parSh
 	}
 	defer f.Close()
 
-	shards, size, err = openInput(log, dataShards, parShards, fname)
+	shards, _, err = openInput(log, dataShards, parShards, fname)
 	if err != nil {
 		return err
 	}
 
 	// We don't know the exact filesize. has bug
-	err = enc.Join(f, shards, int64(dataShards)*size)
+	//err = enc.Join(f, shards, int64(dataShards)*size)
+	err = enc.Join(f, shards, int64(filesize))
 	if err != nil {
 		return err
 	}

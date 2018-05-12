@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -213,8 +212,7 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 		var err error
 		fileSize := int64(req.GetFileSize())
 		if fileSize > PartitionMaxSize {
-			chunkNum := int(math.Ceil(float64(fileSize) / float64(PartitionMaxSize)))
-			chunkSize := fileSize / int64(chunkNum)
+			chunkSize, chunkNum := GetChunkSizeAndNum(fileSize, PartitionMaxSize)
 			partFiles, err = FileSplit(c.TempDir, filename, fileSize, chunkSize, int64(chunkNum))
 			if err != nil {
 				return err
@@ -776,7 +774,7 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 
 		_, onlyFileName := filepath.Split(downFileName)
 		tempDownFileName := filepath.Join(c.TempDir, onlyFileName)
-		err = RsDecoder(log, tempDownFileName, "", datas, paritys)
+		err = RsDecoder(log, tempDownFileName, "", int64(req.FileSize), datas, paritys)
 		if err != nil {
 			return err
 		}
@@ -802,7 +800,11 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 		log.Infof("dataShards %d, parityShards %d", datas, paritys)
 		_, onlyFileName := filepath.Split(partFileName)
 		tempDownFileName := filepath.Join(c.TempDir, onlyFileName)
-		err = RsDecoder(log, tempDownFileName, "", datas, paritys)
+		// file real size can be calcauted by data blocks number * block size
+		// file real size also can be calcauted by filesize and partition number
+		// partitionSize := ReverseCalcuatePartFileSize(req.FileSize, len(partitions)
+		partitionFileSize := uint64(datas) * partition.GetBlock()[0].GetSize()
+		err = RsDecoder(log, tempDownFileName, "", int64(partitionFileSize), datas, paritys)
 		if err != nil {
 			return err
 		}
