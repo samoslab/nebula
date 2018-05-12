@@ -800,10 +800,9 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 		log.Infof("dataShards %d, parityShards %d", datas, paritys)
 		_, onlyFileName := filepath.Split(partFileName)
 		tempDownFileName := filepath.Join(c.TempDir, onlyFileName)
-		// file real size can be calcauted by data blocks number * block size
-		// file real size also can be calcauted by filesize and partition number
-		// partitionSize := ReverseCalcuatePartFileSize(req.FileSize, len(partitions)
-		partitionFileSize := uint64(datas) * partition.GetBlock()[0].GetSize()
+		// file real size can be calcauted by filesize and partition number
+		partitionFileSize := ReverseCalcuatePartFileSize(int64(req.FileSize), len(partitions), i)
+		log.Infof("partition %d, size %d", i, partitionFileSize)
 		err = RsDecoder(log, tempDownFileName, "", int64(partitionFileSize), datas, paritys)
 		if err != nil {
 			return err
