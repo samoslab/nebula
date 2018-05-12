@@ -4,8 +4,10 @@ import (
 	"log"
 	"math"
 	"os"
+	"os/exec"
 	"os/user"
 	"path/filepath"
+	"strings"
 )
 
 // GetConfigFile get config file
@@ -51,4 +53,20 @@ func ReverseCalcuatePartFileSize(fileSize int64, partitionNum, currentPartition 
 		return fileSize - chunkSize*int64(currentPartition)
 	}
 	return chunkSize
+}
+
+func Fping(ips []string) ([]string, error) {
+	commands := "fping " + strings.Join(ips, " ")
+	cmd := exec.Command("/bin/sh", "-c", commands)
+	ip, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	aliveIps := []string{}
+	for _, ip := range strings.Split(string(ip), "\n") {
+		if strings.HasSuffix(ip, "is alive") {
+			aliveIps = append(aliveIps, strings.Trim(ip, " is alive"))
+		}
+	}
+	return aliveIps, nil
 }
