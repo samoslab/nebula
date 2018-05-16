@@ -35,7 +35,7 @@ func main() {
 	server := service.NewHTTPServer(log, *webcfg)
 
 	defer server.Shutdown()
-	fmt.Printf("start http port listen\n")
+	fmt.Printf("start http listen\n")
 	server.Run()
 
 }
