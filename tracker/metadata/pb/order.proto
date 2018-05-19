@@ -1,0 +1,58 @@
+syntax = "proto3";
+package metadata.pb;
+
+service OrderService {
+
+    rpc AllPackage(AllPackageReq)returns(AllPackageResp){}
+
+    rpc BuyPackage(BuyPackageReq)returns(BuyPackageResp){}
+
+    rpc CurrentPackage(CurrentPackageReq)returns(CurrentPackageResp){}
+}
+
+message AllPackageReq{
+    uint32 version =1;
+}
+
+message AllPackageResp{
+    repeated Package allPackage=1;
+}
+
+message Package{
+    uint64 id=1;
+    string name=2;
+    uint32 price=3;
+    uint32 volume=4;
+    uint32 netflow=5;
+    uint32 upNetflow=6;
+    uint32 downNetflow=7;
+    uint32 validDays=8;
+    string remark=9;
+}
+
+message BuyPackageReq{
+    uint32 version =1;
+    uint64 packageId=2;
+    uint32 quanlity=3;
+}
+
+message BuyPackageResp{
+    bytes orderId=1;
+    uint32 totalAmout=2;
+    string payAdress=3;
+}
+
+message CurrentPackageReq{
+    uint32 version =1;
+}
+
+message CurrentPackageResp{
+    uint64 packageId=1;
+    bytes orderId=2;
+    uint64 payTime=3;
+    uint32 volume=4;
+    uint32 netflow=5;
+    uint32 upNetflow=6;
+    uint32 downNetflow=7;
+    uint64 expiredTime=8;
+}
