@@ -11,6 +11,11 @@ import (
 	"time"
 )
 
+const (
+	DefaultConfig  = ".samos-nebula-client/config.json"
+	DefaultTracker = "127.0.0.1:6677"
+)
+
 type Config struct {
 	TrackerServer    string        `json:"tracker_server"`
 	ConfigDir        string        `json:"config_dir"`
@@ -29,15 +34,14 @@ type Config struct {
 
 func (cfg *Config) SetDefault() {
 	if cfg.TrackerServer == "" {
-		cfg.TrackerServer = "127.0.0.1:6677"
+		cfg.TrackerServer = DefaultTracker
 	}
 	if cfg.ConfigDir == "" {
 		usr, err := user.Current()
 		if err != nil {
 			log.Fatalf("Get OS current user failed: %s", err)
 		}
-		defaultAppDir := filepath.Join(usr.HomeDir, ".spo-nebula-client/config.json")
-		cfg.ConfigDir = defaultAppDir
+		cfg.ConfigDir = filepath.Join(usr.HomeDir, DefaultConfig)
 	}
 }
 
@@ -52,7 +56,6 @@ func (cfg *Config) Validate() error {
 }
 
 func LoadWebConfig(configFilePath string) (*Config, error) {
-	// Open our jsonFile
 	jsonFile, err := os.Open(configFilePath)
 	if err != nil {
 		return nil, err

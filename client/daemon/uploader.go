@@ -5,9 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"math"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -33,6 +31,9 @@ var (
 
 	// PartitionMaxSize  max size of one partition
 	PartitionMaxSize = int64(256 * 1024 * 1024)
+
+	// DefaultTempDir default temporary file
+	DefaultTempDir = "/tmp/nebula_client"
 )
 
 // ClientManager client manager
@@ -54,18 +55,22 @@ func NewClientManager(log logrus.FieldLogger, trackerServer string, cfg *config.
 	if cfg == nil {
 		return nil, errors.New("client config nil")
 	}
-	c := &ClientManager{}
 	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
 	if err != nil {
 		log.Errorf("RPC Dial failed: %s", err.Error())
 		return nil, err
 	}
 	log.Infof("tracker server %s", trackerServer)
-	c.serverConn = conn
 
-	c.mclient = mpb.NewMatadataServiceClient(conn)
-	c.Log = log
-	c.TempDir = filepath.Join("/tmp", "nebula_client")
+	c := &ClientManager{
+		serverConn: conn,
+		Log:        log,
+		cfg:        cfg,
+		TempDir:    DefaultTempDir,
+		NodeId:     cfg.Node.NodeId,
+		PM:         common.NewProgressManager(),
+		mclient:    mpb.NewMatadataServiceClient(conn),
+	}
 	log.Infof("temp dir %s", c.TempDir)
 	if _, err := os.Stat(c.TempDir); os.IsNotExist(err) {
 		//create the dir.
@@ -73,32 +78,12 @@ func NewClientManager(log logrus.FieldLogger, trackerServer string, cfg *config.
 			panic(err)
 		}
 	}
-
-	c.NodeId = cfg.Node.NodeId
-	c.cfg = cfg
-	c.PM = common.NewProgressManager()
 	return c, nil
 }
 
 // Shutdown shutdown tracker connection
 func (c *ClientManager) Shutdown() {
 	c.serverConn.Close()
-}
-
-func fping(ips []string) ([]string, error) {
-	commands := "fping " + strings.Join(ips, " ")
-	cmd := exec.Command("/bin/sh", "-c", commands)
-	ip, err := cmd.Output()
-	if err != nil {
-		return nil, err
-	}
-	aliveIps := []string{}
-	for _, ip := range strings.Split(string(ip), "\n") {
-		if strings.HasSuffix(ip, "is alive") {
-			aliveIps = append(aliveIps, strings.Trim(ip, " is alive"))
-		}
-	}
-	return aliveIps, nil
 }
 
 func (c *ClientManager) getPingTime(pro *mpb.BlockProviderAuth) int {
@@ -146,10 +131,6 @@ func (c *ClientManager) PingProvider(pros []*mpb.BlockProviderAuth, needNum int)
 
 	//return availablePros[0:needNum], nil
 	return pros, nil
-}
-
-func (c *ClientManager) ConnectProvider() error {
-	return nil
 }
 
 // UploadDir upload all files in dir to provider
@@ -213,8 +194,7 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 		var err error
 		fileSize := int64(req.GetFileSize())
 		if fileSize > PartitionMaxSize {
-			chunkNum := int(math.Ceil(float64(fileSize) / float64(PartitionMaxSize)))
-			chunkSize := fileSize / int64(chunkNum)
+			chunkSize, chunkNum := GetChunkSizeAndNum(fileSize, PartitionMaxSize)
 			partFiles, err = FileSplit(c.TempDir, filename, fileSize, chunkSize, int64(chunkNum))
 			if err != nil {
 				return err
@@ -339,9 +319,9 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 
 func deleteTemporaryFile(log logrus.FieldLogger, filename string) {
 	log.Debugf("need delete file %s", filename)
-	//if err := os.Remove(filename); err != nil {
-	//log.Errorf("delete %s failed, error %v", filename, err)
-	//}
+	if err := os.Remove(filename); err != nil {
+		log.Errorf("delete %s failed, error %v", filename, err)
+	}
 }
 
 func (c *ClientManager) CheckFileExists(filename string, interactive, newVersion bool) (*mpb.CheckFileExistReq, *mpb.CheckFileExistResp, error) {
@@ -776,7 +756,7 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 
 		_, onlyFileName := filepath.Split(downFileName)
 		tempDownFileName := filepath.Join(c.TempDir, onlyFileName)
-		err = RsDecoder(log, tempDownFileName, "", datas, paritys)
+		err = RsDecoder(log, tempDownFileName, "", int64(req.FileSize), datas, paritys)
 		if err != nil {
 			return err
 		}
@@ -802,7 +782,10 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 		log.Infof("dataShards %d, parityShards %d", datas, paritys)
 		_, onlyFileName := filepath.Split(partFileName)
 		tempDownFileName := filepath.Join(c.TempDir, onlyFileName)
-		err = RsDecoder(log, tempDownFileName, "", datas, paritys)
+		// file real size can be calcauted by filesize and partition number
+		partitionFileSize := ReverseCalcuatePartFileSize(int64(req.FileSize), len(partitions), i)
+		log.Infof("partition %d, size %d", i, partitionFileSize)
+		err = RsDecoder(log, tempDownFileName, "", int64(partitionFileSize), datas, paritys)
 		if err != nil {
 			return err
 		}

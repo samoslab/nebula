@@ -112,6 +112,7 @@ type ProgressManager struct {
 	Mutex                sync.Mutex
 }
 
+// NewProgressManager create progress status manager
 func NewProgressManager() *ProgressManager {
 	pm := &ProgressManager{}
 	pm.Progress = map[string]ProgressCell{}
@@ -119,14 +120,17 @@ func NewProgressManager() *ProgressManager {
 	return pm
 }
 
+// SetProgress set current progress file size
 func (pm *ProgressManager) SetProgress(fileName string, currentSize, totalSize uint64) {
 	pm.Progress[fileName] = ProgressCell{Total: totalSize, Current: currentSize, Rate: 0.0}
 }
 
+// SetPartitionMap set progress file map
 func (pm *ProgressManager) SetPartitionMap(fileName, originFile string) {
 	pm.PartitionToOriginMap[fileName] = originFile
 }
 
+// SetIncrement set increment
 func (pm *ProgressManager) SetIncrement(fileName string, increment uint64) error {
 	pm.Mutex.Lock()
 	defer pm.Mutex.Unlock()
@@ -146,6 +150,7 @@ func match(fileMap map[string]struct{}, file string) bool {
 	return ok
 }
 
+// GetProgress return progress data
 func (pm *ProgressManager) GetProgress(files []string) (map[string]float64, error) {
 	mp := map[string]struct{}{}
 	for _, file := range files {

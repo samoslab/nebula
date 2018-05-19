@@ -51,6 +51,13 @@ func FileShardNum(fileName string, chunkSize int64) (int, error) {
 
 // FileSplit split file by size
 func FileSplit(outDir, fileName string, fileSize int64, chunkSize, chunkNum int64) ([]string, error) {
+	totalSize, err := GetFileSize(fileName)
+	if err != nil {
+		return nil, err
+	}
+	if totalSize <= chunkSize {
+		return []string{fileName}, nil
+	}
 	fi, err := os.OpenFile(fileName, os.O_RDONLY, 0644)
 	if err != nil {
 		return nil, err
@@ -76,6 +83,13 @@ func FileSplit(outDir, fileName string, fileSize int64, chunkSize, chunkNum int6
 			return nil, err
 		}
 		f.Write(b)
+		// last part file
+		if i == chunkNum && totalSize > chunkNum*chunkSize {
+			fi.Seek(i*chunkSize, 0)
+			b = make([]byte, fileSize-i*chunkSize)
+			fi.Read(b)
+			f.Write(b)
+		}
 		f.Close()
 		partFiles = append(partFiles, filename)
 	}
