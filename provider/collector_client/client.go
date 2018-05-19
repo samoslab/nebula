@@ -31,13 +31,11 @@ var queue = make(chan *pb.ActionLog, 2000)
 var cronRunner *cron.Cron
 var sendLock = make(chan bool, 1)
 var conn *grpc.ClientConn
-var no *node.Node
 
 func sendLockOff() {
 	sendLock <- false
 }
 func Start() {
-	no = node.LoadFormConfig()
 	sendLockOff()
 	var err error
 	conn, err = grpc.Dial("127.0.0.1:6688", grpc.WithInsecure())
@@ -94,6 +92,7 @@ func buildReq(size int) *pb.CollectReq {
 	for i := 0; i < size; i++ {
 		bs = append(bs, <-queue)
 	}
+	no := node.LoadFormConfig()
 	req := &pb.CollectReq{NodeId: no.NodeId,
 		Timestamp: uint64(time.Now().UnixNano()),
 		ActionLog: bs}
