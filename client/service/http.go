@@ -305,6 +305,8 @@ func (s *HTTPServer) setupMux() *http.ServeMux {
 	handleAPI("/store/uploaddir", UploadDirHandler(s))
 	handleAPI("/store/downloaddir", DownloadDirHandler(s))
 
+	handleAPI("/order/packages", GetAllPackageHandler(s))
+
 	return mux
 }
 

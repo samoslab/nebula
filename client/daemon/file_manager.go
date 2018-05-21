@@ -14,6 +14,7 @@ import (
 
 	"github.com/samoslab/nebula/client/common"
 	"github.com/samoslab/nebula/client/config"
+	"github.com/samoslab/nebula/client/order"
 	client "github.com/samoslab/nebula/client/provider_client"
 	pb "github.com/samoslab/nebula/provider/pb"
 	mpb "github.com/samoslab/nebula/tracker/metadata/pb"
@@ -24,8 +25,6 @@ import (
 )
 
 var (
-	// Version version of client
-	Version = uint32(1001)
 	// ReplicaFileSize using replication if file size less than
 	ReplicaFileSize = int64(8 * 1024)
 
@@ -45,6 +44,7 @@ type ClientManager struct {
 	cfg        *config.ClientConfig
 	serverConn *grpc.ClientConn
 	PM         *common.ProgressManager
+	OM         *order.OrderManager
 }
 
 // NewClientManager create manager
@@ -62,6 +62,8 @@ func NewClientManager(log logrus.FieldLogger, trackerServer string, cfg *config.
 	}
 	log.Infof("tracker server %s", trackerServer)
 
+	om := order.NewOrderManager(trackerServer, log, cfg.Node.PriKey, cfg.Node.NodeId)
+
 	c := &ClientManager{
 		serverConn: conn,
 		Log:        log,
@@ -70,6 +72,7 @@ func NewClientManager(log logrus.FieldLogger, trackerServer string, cfg *config.
 		NodeId:     cfg.Node.NodeId,
 		PM:         common.NewProgressManager(),
 		mclient:    mpb.NewMatadataServiceClient(conn),
+		OM:         om,
 	}
 	log.Infof("temp dir %s", c.TempDir)
 	if _, err := os.Stat(c.TempDir); os.IsNotExist(err) {
@@ -98,7 +101,9 @@ func (c *ClientManager) getPingTime(pro *mpb.BlockProviderAuth) int {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	pclient := pb.NewProviderServiceClient(conn)
-	req := &pb.PingReq{Version: 1}
+	req := &pb.PingReq{
+		Version: common.Version,
+	}
 	_, err = pclient.Ping(ctx, req)
 	if err != nil {
 		return 99999
@@ -249,7 +254,7 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 		}()
 
 		ufpr := &mpb.UploadFilePrepareReq{
-			Version:   Version,
+			Version:   common.Version,
 			NodeId:    req.NodeId,
 			FileHash:  req.FileHash,
 			FileSize:  req.FileSize,
@@ -337,6 +342,7 @@ func (c *ClientManager) CheckFileExists(filename string, interactive, newVersion
 	dir, fname := filepath.Split(filename)
 	ctx := context.Background()
 	req := &mpb.CheckFileExistReq{
+		Version:     common.Version,
 		FileSize:    uint64(fileInfo.Size()),
 		Interactive: interactive,
 		NewVersion:  newVersion,
@@ -373,6 +379,7 @@ func (c *ClientManager) MkFolder(filepath string, folders []string, interactive 
 	log := c.Log
 	ctx := context.Background()
 	req := &mpb.MkFolderReq{
+		Version:     common.Version,
 		Parent:      &mpb.FilePath{&mpb.FilePath_Path{filepath}},
 		Folder:      folders,
 		NodeId:      c.NodeId,
@@ -546,7 +553,7 @@ func (c *ClientManager) uploadFileByMultiReplica(filename string, req *mpb.Check
 
 func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitions []*mpb.StorePartition) error {
 	req := &mpb.UploadFileDoneReq{
-		Version:     1,
+		Version:     common.Version,
 		NodeId:      c.NodeId,
 		FileHash:    reqCheck.GetFileHash(),
 		FileSize:    reqCheck.GetFileSize(),
@@ -579,7 +586,7 @@ func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitio
 func (c *ClientManager) ListFiles(path string, pageSize, pageNum uint32, sortType string, ascOrder bool) ([]*DownFile, error) {
 	c.Log.Infof("path %s, size %d, num %d, sortype %s, asc %v", path, pageSize, pageNum, sortType, ascOrder)
 	req := &mpb.ListFilesReq{
-		Version:   1,
+		Version:   common.Version,
 		Timestamp: uint64(time.Now().UTC().Unix()),
 		NodeId:    c.NodeId,
 		PageSize:  pageSize,
@@ -678,7 +685,7 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 		return err
 	}
 	req := &mpb.RetrieveFileReq{
-		Version:   1,
+		Version:   common.Version,
 		NodeId:    c.NodeId,
 		Timestamp: uint64(time.Now().UTC().Unix()),
 		FileHash:  fileHash,
@@ -869,6 +876,7 @@ func saveFile(fileName string, content []byte) error {
 func (c *ClientManager) RemoveFile(target string, recursive bool, isPath bool) error {
 	log := c.Log
 	req := &mpb.RemoveReq{
+		Version:   common.Version,
 		NodeId:    c.NodeId,
 		Timestamp: uint64(time.Now().Unix()),
 		Recursive: recursive,
