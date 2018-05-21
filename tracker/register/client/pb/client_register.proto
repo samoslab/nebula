@@ -73,3 +73,139 @@ message TrackerServer{
     string server=1;
     uint32 port=2;
 }
+
+
+service OrderService {
+
+    rpc AllPackage(AllPackageReq)returns(AllPackageResp){}
+
+    rpc PackageInfo(PackageInfoReq)returns(PackageInfoResp){}
+
+    rpc BuyPackage(BuyPackageReq)returns(BuyPackageResp){}
+
+    rpc MyAllOrder(MyAllOrderReq)returns(MyAllOrderResp){}
+
+    rpc OrderInfo(OrderInfoReq)returns(OrderInfoResp){}
+
+    rpc UsageAmount(UsageAmountReq)returns(UsageAmountResp){}
+}
+
+message AllPackageReq{
+    uint32 version =1;
+}
+
+message AllPackageResp{
+    repeated Package allPackage=1;
+}
+
+message Package{
+    uint64 id=1;
+    string name=2;
+    int32 level=3;
+    uint32 price=4;
+    uint32 volume=5;
+    uint32 netflow=6;
+    uint32 upNetflow=7;
+    uint32 downNetflow=8;
+    uint32 validDays=9;
+    string remark=10;
+}
+
+message PackageInfoReq{
+    uint32 version=1;
+    uint64 packageId=2;
+}
+
+message PackageInfoResp{
+    Package package=1;
+}
+
+message BuyPackageReq{
+    uint32 version =1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    uint64 packageId=4;
+    uint32 quanlity=5;
+    bool cancelUnpaid=6;//if true will cancel exist unpaid order
+    bytes sign = 7;
+}
+
+message Order{
+    bytes id=1;
+    uint64 creation=2;
+    uint64 packageId=3;
+    Package package=4;
+    uint32 quanlity=5;
+    uint32 totalAmount=6;
+    bool upgraded=7;
+    float discount=8;
+    uint32 volume=9;
+    uint32 netflow=10;
+    uint32 upNetflow=11;
+    uint32 downNetflow=12;
+    uint32 validDays=13;
+    uint64 startTime=14;
+    uint64 endTime=15;
+    uint64 payTime=16;
+    uint64 height=17;
+    string transactionId=18;
+    string remark=19;
+}
+
+message BuyPackageResp{
+    Order order=1;
+}
+
+message MyAllOrderReq{
+    uint32 version =1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    bool onlyNotExpired=4;
+    bytes sign = 5;
+}
+
+message MyAllOrderResp{
+    repeated Order myAllOrder=1;
+}
+
+message OrderInfoReq{
+    uint32 version=1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    uint64 orderId=4;
+    bytes sign = 5;
+}
+
+message OrderInfoResp{
+    Order order=1;
+}
+
+message CurrentOrderReq{
+    uint32 version =1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    bytes sign = 4;
+}
+
+message CurrentOrderResp{
+    Order order=1;
+    Package package=2;
+}
+
+message UsageAmountReq{
+    uint32 version =1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    bytes sign = 4;
+}
+
+message UsageAmountResp{
+    uint32 volume=1;
+    uint32 netflow=2;
+    uint32 upNetflow=3;
+    uint32 downNetflow=4;
+    uint32 usageVolume=5;
+    uint32 usageNetflow=6;
+    uint32 usageUpNetflow=7;
+    uint32 usageDownNetflow=8;
+}
