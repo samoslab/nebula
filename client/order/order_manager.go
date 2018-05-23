@@ -3,6 +3,7 @@ package order
 import (
 	"context"
 	"crypto/rsa"
+	"encoding/hex"
 	"time"
 
 	"github.com/samoslab/nebula/client/common"
@@ -51,7 +52,7 @@ func (om *OrderManager) GetPackageInfo(id uint64) (*pb.Package, error) {
 	log := om.Log
 	req := &pb.PackageInfoReq{
 		Version:   common.Version,
-		PackageId: id,
+		PackageId: uint32(id),
 	}
 	rsp, err := om.orderClient.PackageInfo(context.Background(), req)
 	if err != nil {
@@ -67,14 +68,14 @@ func (om *OrderManager) BuyPackage(id uint64, canceled bool, quanlity uint32) (*
 		Version:      common.Version,
 		NodeId:       om.NodeId,
 		Timestamp:    uint64(time.Now().UTC().Unix()),
-		PackageId:    id,
+		PackageId:    uint32(id),
 		Quanlity:     quanlity,
 		CancelUnpaid: canceled,
 	}
-	//err := req.SignReq(om.privateKey)
-	//if err != nil {
-	//return nil, err
-	//}
+	err := req.SignReq(om.privateKey)
+	if err != nil {
+		return nil, err
+	}
 	rsp, err := om.orderClient.BuyPackage(context.Background(), req)
 	if err != nil {
 		return nil, err
@@ -91,10 +92,10 @@ func (om *OrderManager) MyAllOrders(expired bool) ([]*pb.Order, error) {
 		Timestamp:      uint64(time.Now().UTC().Unix()),
 		OnlyNotExpired: expired,
 	}
-	//err := req.SignReq(om.privateKey)
-	//if err != nil {
-	//return nil, err
-	//}
+	err := req.SignReq(om.privateKey)
+	if err != nil {
+		return nil, err
+	}
 	rsp, err := om.orderClient.MyAllOrder(context.Background(), req)
 	if err != nil {
 		return nil, err
@@ -103,13 +104,21 @@ func (om *OrderManager) MyAllOrders(expired bool) ([]*pb.Order, error) {
 	return rsp.GetMyAllOrder(), nil
 }
 
-func (om *OrderManager) GetOrderInfo(orderId uint64) (*pb.Order, error) {
+func (om *OrderManager) GetOrderInfo(orderId string) (*pb.Order, error) {
 	log := om.Log
+	orderid, err := hex.DecodeString(orderId)
+	if err != nil {
+		return nil, err
+	}
 	req := &pb.OrderInfoReq{
 		Version:   common.Version,
 		NodeId:    om.NodeId,
 		Timestamp: uint64(time.Now().UTC().Unix()),
-		OrderId:   orderId,
+		OrderId:   orderid,
+	}
+	err = req.SignReq(om.privateKey)
+	if err != nil {
+		return nil, err
 	}
 	rsp, err := om.orderClient.OrderInfo(context.Background(), req)
 	if err != nil {
@@ -126,6 +135,10 @@ func (om *OrderManager) UsageAmount() (*pb.UsageAmountResp, error) {
 		Version:   common.Version,
 		NodeId:    om.NodeId,
 		Timestamp: uint64(time.Now().UTC().Unix()),
+	}
+	err := req.SignReq(om.privateKey)
+	if err != nil {
+		return nil, err
 	}
 	rsp, err := om.orderClient.UsageAmount(context.Background(), req)
 	if err != nil {

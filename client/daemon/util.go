@@ -8,6 +8,8 @@ import (
 	"os/user"
 	"path/filepath"
 	"strings"
+
+	"github.com/samoslab/nebula/client/config"
 )
 
 // GetConfigFile get config file
@@ -16,8 +18,8 @@ func GetConfigFile() (string, string) {
 	if err != nil {
 		log.Fatalf("Get OS current user failed: %s", err)
 	}
-	defaultAppDir := filepath.Join(usr.HomeDir, ".spo-nebula-client")
-	defaultConfig := filepath.Join(defaultAppDir, "config.json")
+	defaultConfig := filepath.Join(usr.HomeDir, config.DefaultConfig)
+	defaultAppDir, _ := filepath.Split(defaultConfig)
 	return defaultAppDir, defaultConfig
 }
 

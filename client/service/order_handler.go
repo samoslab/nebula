@@ -210,12 +210,7 @@ func GetOrderInfoHandler(s *HTTPServer) http.HandlerFunc {
 			errorResponse(ctx, w, http.StatusBadRequest, errors.New("need paras orderid"))
 			return
 		}
-		oid, err := strconv.Atoi(id)
-		if err != nil {
-			errorResponse(ctx, w, http.StatusBadRequest, errors.New("need paras orderid"))
-			return
-		}
-		result, err := s.cm.OM.GetOrderInfo(uint64(oid))
+		result, err := s.cm.OM.GetOrderInfo(id)
 		code := 0
 		errmsg := ""
 		if err != nil {
