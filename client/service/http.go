@@ -306,6 +306,11 @@ func (s *HTTPServer) setupMux() *http.ServeMux {
 	handleAPI("/store/downloaddir", DownloadDirHandler(s))
 
 	handleAPI("/order/packages", GetAllPackageHandler(s))
+	handleAPI("/order/package/get", GetPackageInfoHandler(s))
+	handleAPI("/order/package/buy", BuyPackageHandler(s))
+	handleAPI("/order/all", MyAllOrderHandler(s))
+	handleAPI("/order/getinfo", GetOrderInfoHandler(s))
+	handleAPI("/usage/amount", UsageAmountHandler(s))
 
 	return mux
 }
