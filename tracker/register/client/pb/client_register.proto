@@ -99,7 +99,7 @@ message AllPackageResp{
 }
 
 message Package{
-    uint64 id=1;
+    uint32 id=1;
     string name=2;
     int32 level=3;
     uint32 price=4;
@@ -113,7 +113,7 @@ message Package{
 
 message PackageInfoReq{
     uint32 version=1;
-    uint64 packageId=2;
+    uint32 packageId=2;
 }
 
 message PackageInfoResp{
@@ -124,7 +124,7 @@ message BuyPackageReq{
     uint32 version =1;
     bytes nodeId=2;
     uint64 timestamp=3;
-    uint64 packageId=4;
+    uint32 packageId=4;
     uint32 quanlity=5;
     bool cancelUnpaid=6;//if true will cancel exist unpaid order
     bytes sign = 7;
@@ -133,7 +133,7 @@ message BuyPackageReq{
 message Order{
     bytes id=1;
     uint64 creation=2;
-    uint64 packageId=3;
+    uint32 packageId=3;
     Package package=4;
     uint32 quanlity=5;
     uint32 totalAmount=6;
@@ -172,7 +172,7 @@ message OrderInfoReq{
     uint32 version=1;
     bytes nodeId=2;
     uint64 timestamp=3;
-    uint64 orderId=4;
+    bytes orderId=4;
     bytes sign = 5;
 }
 
