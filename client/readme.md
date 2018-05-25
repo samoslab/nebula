@@ -13,6 +13,12 @@ Index
 | [/store/downloaddir](#storedownloaddir-post)                             | POST      |
 | [/store/remove](#storeremove-post)                             | POST      |
 | [/store/progress](#storeprogress-post)                             | POST      |
+| [/order/packages](#orderpackages-get)                             | GET |
+| [/order/package/get](#orderpackageget-get)                             | GET |
+| [/order/package/buy](#orderpackagebuy-post)                             | POST|
+| [/order/all](#orderall-get)                             | GET |
+| [/order/getinfo](#ordergetinfo-get)                             | GET |
+| [/usage/amount](#usageamount-get)                             | GET |
 
 
 统一说明 返回json object结构统一为： 成功：{"code":0, "data":object} 失败：{"code":1,"errmsg":"errmsg","data":object}  
@@ -174,8 +180,71 @@ curl -X POST -H "Content-Type:application/json" -d '{"files":[]}' http://127.0.0
         "/tmp/abc/ipip.big1": 0.66
     }
 }
+```
+
+## /order/packages [GET]
+
+returns all packages
 
 ```
+URI:/order/packages get
+Method: GET
+Args: None
+
+```
+## /order/package/get [GET]
+
+returns one package
+```
+URI:/order/package/get get
+Method: GET
+Args: id
+
+```
+
+## /order/package/buy [POST]
+
+buy package
+```
+URI:/order/package/buy POST
+Method: POST
+Request Body: {
+   id:int,
+   canceled:bool (default false),
+   quanlity:int,
+   }
+
+```
+
+## /order/all [GET]
+
+returns all orders belong to you 
+```
+URI:/order/all get
+Method: GET
+Args: None
+
+```
+
+## /order/getinfo [GET]
+
+returns all orders belong to you 
+```
+URI:/order/getinfo get
+Method: GET
+Args: orderid(string)
+
+```
+## /usage/amount [GET]
+
+returns usage amount about order
+```
+URI:/usage/amount get
+Method: GET
+Args: None
+
+```
+
 # specification
 
 ```
