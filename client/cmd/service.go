@@ -7,9 +7,13 @@ import (
 	"github.com/samoslab/nebula/client/config"
 	"github.com/samoslab/nebula/client/daemon"
 	"github.com/samoslab/nebula/client/service"
+	"github.com/spf13/pflag"
 )
 
 func main() {
+	configFile := pflag.StringP("conffile", "", "config.json", "config file")
+	serverAddr := pflag.StringP("server", "", "127.0.0.1:7788", "listen address ip:port")
+	pflag.Parse()
 	defaultAppDir, _ := daemon.GetConfigFile()
 	if _, err := os.Stat(defaultAppDir); os.IsNotExist(err) {
 		//create the dir.
@@ -21,7 +25,7 @@ func main() {
 	if err != nil {
 		return
 	}
-	webcfg, err := config.LoadWebConfig("./config.json")
+	webcfg, err := config.LoadWebConfig(*configFile)
 	if err != nil {
 		fmt.Printf("load config error  %v\n", err)
 		//return
@@ -29,7 +33,7 @@ func main() {
 
 	webcfg = &config.Config{}
 	webcfg.SetDefault()
-	webcfg.HTTPAddr = "127.0.0.1:7788"
+	webcfg.HTTPAddr = *serverAddr
 
 	fmt.Printf("webcfg %+v\n", webcfg)
 	server := service.NewHTTPServer(log, *webcfg)

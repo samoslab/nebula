@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	collectClient "github.com/samoslab/nebula/client/collector_client"
+
 	"github.com/samoslab/nebula/client/common"
 	"github.com/samoslab/nebula/client/config"
 	"github.com/samoslab/nebula/client/order"
@@ -37,14 +39,16 @@ var (
 
 // ClientManager client manager
 type ClientManager struct {
-	mclient    mpb.MatadataServiceClient
+	mclient mpb.MatadataServiceClient
+	//collectClient tcppb.ClientCollectorServiceClient
 	NodeId     []byte
 	TempDir    string
 	Log        logrus.FieldLogger
 	cfg        *config.ClientConfig
 	serverConn *grpc.ClientConn
-	PM         *common.ProgressManager
-	OM         *order.OrderManager
+	//collectConn   *grpc.ClientConn
+	PM *common.ProgressManager
+	OM *order.OrderManager
 }
 
 // NewClientManager create manager
@@ -62,18 +66,32 @@ func NewClientManager(log logrus.FieldLogger, trackerServer string, cfg *config.
 	}
 	log.Infof("tracker server %s", trackerServer)
 
+	//collectServer := "127.0.0.1:8888"
+	//connCollect, err := grpc.Dial(collectServer, grpc.WithInsecure())
+	//if err != nil {
+	//log.Errorf("Collect RPC Dial failed: %s", err.Error())
+	//return nil, err
+	//}
+	//log.Infof("collect server %s", collectServer)
+
 	om := order.NewOrderManager(trackerServer, log, cfg.Node.PriKey, cfg.Node.NodeId)
 
 	c := &ClientManager{
 		serverConn: conn,
-		Log:        log,
-		cfg:        cfg,
-		TempDir:    DefaultTempDir,
-		NodeId:     cfg.Node.NodeId,
-		PM:         common.NewProgressManager(),
-		mclient:    mpb.NewMatadataServiceClient(conn),
-		OM:         om,
+		//collectConn:   connCollect,
+		Log:     log,
+		cfg:     cfg,
+		TempDir: DefaultTempDir,
+		NodeId:  cfg.Node.NodeId,
+		PM:      common.NewProgressManager(),
+		mclient: mpb.NewMatadataServiceClient(conn),
+		//collectClient: tcppb.NewClientCollectorServiceClient(connCollect),
+		OM: om,
 	}
+
+	// set collect node
+	collectClient.NodePtr = cfg.Node
+
 	log.Infof("temp dir %s", c.TempDir)
 	if _, err := os.Stat(c.TempDir); os.IsNotExist(err) {
 		//create the dir.
@@ -81,12 +99,17 @@ func NewClientManager(log logrus.FieldLogger, trackerServer string, cfg *config.
 			panic(err)
 		}
 	}
+
+	collectClient.Start()
+
 	return c, nil
 }
 
 // Shutdown shutdown tracker connection
 func (c *ClientManager) Shutdown() {
 	c.serverConn.Close()
+	//c.collectConn.Close()
+	collectClient.Stop()
 }
 
 func (c *ClientManager) getPingTime(pro *mpb.BlockProviderAuth) int {

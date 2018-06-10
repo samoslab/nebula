@@ -36,8 +36,6 @@ type ClientConfig struct {
 	Node          *node.Node `json:"-"`
 }
 
-var clientConfig *ClientConfig
-
 // LoadConfig load config from config file
 func LoadConfig(configDirPath string) (*ClientConfig, error) {
 	if !util_file.Exists(configDirPath) {
