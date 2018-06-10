@@ -20,6 +20,7 @@ import (
 	client "github.com/samoslab/nebula/client/provider_client"
 	pb "github.com/samoslab/nebula/provider/pb"
 	mpb "github.com/samoslab/nebula/tracker/metadata/pb"
+	util_file "github.com/samoslab/nebula/util/file"
 	util_hash "github.com/samoslab/nebula/util/hash"
 	"github.com/sirupsen/logrus"
 
@@ -39,16 +40,14 @@ var (
 
 // ClientManager client manager
 type ClientManager struct {
-	mclient mpb.MatadataServiceClient
-	//collectClient tcppb.ClientCollectorServiceClient
+	mclient    mpb.MatadataServiceClient
 	NodeId     []byte
 	TempDir    string
 	Log        logrus.FieldLogger
 	cfg        *config.ClientConfig
 	serverConn *grpc.ClientConn
-	//collectConn   *grpc.ClientConn
-	PM *common.ProgressManager
-	OM *order.OrderManager
+	PM         *common.ProgressManager
+	OM         *order.OrderManager
 }
 
 // NewClientManager create manager
@@ -66,14 +65,6 @@ func NewClientManager(log logrus.FieldLogger, trackerServer string, cfg *config.
 	}
 	log.Infof("tracker server %s", trackerServer)
 
-	//collectServer := "127.0.0.1:8888"
-	//connCollect, err := grpc.Dial(collectServer, grpc.WithInsecure())
-	//if err != nil {
-	//log.Errorf("Collect RPC Dial failed: %s", err.Error())
-	//return nil, err
-	//}
-	//log.Infof("collect server %s", collectServer)
-
 	om := order.NewOrderManager(trackerServer, log, cfg.Node.PriKey, cfg.Node.NodeId)
 
 	c := &ClientManager{
@@ -85,8 +76,7 @@ func NewClientManager(log logrus.FieldLogger, trackerServer string, cfg *config.
 		NodeId:  cfg.Node.NodeId,
 		PM:      common.NewProgressManager(),
 		mclient: mpb.NewMatadataServiceClient(conn),
-		//collectClient: tcppb.NewClientCollectorServiceClient(connCollect),
-		OM: om,
+		OM:      om,
 	}
 
 	// set collect node
@@ -108,7 +98,6 @@ func NewClientManager(log logrus.FieldLogger, trackerServer string, cfg *config.
 // Shutdown shutdown tracker connection
 func (c *ClientManager) Shutdown() {
 	c.serverConn.Close()
-	//c.collectConn.Close()
 	collectClient.Stop()
 }
 
@@ -488,7 +477,6 @@ func getOneOfPartition(pro *mpb.ErasureCodePartition) *mpb.BlockProviderAuth {
 func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, tm uint64, uploadPara *common.UploadParameter) (*mpb.StoreBlock, error) {
 	log := c.Log
 	server := fmt.Sprintf("%s:%d", pro.GetServer(), pro.GetPort())
-	//log.Infof("[file %s hash %x ] upload to server %s", fileInfo.FileName, fileInfo.FileHash, server)
 	conn, err := grpc.Dial(server, grpc.WithInsecure())
 	if err != nil {
 		log.Errorf("RPC Dial failed: %s", err.Error())
@@ -646,7 +634,12 @@ func (c *ClientManager) ListFiles(path string, pageSize, pageNum uint32, sortTyp
 	for _, info := range rsp.GetFof() {
 		hash := hex.EncodeToString(info.GetFileHash())
 		id := hex.EncodeToString(info.GetId())
-		df := &DownFile{ID: id, FileName: info.GetName(), Folder: info.GetFolder(), FileHash: hash, FileSize: info.GetFileSize()}
+		df := &DownFile{
+			ID:       id,
+			FileHash: hash,
+			FileName: info.GetName(),
+			Folder:   info.GetFolder(),
+			FileSize: info.GetFileSize()}
 		fileLists = append(fileLists, df)
 	}
 	return fileLists, nil
@@ -685,16 +678,24 @@ func (c *ClientManager) DownloadDir(path string) error {
 				}
 			} else {
 				log.Infof("start download %s", currentFile)
-				err = c.DownloadFile(currentFile, fileInfo.FileHash, fileInfo.FileSize)
-				if err != nil {
-					log.Errorf("download file %s error %v", currentFile, err)
-					errResult = append(errResult, fmt.Errorf("%s %v", currentFile, err))
-					//return err
+				if fileInfo.FileSize == 0 {
+					log.Infof("only create %s because file size is 0", fileInfo.FileName)
+					saveFile(currentFile, []byte{})
+				} else {
+					err = c.DownloadFile(currentFile, fileInfo.FileHash, fileInfo.FileSize)
+					if err != nil {
+						log.Errorf("download file %s error %v", currentFile, err)
+						errResult = append(errResult, fmt.Errorf("%s %v", currentFile, err))
+						//return err
+					}
 				}
 			}
 		}
 	}
 	if len(errResult) > 0 {
+		for _, err := range errResult {
+			log.Errorf("download error: %v", err)
+		}
 		return errResult[0]
 	}
 	return nil
@@ -792,7 +793,10 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 		}
 
 		defer func() {
-			deleteTemporaryFile(log, tempDownFileName)
+			// delete file in case rename failed
+			if util_file.Exists(tempDownFileName) {
+				deleteTemporaryFile(log, tempDownFileName)
+			}
 		}()
 
 		if err := os.Rename(tempDownFileName, downFileName); err != nil {

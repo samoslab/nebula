@@ -70,7 +70,14 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadP
 	if !ok {
 		log.Errorf("file %s not in reverse partition map", filePath)
 	}
-	req := &pb.StoreReq{Ticket: ticket, Auth: auth, Timestamp: tm, FileKey: uploadPara.OriginFileHash, FileSize: uploadPara.OriginFileSize, BlockKey: fileInfo.FileHash, BlockSize: fileSize}
+	req := &pb.StoreReq{
+		Ticket:    ticket,
+		Auth:      auth,
+		Timestamp: tm,
+		FileKey:   uploadPara.OriginFileHash,
+		FileSize:  uploadPara.OriginFileSize,
+		BlockKey:  fileInfo.FileHash,
+		BlockSize: fileSize}
 	al := newActionLogFromStoreReq(req)
 	defer collectClient.Collect(al)
 	if fileSize < small_file_size {
@@ -181,7 +188,14 @@ func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath 
 	if !ok {
 		log.Errorf("file %s not in reverse partition map", fileHashString)
 	}
-	req := &pb.RetrieveReq{Ticket: ticket, FileKey: fileKey, Auth: auth, FileSize: fileSize, Timestamp: tm, BlockKey: blockKey, BlockSize: blockSize}
+	req := &pb.RetrieveReq{
+		Ticket:    ticket,
+		FileKey:   fileKey,
+		Auth:      auth,
+		FileSize:  fileSize,
+		Timestamp: tm,
+		BlockKey:  blockKey,
+		BlockSize: blockSize}
 	al := newActionLogFromRetrieveReq(req)
 	defer collectClient.Collect(al)
 	if fileSize < small_file_size {
