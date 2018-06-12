@@ -335,7 +335,7 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 }
 
 func deleteTemporaryFile(log logrus.FieldLogger, filename string) {
-	log.Debugf("need delete file %s", filename)
+	log.Debugf("delete file %s", filename)
 	if err := os.Remove(filename); err != nil {
 		log.Errorf("delete %s failed, error %v", filename, err)
 	}
@@ -750,7 +750,7 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 			for _, block := range partitions[0].GetBlock() {
 				c.PM.SetPartitionMap(hex.EncodeToString(block.GetHash()), downFileName)
 			}
-			_, _, _, err := c.saveFileByPartition(downFileName, partitions[0], rsp.GetTimestamp(), req.FileHash, req.FileSize, true)
+			_, _, _, _, err := c.saveFileByPartition(downFileName, partitions[0], rsp.GetTimestamp(), req.FileHash, req.FileSize, true)
 			return err
 		}
 	}
@@ -770,10 +770,13 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 
 	if len(partitions) == 1 {
 		partition := partitions[0]
-		datas, paritys, middleFiles, err := c.saveFileByPartition(downFileName, partition, rsp.GetTimestamp(), req.FileHash, req.FileSize, false)
-		if err != nil {
-			log.Errorf("save file by partition error %v", err)
+		datas, paritys, failedCount, middleFiles, err := c.saveFileByPartition(downFileName, partition, rsp.GetTimestamp(), req.FileHash, req.FileSize, false)
+		if failedCount > paritys {
+			log.Errorf("file %s cannot be recoved!!!", downFileName)
 			return err
+		}
+		if err != nil {
+			log.Errorf("save file by partition error: %v, but file still can be recoverd", err)
 		}
 
 		// delete middle files
@@ -783,7 +786,7 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 			}
 		}()
 
-		log.Infof("dataShards %d, parityShards %d", datas, paritys)
+		log.Infof("dataShards %d, parityShards %d, failedCount %d", datas, paritys, failedCount)
 
 		_, onlyFileName := filepath.Split(downFileName)
 		tempDownFileName := filepath.Join(c.TempDir, onlyFileName)
@@ -808,12 +811,15 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 	partFiles := []string{}
 	for i, partition := range partitions {
 		partFileName := fmt.Sprintf("%s.part.%d", downFileName, i)
-		datas, paritys, middleFiles, err := c.saveFileByPartition(partFileName, partition, rsp.GetTimestamp(), req.FileHash, req.FileSize, false)
-		if err != nil {
-			log.Errorf("save file by partition error %v", err)
+		datas, paritys, failedCount, middleFiles, err := c.saveFileByPartition(partFileName, partition, rsp.GetTimestamp(), req.FileHash, req.FileSize, false)
+		if failedCount > paritys {
+			log.Errorf("middle file %s cannot be recoved!!!", partFileName)
 			return err
 		}
-		log.Infof("dataShards %d, parityShards %d", datas, paritys)
+		if err != nil {
+			log.Errorf("save file by partition error %v, but file still can be recoverd", err)
+		}
+		log.Infof("dataShards %d, parityShards %d, failedCount %d", datas, paritys, failedCount)
 		_, onlyFileName := filepath.Split(partFileName)
 		tempDownFileName := filepath.Join(c.TempDir, onlyFileName)
 		// file real size can be calcauted by filesize and partition number
@@ -846,12 +852,14 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 	return nil
 }
 
-func (c *ClientManager) saveFileByPartition(filename string, partition *mpb.RetrievePartition, tm uint64, fileHash []byte, fileSize uint64, multiReplica bool) (int, int, []string, error) {
+func (c *ClientManager) saveFileByPartition(filename string, partition *mpb.RetrievePartition, tm uint64, fileHash []byte, fileSize uint64, multiReplica bool) (int, int, int, []string, error) {
 	log := c.Log
 	log.Infof("there is %d blocks", len(partition.GetBlock()))
 	dataShards := 0
 	parityShards := 0
+	failedCount := 0
 	middleFiles := []string{}
+	errArray := []string{}
 	for _, block := range partition.GetBlock() {
 		if block.GetChecksum() {
 			parityShards++
@@ -861,29 +869,42 @@ func (c *ClientManager) saveFileByPartition(filename string, partition *mpb.Retr
 		nodes := block.GetStoreNode()
 		node := nodes[0]
 		server := fmt.Sprintf("%s:%d", node.GetServer(), node.GetPort())
-		conn, err := grpc.Dial(server, grpc.WithInsecure())
-		if err != nil {
-			log.Errorf("RPC Dial failed: %s", err.Error())
-			return 0, 0, nil, err
-		}
-		defer conn.Close()
-		pclient := pb.NewProviderServiceClient(conn)
-
 		tempFileName := filename
 		if !multiReplica {
 			_, onlyFileName := filepath.Split(filename)
 			tempFileName = filepath.Join(c.TempDir, fmt.Sprintf("%s.%d", onlyFileName, block.GetBlockSeq()))
 		}
 		log.Infof("[part file] %s, hash %x retrieve from %s", tempFileName, block.GetHash(), server)
+		conn, err := grpc.Dial(server, grpc.WithInsecure(), grpc.WithTimeout(3*time.Second), grpc.WithBlock())
+		if err != nil {
+			log.Errorf("RPC Dial %s failed, : %s", server, err.Error())
+			log.Errorf("[part file] %s  retrieve failed", tempFileName)
+			errArray = append(errArray, err.Error())
+			middleFiles = append(middleFiles, tempFileName)
+			failedCount++
+			continue
+		}
+		pclient := pb.NewProviderServiceClient(conn)
+
 		err = client.Retrieve(log, pclient, tempFileName, node.GetAuth(), node.GetTicket(), tm, fileHash, block.GetHash(), fileSize, block.GetSize(), c.PM)
 		if err != nil {
-			return 0, 0, nil, err
+			failedCount++
+			errArray = append(errArray, err.Error())
+			conn.Close()
+			log.Errorf("[part file] %s  retrieve failed", tempFileName)
+			middleFiles = append(middleFiles, tempFileName)
+			continue
 		}
 		log.Infof("[part file] %s  retrieve success", tempFileName)
 		middleFiles = append(middleFiles, tempFileName)
+		conn.Close()
 	}
 
-	return dataShards, parityShards, middleFiles, nil
+	if len(errArray) > 0 {
+		errRtn := fmt.Errorf("%s", strings.Join(errArray, "\n"))
+		return dataShards, parityShards, failedCount, middleFiles, errRtn
+	}
+	return dataShards, parityShards, failedCount, middleFiles, nil
 }
 
 func saveFile(fileName string, content []byte) error {

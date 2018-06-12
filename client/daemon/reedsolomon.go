@@ -141,14 +141,17 @@ func RsDecoder(log logrus.FieldLogger, fname, outfname string, filesize int64, d
 		}
 		err = enc.Reconstruct(shards, out)
 		if err != nil {
-			log.Info("Reconstruct failed -", err)
+			log.Info("Reconstruct failed %v", err)
 			return err
 		}
 		// Close output.
 		for i := range out {
 			if out[i] != nil {
 				err := out[i].(*os.File).Close()
-				return err
+				if err != nil {
+					log.Info("close file error %v", err)
+					return err
+				}
 			}
 		}
 		shards, _, err = openInput(log, dataShards, parShards, fname)
