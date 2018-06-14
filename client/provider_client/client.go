@@ -8,14 +8,46 @@ import (
 	"os"
 	"time"
 
+	collectClient "github.com/samoslab/nebula/client/collector_client"
 	"github.com/samoslab/nebula/client/common"
 	pb "github.com/samoslab/nebula/provider/pb"
+	tcppb "github.com/samoslab/nebula/tracker/collector/client/pb"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
 )
 
 const stream_data_size = 32 * 1024
 const small_file_size = 512 * 1024
+
+func now() uint64 {
+	return uint64(time.Now().UnixNano())
+}
+
+func SetActionLog(err error, al *tcppb.ActionLog) {
+	if al != nil {
+		al.EndTime, al.Info = now(), err.Error()
+	}
+}
+
+func newActionLogFromStoreReq(req *pb.StoreReq) *tcppb.ActionLog {
+	return &tcppb.ActionLog{Type: 1,
+		Ticket:    req.Ticket,
+		FileHash:  req.FileKey,
+		FileSize:  req.FileSize,
+		BlockHash: req.BlockKey,
+		BlockSize: req.BlockSize,
+		BeginTime: now()}
+}
+
+func newActionLogFromRetrieveReq(req *pb.RetrieveReq) *tcppb.ActionLog {
+	return &tcppb.ActionLog{Type: 2,
+		Ticket:    req.Ticket,
+		FileHash:  req.FileKey,
+		FileSize:  req.FileSize,
+		BlockHash: req.BlockKey,
+		BlockSize: req.BlockSize,
+		BeginTime: now()}
+}
 
 func Ping(client pb.ProviderServiceClient) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -38,18 +70,31 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadP
 	if !ok {
 		log.Errorf("file %s not in reverse partition map", filePath)
 	}
-	req := &pb.StoreReq{Ticket: ticket, Auth: auth, Timestamp: tm, FileKey: uploadPara.OriginFileHash, FileSize: uploadPara.OriginFileSize, BlockKey: fileInfo.FileHash, BlockSize: fileSize}
+	req := &pb.StoreReq{
+		Ticket:    ticket,
+		Auth:      auth,
+		Timestamp: tm,
+		FileKey:   uploadPara.OriginFileHash,
+		FileSize:  uploadPara.OriginFileSize,
+		BlockKey:  fileInfo.FileHash,
+		BlockSize: fileSize}
+	al := newActionLogFromStoreReq(req)
+	defer collectClient.Collect(al)
 	if fileSize < small_file_size {
 		req.Data, err = ioutil.ReadAll(file)
 		if err != nil {
+			SetActionLog(err, al)
 			return err
 		}
+		al.TransportSize = uint64(len(req.Data))
 		resp, err := client.StoreSmall(context.Background(), req)
 		if err != nil {
+			SetActionLog(err, al)
 			return err
 		}
 		if !resp.Success {
 			log.Errorf("RPC return false")
+			SetActionLog(err, al)
 			return errors.New("RPC return false")
 		}
 		// for progress
@@ -58,12 +103,14 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadP
 				log.Errorf("file %s not in progress map", realfile)
 			}
 		}
+		al.Success, al.EndTime = true, now()
 		return nil
 	}
 
 	stream, err := client.Store(context.Background())
 	if err != nil {
 		log.Errorf("RPC Store failed: %s", err.Error())
+		SetActionLog(err, al)
 		return err
 	}
 	defer stream.CloseSend()
@@ -76,6 +123,7 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadP
 				break
 			}
 			log.Errorf("read file failed: %s", err.Error())
+			SetActionLog(err, al)
 			return err
 		}
 		if first {
@@ -86,6 +134,7 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadP
 				if err == io.EOF {
 					break
 				}
+				SetActionLog(err, al)
 				return err
 			}
 			log.Infof("RPC First Send StoreReq SUCCESS")
@@ -111,13 +160,16 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadP
 	storeResp, err := stream.CloseAndRecv()
 	if err != nil {
 		log.Errorf("RPC CloseAndRecv failed: %s", err.Error())
+
+		SetActionLog(err, al)
 		return err
 	}
 	if !storeResp.Success {
 		log.Error("RPC return false")
+		SetActionLog(err, al)
 		return errors.New("RPC return false")
 	}
-	time.Sleep(time.Second)
+	al.Success, al.EndTime = true, now()
 	return nil
 }
 
@@ -136,13 +188,24 @@ func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath 
 	if !ok {
 		log.Errorf("file %s not in reverse partition map", fileHashString)
 	}
-	req := &pb.RetrieveReq{Ticket: ticket, FileKey: fileKey, Auth: auth, FileSize: fileSize, Timestamp: tm, BlockKey: blockKey, BlockSize: blockSize}
+	req := &pb.RetrieveReq{
+		Ticket:    ticket,
+		FileKey:   fileKey,
+		Auth:      auth,
+		FileSize:  fileSize,
+		Timestamp: tm,
+		BlockKey:  blockKey,
+		BlockSize: blockSize}
+	al := newActionLogFromRetrieveReq(req)
+	defer collectClient.Collect(al)
 	if fileSize < small_file_size {
 		resp, err := client.RetrieveSmall(context.Background(), req)
 		if err != nil {
+			SetActionLog(err, al)
 			return err
 		}
 		if _, err = file.Write(resp.Data); err != nil {
+			SetActionLog(err, al)
 			log.Errorf("write file %d bytes failed : %s", len(resp.Data), err.Error())
 			return err
 		}
@@ -161,6 +224,7 @@ func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath 
 		}
 		if err != nil {
 			log.Errorf("RPC Recv failed: %s", err.Error())
+			SetActionLog(err, al)
 			return err
 		}
 		if len(resp.Data) == 0 {
@@ -176,5 +240,6 @@ func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath 
 			return err
 		}
 	}
+	al.Success, al.EndTime, al.TransportSize = true, now(), uint64(fileSize)
 	return nil
 }

@@ -9,6 +9,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/samoslab/nebula/client/common"
 	"github.com/samoslab/nebula/client/config"
 	"github.com/samoslab/nebula/provider/node"
 	pb "github.com/samoslab/nebula/tracker/register/client/pb"
@@ -19,7 +20,9 @@ import (
 
 func doGetPubkey(registClient pb.ClientRegisterServiceClient) ([]byte, error) {
 	ctx := context.Background()
-	getPublicKeyReq := pb.GetPublicKeyReq{}
+	getPublicKeyReq := pb.GetPublicKeyReq{
+		Version: common.Version,
+	}
 	getPublicKeyReq.Version = 1
 	pubKey, err := registClient.GetPublicKey(ctx, &getPublicKeyReq)
 	if err != nil {
@@ -48,7 +51,7 @@ func DoRegister(registClient pb.ClientRegisterServiceClient, cfg *config.ClientC
 		return nil, err
 	}
 	registerReq := pb.RegisterReq{
-		Version:         1,
+		Version:         common.Version,
 		NodeId:          cfg.Node.NodeId,
 		PublicKeyEnc:    pubkeyEnc,
 		ContactEmailEnc: contactEmailEnc,
@@ -85,6 +88,7 @@ func resendVerifyCode(client pb.ClientRegisterServiceClient, node *node.Node) (s
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	req := &pb.ResendVerifyCodeReq{
+		Version:   common.Version,
 		NodeId:    node.NodeId,
 		Timestamp: uint64(time.Now().Unix()),
 	}
