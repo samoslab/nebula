@@ -46,7 +46,7 @@ func (self *BuyPackageReq) hash() []byte {
 	hasher := sha256.New()
 	hasher.Write(self.NodeId)
 	hasher.Write(util_bytes.FromUint64(self.Timestamp))
-	hasher.Write(util_bytes.FromUint32(self.PackageId))
+	hasher.Write(util_bytes.FromUint64(uint64(self.PackageId)))
 	hasher.Write(util_bytes.FromUint32(self.Quanlity))
 	if self.CancelUnpaid {
 		hasher.Write([]byte{1})
