@@ -87,6 +87,8 @@ service OrderService {
 
     rpc OrderInfo(OrderInfoReq)returns(OrderInfoResp){}
 
+    rpc RechargeAddress(RechargeAddressReq)returns(RechargeAddressResp){}
+ 
     rpc PayOrder(PayOrderReq)returns(PayOrderResp){}
 
     rpc UsageAmount(UsageAmountReq)returns(UsageAmountResp){}
@@ -103,14 +105,13 @@ message AllPackageResp{
 message Package{
     sint64 id=1;
     string name=2;
-    int32 level=3;
-    uint64 price=4;
-    uint32 volume=5;
-    uint32 netflow=6;
-    uint32 upNetflow=7;
-    uint32 downNetflow=8;
-    uint32 validDays=9;
-    string remark=10;
+    uint64 price=3;
+    uint32 volume=4;
+    uint32 netflow=5;
+    uint32 upNetflow=6;
+    uint32 downNetflow=7;
+    uint32 validDays=8;
+    string remark=9;
 }
 
 message PackageInfoReq{
@@ -148,8 +149,9 @@ message Order{
     uint32 validDays=13;
     uint64 startTime=14;
     uint64 endTime=15;
-    uint64 payTime=16;
-    string remark=19;
+    bool paid=16;
+    uint64 payTime=17;
+    string remark=18;
 }
 
 message BuyPackageResp{
@@ -184,6 +186,20 @@ message OrderInfoResp{
     uint32 code = 1;//0:success, other value: failed
     string errMsg=2;
     Order order=3;
+}
+
+message RechargeAddressReq{
+    uint32 version =1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    bytes sign = 4;
+}
+
+message RechargeAddressResp{
+    uint32 code = 1;//0:success, other value: failed
+    string errMsg=2;
+    string rechargeAddress=3;
+    uint64 balance=4;
 }
 
 message PayOrderReq{
