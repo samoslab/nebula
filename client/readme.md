@@ -18,6 +18,8 @@ Index
 | [/order/package/buy](#orderpackagebuy-post)                             | POST|
 | [/order/all](#orderall-get)                             | GET |
 | [/order/getinfo](#ordergetinfo-get)                             | GET |
+| [/order/recharge/address](#orderrechargeaddress-get)                             | GET|
+| [/order/pay](#orderpay-post)                             | POST |
 | [/usage/amount](#usageamount-get)                             | GET |
 
 
@@ -235,6 +237,29 @@ Method: GET
 Args: orderid(string)
 
 ```
+
+## /order/pay [POST]
+
+pay order
+```
+URI:/order/pay POST
+Method: POST
+Request Body: {
+   order_id:string,
+   }
+
+```
+
+## /order/recharge/address [GET]
+
+returns pay-address and balance
+```
+URI:/order/recharge/address get
+Method: GET
+Args: None
+
+```
+
 ## /usage/amount [GET]
 
 returns usage amount about order

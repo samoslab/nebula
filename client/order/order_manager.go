@@ -52,7 +52,7 @@ func (om *OrderManager) GetPackageInfo(id uint64) (*pb.Package, error) {
 	log := om.Log
 	req := &pb.PackageInfoReq{
 		Version:   common.Version,
-		PackageId: uint32(id),
+		PackageId: int64(id),
 	}
 	rsp, err := om.orderClient.PackageInfo(context.Background(), req)
 	if err != nil {
@@ -68,7 +68,7 @@ func (om *OrderManager) BuyPackage(id uint64, canceled bool, quanlity uint32) (*
 		Version:      common.Version,
 		NodeId:       om.NodeId,
 		Timestamp:    uint64(time.Now().UTC().Unix()),
-		PackageId:    uint32(id),
+		PackageId:    int64(id),
 		Quanlity:     quanlity,
 		CancelUnpaid: canceled,
 	}
@@ -127,6 +127,51 @@ func (om *OrderManager) GetOrderInfo(orderId string) (*pb.Order, error) {
 	log.Infof("%+v", rsp)
 
 	return rsp.GetOrder(), nil
+}
+
+func (om *OrderManager) RechargeAddress() (*pb.RechargeAddressResp, error) {
+	log := om.Log
+	req := &pb.RechargeAddressReq{
+		Version:   common.Version,
+		NodeId:    om.NodeId,
+		Timestamp: uint64(time.Now().UTC().Unix()),
+	}
+	err := req.SignReq(om.privateKey)
+	if err != nil {
+		return nil, err
+	}
+	rsp, err := om.orderClient.RechargeAddress(context.Background(), req)
+	if err != nil {
+		return nil, err
+	}
+	log.Infof("%+v", rsp)
+
+	return rsp, nil
+}
+
+func (om *OrderManager) PayOrdor(orderId string) (*pb.PayOrderResp, error) {
+	log := om.Log
+	orderid, err := hex.DecodeString(orderId)
+	if err != nil {
+		return nil, err
+	}
+	req := &pb.PayOrderReq{
+		Version:   common.Version,
+		NodeId:    om.NodeId,
+		Timestamp: uint64(time.Now().UTC().Unix()),
+		OrderId:   orderid,
+	}
+	err = req.SignReq(om.privateKey)
+	if err != nil {
+		return nil, err
+	}
+	rsp, err := om.orderClient.PayOrder(context.Background(), req)
+	if err != nil {
+		return nil, err
+	}
+	log.Infof("%+v", rsp)
+
+	return rsp, nil
 }
 
 func (om *OrderManager) UsageAmount() (*pb.UsageAmountResp, error) {

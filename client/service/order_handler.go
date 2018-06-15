@@ -231,6 +231,99 @@ func GetOrderInfoHandler(s *HTTPServer) http.HandlerFunc {
 	}
 }
 
+type PayOrderReq struct {
+	ID string `json:"order_id"`
+}
+
+func PayOrderHandler(s *HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		if !s.CanBeWork() {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
+			return
+		}
+		log := s.cm.Log
+		w.Header().Set("Accept", "application/json")
+
+		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
+			return
+		}
+
+		if r.Header.Get("Content-Type") != "application/json" {
+			errorResponse(ctx, w, http.StatusUnsupportedMediaType, errors.New("Invalid content type"))
+			return
+		}
+
+		req := &PayOrderReq{}
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&req); err != nil {
+			err = fmt.Errorf("Invalid json request body: %v", err)
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+
+		defer r.Body.Close()
+		if req.ID == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument order_id must not empty"))
+			return
+		}
+
+		result, err := s.cm.OM.PayOrdor(req.ID)
+		code := 0
+		errmsg := ""
+		if err != nil {
+			log.Errorf("get all packages error %v", err)
+			code = 1
+			errmsg = err.Error()
+			result = nil
+		}
+
+		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
+		if err != nil {
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+		if err := JSONResponse(w, rsp); err != nil {
+			fmt.Printf("error %v\n", err)
+		}
+	}
+}
+
+func RechargeAddressHandler(s *HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		if !s.CanBeWork() {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
+			return
+		}
+		log := s.cm.Log
+		w.Header().Set("Accept", "application/json")
+
+		if !validMethod(ctx, w, r, []string{http.MethodGet}) {
+			return
+		}
+
+		result, err := s.cm.OM.RechargeAddress()
+		code := 0
+		errmsg := ""
+		if err != nil {
+			log.Errorf("get usage amount error %v", err)
+			code = 1
+			errmsg = err.Error()
+			result = nil
+		}
+
+		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
+		if err != nil {
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+		if err := JSONResponse(w, rsp); err != nil {
+			fmt.Printf("error %v\n", err)
+		}
+	}
+}
+
 func UsageAmountHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()

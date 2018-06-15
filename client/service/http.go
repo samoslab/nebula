@@ -310,6 +310,8 @@ func (s *HTTPServer) setupMux() *http.ServeMux {
 	handleAPI("/order/package/buy", BuyPackageHandler(s))
 	handleAPI("/order/all", MyAllOrderHandler(s))
 	handleAPI("/order/getinfo", GetOrderInfoHandler(s))
+	handleAPI("/order/recharge/address", RechargeAddressHandler(s))
+	handleAPI("/order/pay", PayOrderHandler(s))
 	handleAPI("/usage/amount", UsageAmountHandler(s))
 
 	return mux
