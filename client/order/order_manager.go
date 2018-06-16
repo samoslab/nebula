@@ -4,7 +4,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"encoding/hex"
-	"time"
+	"fmt"
 
 	"github.com/samoslab/nebula/client/common"
 	pb "github.com/samoslab/nebula/tracker/register/client/pb"
@@ -17,6 +17,50 @@ type OrderManager struct {
 	Log         logrus.FieldLogger
 	privateKey  *rsa.PrivateKey
 	NodeId      []byte
+}
+
+type Order struct {
+	Id          string      `json:"id,omitempty"`
+	Creation    uint64      `json:"creation,omitempty"`
+	PackageId   int64       `json:"packageId,omitempty"`
+	Package     *pb.Package `json:"package,omitempty"`
+	Quanlity    uint32      `json:"quanlity,omitempty"`
+	TotalAmount uint64      `json:"totalAmount,omitempty"`
+	Upgraded    bool        `json:"upgraded,omitempty"`
+	Discount    float32     `json:"discount,omitempty"`
+	Volume      uint32      `json:"volume,omitempty"`
+	Netflow     uint32      `json:"netflow,omitempty"`
+	UpNetflow   uint32      `json:"upNetflow,omitempty"`
+	DownNetflow uint32      `json:"downNetflow,omitempty"`
+	ValidDays   uint32      `json:"validDays,omitempty"`
+	StartTime   uint64      `json:"startTime,omitempty"`
+	EndTime     uint64      `json:"endTime,omitempty"`
+	Paid        bool        `json:"paid,omitempty"`
+	PayTime     uint64      `json:"payTime,omitempty"`
+	Remark      string      `json:"remark,omitempty"`
+}
+
+func NewOrderFromPbOrder(o *pb.Order) *Order {
+	return &Order{
+		Id:          hex.EncodeToString(o.Id),
+		Creation:    o.Creation,
+		PackageId:   o.PackageId,
+		Package:     o.Package,
+		Quanlity:    o.Quanlity,
+		TotalAmount: o.TotalAmount,
+		Upgraded:    o.Upgraded,
+		Discount:    o.Discount,
+		Volume:      o.Volume,
+		Netflow:     o.Netflow,
+		UpNetflow:   o.UpNetflow,
+		DownNetflow: o.DownNetflow,
+		ValidDays:   o.ValidDays,
+		StartTime:   o.StartTime,
+		EndTime:     o.EndTime,
+		Paid:        o.Paid,
+		PayTime:     o.PayTime,
+		Remark:      o.Remark,
+	}
 }
 
 func NewOrderManager(trackerServer string, log logrus.FieldLogger, privateKey *rsa.PrivateKey, nodeId []byte) *OrderManager {
@@ -62,12 +106,12 @@ func (om *OrderManager) GetPackageInfo(id uint64) (*pb.Package, error) {
 	return rsp.GetPackage(), nil
 }
 
-func (om *OrderManager) BuyPackage(id uint64, canceled bool, quanlity uint32) (*pb.Order, error) {
+func (om *OrderManager) BuyPackage(id uint64, canceled bool, quanlity uint32) (*Order, error) {
 	log := om.Log
 	req := &pb.BuyPackageReq{
 		Version:      common.Version,
 		NodeId:       om.NodeId,
-		Timestamp:    uint64(time.Now().UTC().Unix()),
+		Timestamp:    common.Now(),
 		PackageId:    int64(id),
 		Quanlity:     quanlity,
 		CancelUnpaid: canceled,
@@ -81,15 +125,15 @@ func (om *OrderManager) BuyPackage(id uint64, canceled bool, quanlity uint32) (*
 		return nil, err
 	}
 	log.Infof("%+v", rsp)
-	return rsp.GetOrder(), nil
+	return NewOrderFromPbOrder(rsp.GetOrder()), nil
 }
 
-func (om *OrderManager) MyAllOrders(expired bool) ([]*pb.Order, error) {
+func (om *OrderManager) MyAllOrders(expired bool) ([]*Order, error) {
 	log := om.Log
 	req := &pb.MyAllOrderReq{
 		Version:        common.Version,
 		NodeId:         om.NodeId,
-		Timestamp:      uint64(time.Now().UTC().Unix()),
+		Timestamp:      common.Now(),
 		OnlyNotExpired: expired,
 	}
 	err := req.SignReq(om.privateKey)
@@ -101,10 +145,14 @@ func (om *OrderManager) MyAllOrders(expired bool) ([]*pb.Order, error) {
 		return nil, err
 	}
 	log.Infof("%+v", rsp)
-	return rsp.GetMyAllOrder(), nil
+	allOrder := []*Order{}
+	for _, o := range rsp.GetMyAllOrder() {
+		allOrder = append(allOrder, NewOrderFromPbOrder(o))
+	}
+	return allOrder, nil
 }
 
-func (om *OrderManager) GetOrderInfo(orderId string) (*pb.Order, error) {
+func (om *OrderManager) GetOrderInfo(orderId string) (*Order, error) {
 	log := om.Log
 	orderid, err := hex.DecodeString(orderId)
 	if err != nil {
@@ -113,28 +161,34 @@ func (om *OrderManager) GetOrderInfo(orderId string) (*pb.Order, error) {
 	req := &pb.OrderInfoReq{
 		Version:   common.Version,
 		NodeId:    om.NodeId,
-		Timestamp: uint64(time.Now().UTC().Unix()),
+		Timestamp: common.Now(),
 		OrderId:   orderid,
 	}
 	err = req.SignReq(om.privateKey)
 	if err != nil {
 		return nil, err
 	}
+
 	rsp, err := om.orderClient.OrderInfo(context.Background(), req)
 	if err != nil {
 		return nil, err
 	}
 	log.Infof("%+v", rsp)
 
-	return rsp.GetOrder(), nil
+	return NewOrderFromPbOrder(rsp.GetOrder()), nil
 }
 
-func (om *OrderManager) RechargeAddress() (*pb.RechargeAddressResp, error) {
+type AddressBalance struct {
+	Address string `json:"address"`
+	Balance uint64 `json:"balance"`
+}
+
+func (om *OrderManager) RechargeAddress() (*AddressBalance, error) {
 	log := om.Log
 	req := &pb.RechargeAddressReq{
 		Version:   common.Version,
 		NodeId:    om.NodeId,
-		Timestamp: uint64(time.Now().UTC().Unix()),
+		Timestamp: common.Now(),
 	}
 	err := req.SignReq(om.privateKey)
 	if err != nil {
@@ -146,7 +200,15 @@ func (om *OrderManager) RechargeAddress() (*pb.RechargeAddressResp, error) {
 	}
 	log.Infof("%+v", rsp)
 
-	return rsp, nil
+	if rsp.GetCode() != 0 {
+		return nil, fmt.Errorf("recharge error %v", rsp.GetErrMsg())
+	}
+	ab := &AddressBalance{
+		Address: rsp.GetRechargeAddress(),
+		Balance: rsp.GetBalance(),
+	}
+
+	return ab, nil
 }
 
 func (om *OrderManager) PayOrdor(orderId string) (*pb.PayOrderResp, error) {
@@ -158,7 +220,7 @@ func (om *OrderManager) PayOrdor(orderId string) (*pb.PayOrderResp, error) {
 	req := &pb.PayOrderReq{
 		Version:   common.Version,
 		NodeId:    om.NodeId,
-		Timestamp: uint64(time.Now().UTC().Unix()),
+		Timestamp: common.Now(),
 		OrderId:   orderid,
 	}
 	err = req.SignReq(om.privateKey)
@@ -179,7 +241,7 @@ func (om *OrderManager) UsageAmount() (*pb.UsageAmountResp, error) {
 	req := &pb.UsageAmountReq{
 		Version:   common.Version,
 		NodeId:    om.NodeId,
-		Timestamp: uint64(time.Now().UTC().Unix()),
+		Timestamp: common.Now(),
 	}
 	err := req.SignReq(om.privateKey)
 	if err != nil {
