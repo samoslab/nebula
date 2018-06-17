@@ -59,14 +59,14 @@ func GetPackageInfoHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		id := r.URL.Query().Get("packageid")
+		id := r.URL.Query().Get("id")
 		if id == "" {
-			errorResponse(ctx, w, http.StatusBadRequest, errors.New("need paras packageid"))
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("need paras id"))
 			return
 		}
 		pid, err := strconv.Atoi(id)
 		if err != nil {
-			errorResponse(ctx, w, http.StatusBadRequest, errors.New("need paras packageid"))
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("need paras id"))
 			return
 		}
 		result, err := s.cm.OM.GetPackageInfo(uint64(pid))
@@ -165,10 +165,14 @@ func MyAllOrderHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		expired := r.URL.Query().Get("expired")
-		boolExpired, err := strconv.ParseBool(expired)
-		if err != nil {
-			errorResponse(ctx, w, http.StatusBadRequest, errors.New("bool expired wrong"))
-			return
+		boolExpired := true
+		if expired != "" {
+			var err error
+			boolExpired, err = strconv.ParseBool(expired)
+			if err != nil {
+				errorResponse(ctx, w, http.StatusBadRequest, errors.New("expired args wrong, need bool"))
+				return
+			}
 		}
 		result, err := s.cm.OM.MyAllOrders(boolExpired)
 		code := 0

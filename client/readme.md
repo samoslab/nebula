@@ -3,32 +3,32 @@ Index
 
 | Route                                                                                      | HTTP verb |
 | ------------------------------------------------------------------------------------------ | --------- |
-| [/store/list](#storelist-post)                             | POST      |
-| [/store/register](#storeregister-post)                                   | POST      |
-| [/store/verifyemail](#storeverifyemail-post)                             | POST      |
-| [/store/resendemail](#storeresendemail-post)                             | POST      |
-| [/store/upload](#storeupload-post)                                   | POST      |
-| [/store/uploaddir](#storeuploaddir-post)                                   | POST      |
-| [/store/download](#storedownload-post)                             | POST      |
-| [/store/downloaddir](#storedownloaddir-post)                             | POST      |
-| [/store/remove](#storeremove-post)                             | POST      |
-| [/store/progress](#storeprogress-post)                             | POST      |
-| [/order/packages](#orderpackages-get)                             | GET |
-| [/order/package/get](#orderpackageget-get)                             | GET |
-| [/order/package/buy](#orderpackagebuy-post)                             | POST|
-| [/order/all](#orderall-get)                             | GET |
-| [/order/getinfo](#ordergetinfo-get)                             | GET |
-| [/order/recharge/address](#orderrechargeaddress-get)                             | GET|
-| [/order/pay](#orderpay-post)                             | POST |
-| [/usage/amount](#usageamount-get)                             | GET |
+| [/api/v1/store/list](#apiv1storelist-post)                             | POST      |
+| [/api/v1/store/register](#apiv1storeregister-post)                                   | POST      |
+| [/api/v1/store/verifyemail](#apiv1storeverifyemail-post)                             | POST      |
+| [/api/v1/store/resendemail](#apiv1storeresendemail-post)                             | POST      |
+| [/api/v1/store/upload](#apiv1storeupload-post)                                   | POST      |
+| [/api/v1/store/uploaddir](#apiv1storeuploaddir-post)                                   | POST      |
+| [/api/v1/store/download](#apiv1storedownload-post)                             | POST      |
+| [/api/v1/store/downloaddir](#apiv1storedownloaddir-post)                             | POST      |
+| [/api/v1/store/remove](#apiv1storeremove-post)                             | POST      |
+| [/api/v1/store/progress](#apiv1storeprogress-post)                             | POST      |
+| [/api/v1/package/all](#apiv1packageall-get)                             | GET |
+| [/api/v1/package](#apiv1package-get)                             | GET |
+| [/api/v1/package/buy](#apiv1packagebuy-post)                             | POST|
+| [/api/v1/order/all](#apiv1orderall-get)                             | GET |
+| [/api/v1/order/getinfo](#apiv1ordergetinfo-get)                             | GET |
+| [/api/v1/order/recharge/address](#apiv1orderrechargeaddress-get)                             | GET|
+| [/api/v1/order/pay](#apiv1orderpay-post)                             | POST |
+| [/api/v1/usage/amount](#apiv1usageamount-get)                             | GET |
 
 
 统一说明 返回json object结构统一为： 成功：{"code":0, "data":object} 失败：{"code":1,"errmsg":"errmsg","data":object}  
 
   
-## /store/register [POST]
+## /api/v1/store/register [POST]
 ```
-URI:/store/register
+URI:/api/v1/store/register
 Method:POST
 Request Body: {
    email:string
@@ -36,14 +36,32 @@ Request Body: {
    }
 ```
 
-## /store/verifyemail [POST]
+Example
 
 ```
-URI:/store/verifyemail
+curl -X POST -H "Content-Type:application/json" -d '{"email":"16330@qq.com"}' http://127.0.0.1:7788/api/v1/store/register
+{
+    "errmsg": "",
+    "code": 0,
+    "Data": "ok"
+}
+```
+
+## /api/v1/store/verifyemail [POST]
+
+```
+URI:/api/v1/store/verifyemail
 Method:POST
 Request Body: {
    code:string
    }
+```
+
+Example 
+
+```
+curl -X POST -H "Content-Type:application/json" -d '{"code":"pf7v87ic"}' http://127.0.0.1:7788/api/v1/store/verifyemail
+
 ```
 
 ## /store/folder/add [POST]
@@ -58,10 +76,10 @@ Request Body: {
 }
 ```
 
-## /store/upload [POST]
+## /api/v1/store/upload [POST]
 
 ```
-URI:/store/upload
+URI:/api/v1/store/upload
 Method: POST
 Request Body: {
   "filename":"/tmp/abc.txt"
@@ -70,21 +88,21 @@ Request Body: {
   }
 ```
 
-## /store/uploaddir [POST]
+## /api/v1/store/uploaddir [POST]
 
 ```
-URI:/store/uploaddir
+URI:/api/v1/store/uploaddir
 Method: POST
 Request Body: {
   "parent":/tmp
   }
 ```
 
-## /store/list [POST]
+## /api/v1/store/list [POST]
 
 ```
 
-URI:/store/list
+URI:/api/v1/store/list
 Method: get
 Request Body: {
   "path":"/tmp"
@@ -99,7 +117,7 @@ Request Body: {
 Example
 
 ```
-curl -X POST -H "Content-Type:application/json" -d '{"path":"/tmp/ok", "pagesize":10, "pagenum":1, "sorttype":"name", "ascorder":true}' http://127.0.0.1:7788/store/list
+curl -X POST -H "Content-Type:application/json" -d '{"path":"/tmp/ok", "pagesize":10, "pagenum":1, "sorttype":"name", "ascorder":true}' http://127.0.0.1:7788/api/v1/store/list
 {
     "errmsg": "",
     "code": 0,
@@ -123,12 +141,12 @@ curl -X POST -H "Content-Type:application/json" -d '{"path":"/tmp/ok", "pagesize
 
 ```
 
-## /store/download [POST]
+## /api/v1/store/download [POST]
 
-filehash and filehash is from /store/list result
+filehash and filehash is from /api/v1/store/list result
 download directory if parent isn't empty but others is empty , or download filename
 ```
-URI:/store/download
+URI:/api/v1/store/download
 Method: POST
 Request Body: {
   filehash:string
@@ -137,20 +155,20 @@ Request Body: {
   }
 ```
 
-## /store/downloaddir [POST]
+## /api/v1/store/downloaddir [POST]
 
 ```
-URI:/store/downloaddir
+URI:/api/v1/store/downloaddir
 Method: POST
 Request Body: {
   parent:string
   }
 ```
 
-## /store/remove [POST]
+## /api/v1/store/remove [POST]
 
 ```
-URI:/store/remove post
+URI:/api/v1/store/remove post
 Method: POST
 Request Body: {
    target:string
@@ -159,7 +177,7 @@ Request Body: {
    }
 ```
 
-## /store/progress [POST]
+## /api/v1/store/progress [POST]
 
 returns all progress info if files is empty
 ```
@@ -174,7 +192,7 @@ Request Body: {
 Example
 
 ```
-curl -X POST -H "Content-Type:application/json" -d '{"files":[]}' http://127.0.0.1:7788/store/progress
+curl -X POST -H "Content-Type:application/json" -d '{"files":[]}' http://127.0.0.1:7788/api/v1/store/progress
 {
     "errmsg": "",
     "code": 0,
@@ -189,26 +207,79 @@ curl -X POST -H "Content-Type:application/json" -d '{"files":[]}' http://127.0.0
 returns all packages
 
 ```
-URI:/order/packages get
+URI:/api/v1/package/all get
 Method: GET
 Args: None
 
 ```
-## /order/package/get [GET]
+
+Example 
+
+```
+curl   http://127.0.0.1:7788/api/v1/package/all
+
+{
+    "errmsg": "",
+    "code": 0,
+    "Data": [
+        {
+            "id": 357096341043478529,
+            "name": "month package",
+            "price": 15000000,
+            "volume": 1024,
+            "netflow": 6144,
+            "upNetflow": 3072,
+            "downNetflow": 3072,
+            "validDays": 30
+        },
+        {
+            "id": 357096341154267137,
+            "name": "season package",
+            "price": 40000000,
+            "volume": 1024,
+            "netflow": 18432,
+            "upNetflow": 9216,
+            "downNetflow": 9216,
+            "validDays": 90
+        }
+    ]
+}
+```
+
+## /api/v1/package [GET]
 
 returns one package
 ```
-URI:/order/package/get get
+URI:/api/v1/package get
 Method: GET
 Args: id
 
 ```
+Examples
 
-## /order/package/buy [POST]
+curl   http://127.0.0.1:7788/api/v1/package?id=357096341154267137
+
+```
+{
+    "errmsg": "",
+    "code": 0,
+    "Data": {
+        "id": 357096341154267137,
+        "name": "season package",
+        "price": 40000000,
+        "volume": 1024,
+        "netflow": 18432,
+        "upNetflow": 9216,
+        "downNetflow": 9216,
+        "validDays": 90
+    }
+}
+```
+## /api/v1/package/buy [POST]
 
 buy package
 ```
-URI:/order/package/buy POST
+URI:/api/v1/package/buy POST
 Method: POST
 Request Body: {
    id:int,
@@ -218,31 +289,132 @@ Request Body: {
 
 ```
 
-## /order/all [GET]
+Example 
+
+```
+curl  -X POST  http://127.0.0.1:7788/api/v1/package/buy  -H "Content-Type:application/json" -d '{"id":357615924202078209, "quanlity":1}'
+{
+    "errmsg": "",
+    "code": 0,
+    "Data": {
+        "id": "31336164303736382d323330362d343736372d626131302d316332306265633131396332",
+        "creation": 1529224680,
+        "packageId": 357615924202078209,
+        "package": {
+            "id": 357615924202078209,
+            "name": "basic package",
+            "price": 15000000,
+            "volume": 1024,
+            "netflow": 6144,
+            "upNetflow": 3072,
+            "downNetflow": 3072,
+            "validDays": 30
+        },
+        "quanlity": 1,
+        "totalAmount": 15000000,
+        "discount": 1,
+        "volume": 1024,
+        "netflow": 6144,
+        "upNetflow": 3072,
+        "downNetflow": 3072,
+        "validDays": 30
+    }
+}
+```
+
+## /api/v1/order/all [GET]
 
 returns all orders belong to you 
 ```
-URI:/order/all get
+URI:/api/v1/order/all get
 Method: GET
-Args: None
+Args: expired=[true|false] default is true
 
 ```
 
-## /order/getinfo [GET]
+Example
+
+```
+curl   http://127.0.0.1:7788/api/v1/order/all?expired=true
+{
+    "errmsg": "",
+    "code": 0,
+    "Data": [
+        {
+            "id": "31336164303736382d323330362d343736372d626131302d316332306265633131396332",
+            "creation": 1529224680,
+            "packageId": 357615924202078209,
+            "package": {
+                "id": 357615924202078209,
+                "name": "basic package",
+                "price": 15000000,
+                "volume": 1024,
+                "netflow": 6144,
+                "upNetflow": 3072,
+                "downNetflow": 3072,
+                "validDays": 30
+            },
+            "quanlity": 1,
+            "totalAmount": 15000000,
+            "discount": 1,
+            "volume": 1024,
+            "netflow": 6144,
+            "upNetflow": 3072,
+            "downNetflow": 3072,
+            "validDays": 30
+        }
+    ]
+}
+```
+
+## /api/v1/order/getinfo [GET]
 
 returns all orders belong to you 
 ```
-URI:/order/getinfo get
+URI:/api/v1/order/getinfo get
 Method: GET
 Args: orderid(string)
 
 ```
 
-## /order/pay [POST]
+Example
+
+```
+curl   http://127.0.0.1:7788/api/v1/order/getinfo?orderid=31336164303736382d323330362d343736372d626131302d316332306265633131396332
+{
+    "errmsg": "",
+    "code": 0,
+    "Data": {
+        "id": "31336164303736382d323330362d343736372d626131302d316332306265633131396332",
+        "creation": 1529224680,
+        "packageId": 357615924202078209,
+        "package": {
+            "id": 357615924202078209,
+            "name": "basic package",
+            "price": 15000000,
+            "volume": 1024,
+            "netflow": 6144,
+            "upNetflow": 3072,
+            "downNetflow": 3072,
+            "validDays": 30
+        },
+        "quanlity": 1,
+        "totalAmount": 15000000,
+        "discount": 1,
+        "volume": 1024,
+        "netflow": 6144,
+        "upNetflow": 3072,
+        "downNetflow": 3072,
+        "validDays": 30
+    }
+}
+```
+
+## /api/v1/order/pay [POST]
 
 pay order
 ```
-URI:/order/pay POST
+URI:/api/v1/order/pay POST
 Method: POST
 Request Body: {
    order_id:string,
@@ -250,24 +422,67 @@ Request Body: {
 
 ```
 
-## /order/recharge/address [GET]
+Exmpale 
+
+```
+curl  -X POST  http://127.0.0.1:7788/api/v1/order/pay  -H "Content-Type:application/json" -d '{"order_id":"31336164303736382d323330362d343736372d626131302d316332306265633131396332"}'
+{
+    "errmsg": "",
+    "code": 0,
+    "Data": {}
+}
+```
+
+## /api/v1/order/recharge/address [GET]
 
 returns pay-address and balance
 ```
-URI:/order/recharge/address get
+URI:/api/v1/order/recharge/address get
 Method: GET
 Args: None
 
 ```
 
-## /usage/amount [GET]
+Example
+
+```
+curl http://127.0.0.1:7788/api/v1/order/recharge/address
+{
+    "errmsg": "",
+    "code": 0,
+    "Data": {
+        "address": "29deQdbg3GKBueNhdX7FNJyC23HXk9JwjdU",
+        "balance": 0
+    }
+}
+```
+
+## /api/v1/usage/amount [GET]
 
 returns usage amount about order
 ```
-URI:/usage/amount get
+URI:/api/v1/usage/amount get
 Method: GET
 Args: None
 
+```
+
+Example 
+
+```
+curl http://127.0.0.1:7788/api/v1/usage/amount
+{
+    "errmsg": "",
+    "code": 0,
+    "Data": {
+        "packageId": 357615924202078209,
+        "volume": 1024,
+        "netflow": 6144,
+        "upNetflow": 3072,
+        "downNetflow": 3072,
+        "endTime": 1531819508
+    }
+}
 ```
 
 # specification

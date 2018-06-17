@@ -124,6 +124,9 @@ func (om *OrderManager) BuyPackage(id uint64, canceled bool, quanlity uint32) (*
 	if err != nil {
 		return nil, err
 	}
+	if rsp.GetCode() != 0 {
+		return nil, fmt.Errorf("buy packge error %s", rsp.GetErrMsg())
+	}
 	log.Infof("%+v", rsp)
 	return NewOrderFromPbOrder(rsp.GetOrder()), nil
 }
