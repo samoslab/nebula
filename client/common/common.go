@@ -174,3 +174,7 @@ func (pm *ProgressManager) GetProgress(files []string) (map[string]float64, erro
 	}
 	return a, nil
 }
+
+func Now() uint64 {
+	return uint64(time.Now().UTC().Unix())
+}

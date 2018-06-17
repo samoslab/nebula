@@ -270,7 +270,7 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 			NodeId:    req.NodeId,
 			FileHash:  req.FileHash,
 			FileSize:  req.FileSize,
-			Timestamp: uint64(time.Now().UTC().Unix()),
+			Timestamp: common.Now(),
 			Partition: make([]*mpb.SplitPartition, len(partFiles)),
 		}
 		block := 0
@@ -362,7 +362,7 @@ func (c *ClientManager) CheckFileExists(filename string, interactive, newVersion
 		FileHash:    hash,
 		NodeId:      c.NodeId,
 		FileName:    fname,
-		Timestamp:   uint64(time.Now().UTC().Unix()),
+		Timestamp:   common.Now(),
 	}
 	mtime, err := GetFileModTime(filename)
 	if err != nil {
@@ -396,7 +396,7 @@ func (c *ClientManager) MkFolder(filepath string, folders []string, interactive 
 		Folder:      folders,
 		NodeId:      c.NodeId,
 		Interactive: interactive,
-		Timestamp:   uint64(time.Now().UTC().Unix()),
+		Timestamp:   common.Now(),
 	}
 	err := req.SignReq(c.cfg.Node.PriKey)
 	if err != nil {
@@ -573,7 +573,7 @@ func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitio
 		Parent:      reqCheck.GetParent(),
 		Interactive: reqCheck.GetInteractive(),
 		NewVersion:  reqCheck.GetNewVersion(),
-		Timestamp:   uint64(time.Now().UTC().Unix()),
+		Timestamp:   common.Now(),
 		Partition:   partitions,
 	}
 	err := req.SignReq(c.cfg.Node.PriKey)
@@ -598,7 +598,7 @@ func (c *ClientManager) ListFiles(path string, pageSize, pageNum uint32, sortTyp
 	c.Log.Infof("path %s, size %d, num %d, sortype %s, asc %v", path, pageSize, pageNum, sortType, ascOrder)
 	req := &mpb.ListFilesReq{
 		Version:   common.Version,
-		Timestamp: uint64(time.Now().UTC().Unix()),
+		Timestamp: common.Now(),
 		NodeId:    c.NodeId,
 		PageSize:  pageSize,
 		PageNum:   pageNum,
@@ -711,7 +711,7 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 	req := &mpb.RetrieveFileReq{
 		Version:   common.Version,
 		NodeId:    c.NodeId,
-		Timestamp: uint64(time.Now().UTC().Unix()),
+		Timestamp: common.Now(),
 		FileHash:  fileHash,
 		FileSize:  fileSize,
 	}
@@ -926,7 +926,7 @@ func (c *ClientManager) RemoveFile(target string, recursive bool, isPath bool) e
 	req := &mpb.RemoveReq{
 		Version:   common.Version,
 		NodeId:    c.NodeId,
-		Timestamp: uint64(time.Now().Unix()),
+		Timestamp: common.Now(),
 		Recursive: recursive,
 	}
 	if isPath {
