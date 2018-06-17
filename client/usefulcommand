@@ -1,20 +1,20 @@
-curl -X POST -H "Content-Type:application/json" -d '{"email":"xxx@163.com"}' http://127.0.0.1:7788/store/register
+curl -X POST -H "Content-Type:application/json" -d '{"email":"xxx@163.com"}' http://127.0.0.1:7788/api/v1/store/register
 
-curl -X POST -H "Content-Type:application/json" -d '{"parent":"/", "folders":["temp"], "interactive":false}' http://127.0.0.1:7788/store/folder/add
+curl -X POST -H "Content-Type:application/json" -d '{"parent":"/", "folders":["temp"], "interactive":false}' http://127.0.0.1:7788/api/v1/store/folder/add
 {
     "errmsg": "",
     "code": 0,
     "Data": true
 }
 
-curl -X POST -H "Content-Type:application/json" -d '{"parent":"/tmp", "filename":"/tmp/ok/abc.txt", "interactive":false, "newversion":false}' http://127.0.0.1:7788/store/upload
+curl -X POST -H "Content-Type:application/json" -d '{"parent":"/tmp", "filename":"/tmp/ok/abc.txt", "interactive":false, "newversion":false}' http://127.0.0.1:7788/api/v1/store/upload
 {
     "errmsg": "",
     "code": 0,
     "Data": "success"
 }
 
-curl -X POST -H "Content-Type:application/json" -d '{"path":"/tmp/ok", "pagesize":10, "pagenum":1, "sorttype":"name", "ascorder":true}' http://127.0.0.1:7788/store/list
+curl -X POST -H "Content-Type:application/json" -d '{"path":"/tmp/ok", "pagesize":10, "pagenum":1, "sorttype":"name", "ascorder":true}' http://127.0.0.1:7788/api/v1/store/list
 {
     "errmsg": "",
     "code": 0,
@@ -57,21 +57,21 @@ curl -X POST -H "Content-Type:application/json" -d '{"path":"/tmp/ok", "pagesize
     ]
 }
 
-curl -X POST -H "Content-Type:application/json" -d '{"filehash":"732e7a7d3db77ffb6dde834c81d263dfd05922dc","filesize":68073855, "filename":"/tmp/ok/abc.txt", "folder":false}' http://127.0.0.1:7788/store/download
+curl -X POST -H "Content-Type:application/json" -d '{"filehash":"732e7a7d3db77ffb6dde834c81d263dfd05922dc","filesize":68073855, "filename":"/tmp/ok/abc.txt", "folder":false}' http://127.0.0.1:7788/api/v1/store/download
 {
     "errmsg": "too few shards given",
     "code": 1,
     "Data": ""
 }
 
-curl -X POST -H "Content-Type:application/json" -d '{"target":"62633239633363392d373462332d343961632d396633312d363731336331376433633334", "ispath":false, "recursion":false }' http://127.0.0.1:7788/store/remove
+curl -X POST -H "Content-Type:application/json" -d '{"target":"62633239633363392d373462332d343961632d396633312d363731336331376433633334", "ispath":false, "recursion":false }' http://127.0.0.1:7788/api/v1/store/remove
 {
     "errmsg": "",
     "code": 0,
     "Data": "success"
 }
 
-curl -X POST -H "Content-Type:application/json" -d '{"files":[]}' http://127.0.0.1:7788/store/progress
+curl -X POST -H "Content-Type:application/json" -d '{"files":[]}' http://127.0.0.1:7788/api/v1/store/progress
 {
     "errmsg": "",
     "code": 0,
@@ -80,8 +80,8 @@ curl -X POST -H "Content-Type:application/json" -d '{"files":[]}' http://127.0.0
     }
 }
 
-curl -X POST -H "Content-Type:application/json" -d '{"parent":"/tmp/abc"}' http://127.0.0.1:7788/store/downloaddir
-curl -X POST -H "Content-Type:application/json" -d '{"parent":"/tmp/bak"}' http://127.0.0.1:7788/store/uploaddi
+curl -X POST -H "Content-Type:application/json" -d '{"parent":"/tmp/abc"}' http://127.0.0.1:7788/api/v1/store/downloaddir
+curl -X POST -H "Content-Type:application/json" -d '{"parent":"/tmp/bak"}' http://127.0.0.1:7788/api/v1/store/uploaddi
 
 alter table file_version DROP CONSTRAINT fk_node_id_ref_client;
 alter table file_version DROP CONSTRAINT fk_owner_id_ref_file_owner;

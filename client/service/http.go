@@ -294,25 +294,25 @@ func (s *HTTPServer) setupMux() *http.ServeMux {
 	}
 
 	// API Methods
-	handleAPI("/store/register", RegisterHandler(s))
-	handleAPI("/store/email", EmailHandler(s))
-	handleAPI("/store/folder/add", MkfolderHandler(s))
-	handleAPI("/store/upload", UploadHandler(s))
-	handleAPI("/store/download", DownloadHandler(s))
-	handleAPI("/store/list", ListHandler(s))
-	handleAPI("/store/remove", RemoveHandler(s))
-	handleAPI("/store/progress", ProgressHandler(s))
-	handleAPI("/store/uploaddir", UploadDirHandler(s))
-	handleAPI("/store/downloaddir", DownloadDirHandler(s))
+	handleAPI("/api/v1/store/register", RegisterHandler(s))
+	handleAPI("/api/v1/store/verifyemail", EmailHandler(s))
+	handleAPI("/api/v1/store/folder/add", MkfolderHandler(s))
+	handleAPI("/api/v1/store/upload", UploadHandler(s))
+	handleAPI("/api/v1/store/download", DownloadHandler(s))
+	handleAPI("/api/v1/store/list", ListHandler(s))
+	handleAPI("/api/v1/store/remove", RemoveHandler(s))
+	handleAPI("/api/v1/store/progress", ProgressHandler(s))
+	handleAPI("/api/v1/store/uploaddir", UploadDirHandler(s))
+	handleAPI("/api/v1/store/downloaddir", DownloadDirHandler(s))
 
-	handleAPI("/order/packages", GetAllPackageHandler(s))
-	handleAPI("/order/package/get", GetPackageInfoHandler(s))
-	handleAPI("/order/package/buy", BuyPackageHandler(s))
-	handleAPI("/order/all", MyAllOrderHandler(s))
-	handleAPI("/order/getinfo", GetOrderInfoHandler(s))
-	handleAPI("/order/recharge/address", RechargeAddressHandler(s))
-	handleAPI("/order/pay", PayOrderHandler(s))
-	handleAPI("/usage/amount", UsageAmountHandler(s))
+	handleAPI("/api/v1/package/all", GetAllPackageHandler(s))
+	handleAPI("/api/v1/package", GetPackageInfoHandler(s))
+	handleAPI("/api/v1/package/buy", BuyPackageHandler(s))
+	handleAPI("/api/v1/order/all", MyAllOrderHandler(s))
+	handleAPI("/api/v1/order/getinfo", GetOrderInfoHandler(s))
+	handleAPI("/api/v1/order/recharge/address", RechargeAddressHandler(s))
+	handleAPI("/api/v1/order/pay", PayOrderHandler(s))
+	handleAPI("/api/v1/usage/amount", UsageAmountHandler(s))
 
 	return mux
 }
