@@ -81,6 +81,8 @@ service OrderService {
 
     rpc PackageInfo(PackageInfoReq)returns(PackageInfoResp){}
 
+    rpc PackageDiscount(PackageDiscountReq)returns(PackageDiscountResp){}
+
     rpc BuyPackage(BuyPackageReq)returns(BuyPackageResp){}
 
     rpc MyAllOrder(MyAllOrderReq)returns(MyAllOrderResp){}
@@ -121,6 +123,15 @@ message PackageInfoReq{
 
 message PackageInfoResp{
     Package package=1;
+}
+
+message PackageDiscountReq{
+    uint32 version=1;
+    sint64 packageId=2;
+}
+
+message PackageDiscountResp{
+    map<uint32, string> discount = 1;
 }
 
 message BuyPackageReq{
