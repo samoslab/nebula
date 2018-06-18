@@ -51,21 +51,24 @@ type ClientManager struct {
 }
 
 // NewClientManager create manager
-func NewClientManager(log logrus.FieldLogger, trackerServer string, cfg *config.ClientConfig) (*ClientManager, error) {
-	if trackerServer == "" {
+func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.ClientConfig) (*ClientManager, error) {
+	if webcfg.TrackerServer == "" {
 		return nil, errors.New("tracker server nil")
+	}
+	if webcfg.CollectServer == "" {
+		return nil, errors.New("collect server nil")
 	}
 	if cfg == nil {
 		return nil, errors.New("client config nil")
 	}
-	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
+	conn, err := grpc.Dial(webcfg.TrackerServer, grpc.WithInsecure())
 	if err != nil {
 		log.Errorf("RPC Dial failed: %s", err.Error())
 		return nil, err
 	}
-	log.Infof("tracker server %s", trackerServer)
+	log.Infof("tracker server %s", webcfg.TrackerServer)
 
-	om := order.NewOrderManager(trackerServer, log, cfg.Node.PriKey, cfg.Node.NodeId)
+	om := order.NewOrderManager(webcfg.TrackerServer, log, cfg.Node.PriKey, cfg.Node.NodeId)
 
 	c := &ClientManager{
 		serverConn: conn,
@@ -90,7 +93,7 @@ func NewClientManager(log logrus.FieldLogger, trackerServer string, cfg *config.
 		}
 	}
 
-	collectClient.Start()
+	collectClient.Start(webcfg.CollectServer)
 
 	return c, nil
 }

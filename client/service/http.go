@@ -54,7 +54,7 @@ type HTTPServer struct {
 	done          chan struct{}
 }
 
-func InitClientManager(log logrus.FieldLogger) (*daemon.ClientManager, error) {
+func InitClientManager(log logrus.FieldLogger, webcfg config.Config) (*daemon.ClientManager, error) {
 	_, defaultConfig := daemon.GetConfigFile()
 	clientConfig, err := config.LoadConfig(defaultConfig)
 	if err != nil {
@@ -64,8 +64,7 @@ func InitClientManager(log logrus.FieldLogger) (*daemon.ClientManager, error) {
 			return nil, fmt.Errorf("Config file wrong, can not start daemon.")
 		}
 	}
-	//clientConfig.TempDir = "/tmp"
-	cm, err := daemon.NewClientManager(log, clientConfig.TrackerServer, clientConfig)
+	cm, err := daemon.NewClientManager(log, webcfg, clientConfig)
 	if err != nil {
 		fmt.Printf("new client manager failed %v\n", err)
 		return cm, err
@@ -75,7 +74,7 @@ func InitClientManager(log logrus.FieldLogger) (*daemon.ClientManager, error) {
 
 // NewHTTPServer creates an HTTPServer
 func NewHTTPServer(log logrus.FieldLogger, cfg config.Config) *HTTPServer {
-	cm, err := InitClientManager(log)
+	cm, err := InitClientManager(log, cfg)
 	if err != nil {
 		log.Errorf("init client manager failed, error %v", err)
 	}
@@ -422,7 +421,7 @@ func RegisterHandler(s *HTTPServer) http.HandlerFunc {
 			result = ""
 		}
 		if !regReq.Resend {
-			cm, err := InitClientManager(log)
+			cm, err := InitClientManager(log, s.cfg)
 			if err != nil {
 				code = 1
 				errmsg = err.Error()
