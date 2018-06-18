@@ -14,10 +14,12 @@ import (
 const (
 	DefaultConfig  = ".samos-nebula-client/config.json"
 	DefaultTracker = "127.0.0.1:6677"
+	DefaultCollect = "127.0.0.1:6688"
 )
 
 type Config struct {
 	TrackerServer    string        `json:"tracker_server"`
+	CollectServer    string        `json:"collect_server"`
 	ConfigDir        string        `json:"config_dir"`
 	HTTPAddr         string        `json:"http_addr"`
 	HTTPPort         uint32        `json:"http_port"`
@@ -35,6 +37,9 @@ type Config struct {
 func (cfg *Config) SetDefault() {
 	if cfg.TrackerServer == "" {
 		cfg.TrackerServer = DefaultTracker
+	}
+	if cfg.CollectServer == "" {
+		cfg.CollectServer = DefaultCollect
 	}
 	if cfg.ConfigDir == "" {
 		usr, err := user.Current()
