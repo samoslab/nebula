@@ -104,8 +104,8 @@ func (c *ClientManager) Shutdown() {
 	collectClient.Stop()
 }
 
-func (c *ClientManager) getPingTime(pro *mpb.BlockProviderAuth) int {
-	server := fmt.Sprintf("%s:%d", pro.GetServer(), pro.GetPort())
+func (c *ClientManager) getPingTime(ip string, port uint32) int {
+	server := fmt.Sprintf("%s:%d", ip, port)
 	timeStart := time.Now().Unix()
 	conn, err := grpc.Dial(server, grpc.WithInsecure())
 	if err != nil {
@@ -138,10 +138,11 @@ func (c *ClientManager) PingProvider(pros []*mpb.BlockProviderAuth, needNum int)
 	sortPros := []SortablePro{}
 	// TODO can ping concurrent
 	for _, bpa := range pros {
-		pingTime := c.getPingTime(bpa)
+		pingTime := c.getPingTime(bpa.GetServer(), bpa.GetPort())
 		sortPros = append(sortPros, SortablePro{Pro: bpa, Delay: pingTime})
 	}
 
+	// TODO need consider Spare , Spare = false is backup provider
 	sort.Slice(sortPros, func(i, j int) bool { return sortPros[i].Delay < sortPros[j].Delay })
 
 	availablePros := []*mpb.BlockProviderAuth{}
@@ -151,6 +152,31 @@ func (c *ClientManager) PingProvider(pros []*mpb.BlockProviderAuth, needNum int)
 
 	//return availablePros[0:needNum], nil
 	return pros, nil
+}
+
+// BestRetrieveNode ping retrieve node
+func (c *ClientManager) BestRetrieveNode(pros []*mpb.RetrieveNode) *mpb.RetrieveNode {
+	//todo if provider ip is same
+	type SortablePro struct {
+		Pro   *mpb.RetrieveNode
+		Delay int
+	}
+
+	sortPros := []SortablePro{}
+	// TODO can ping concurrent
+	for _, bpa := range pros {
+		pingTime := c.getPingTime(bpa.GetServer(), bpa.GetPort())
+		sortPros = append(sortPros, SortablePro{Pro: bpa, Delay: pingTime})
+	}
+
+	sort.Slice(sortPros, func(i, j int) bool { return sortPros[i].Delay < sortPros[j].Delay })
+
+	availablePros := []*mpb.RetrieveNode{}
+	for _, proInfo := range sortPros {
+		availablePros = append(availablePros, proInfo.Pro)
+	}
+
+	return availablePros[0]
 }
 
 // UploadDir upload all files in dir to provider
@@ -872,8 +898,7 @@ func (c *ClientManager) saveFileByPartition(filename string, partition *mpb.Retr
 		} else {
 			dataShards++
 		}
-		nodes := block.GetStoreNode()
-		node := nodes[0]
+		node := c.BestRetrieveNode(block.GetStoreNode())
 		server := fmt.Sprintf("%s:%d", node.GetServer(), node.GetPort())
 		tempFileName := filename
 		if !multiReplica {
