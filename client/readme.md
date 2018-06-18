@@ -7,6 +7,7 @@ Index
 | [/api/v1/store/register](#apiv1storeregister-post)                                   | POST      |
 | [/api/v1/store/verifyemail](#apiv1storeverifyemail-post)                             | POST      |
 | [/api/v1/store/resendemail](#apiv1storeresendemail-post)                             | POST      |
+| [/api/v1/store/folder/add](#apiv1storefolderadd-post)                                   | POST      |
 | [/api/v1/store/upload](#apiv1storeupload-post)                                   | POST      |
 | [/api/v1/store/uploaddir](#apiv1storeuploaddir-post)                                   | POST      |
 | [/api/v1/store/download](#apiv1storedownload-post)                             | POST      |
@@ -21,7 +22,6 @@ Index
 | [/api/v1/order/recharge/address](#apiv1orderrechargeaddress-get)                             | GET|
 | [/api/v1/order/pay](#apiv1orderpay-post)                             | POST |
 | [/api/v1/usage/amount](#apiv1usageamount-get)                             | GET |
-
 
 统一说明 返回json object结构统一为： 成功：{"code":0, "data":object} 失败：{"code":1,"errmsg":"errmsg","data":object}  
 
@@ -64,16 +64,28 @@ curl -X POST -H "Content-Type:application/json" -d '{"code":"pf7v87ic"}' http://
 
 ```
 
-## /store/folder/add [POST]
+## /api/v1/store/folder/add [POST]
 
 ```
-URI:/store/folder/add
+URI:/api/v1/store/folder/add
 Method: POST
 Request Body: {
   "parent":"/"
   "":["abc","tmp"]
   "interactive":bool
 }
+```
+
+Example 
+
+```
+curl -X POST -H "Content-Type:application/json" -d '{"parent":"/", "folders":["temp"], "interactive":false}' http://127.0.0.1:7788/api/v1/store/folder/add
+{
+    "errmsg": "",
+    "code": 0,
+    "Data": true
+}
+
 ```
 
 ## /api/v1/store/upload [POST]
@@ -88,6 +100,18 @@ Request Body: {
   }
 ```
 
+Example 
+
+```
+curl -X POST -H "Content-Type:application/json" -d '{"parent":"/tmp", "filename":"/tmp/ok/abc.txt", "interactive":false, "newversion":false}' http://127.0.0.1:7788/api/v1/store/upload
+{
+    "errmsg": "",
+    "code": 0,
+    "Data": "success"
+}
+
+```
+
 ## /api/v1/store/uploaddir [POST]
 
 ```
@@ -96,6 +120,17 @@ Method: POST
 Request Body: {
   "parent":/tmp
   }
+```
+
+Example 
+
+```
+curl -X POST -H "Content-Type:application/json" -d '{"parent":"/tmp/bak"}' http://127.0.0.1:7788/api/v1/store/uploaddir
+{
+    "errmsg": "",
+    "code": 0,
+    "Data": "success"
+}
 ```
 
 ## /api/v1/store/list [POST]
@@ -155,7 +190,20 @@ Request Body: {
   }
 ```
 
+Example 
+
+```
+curl -X POST -H "Content-Type:application/json" -d '{"filehash":"732e7a7d3db77ffb6dde834c81d263dfd05922dc","filesize":68073855, "filename":"/tmp/ok/abc.txt", "folder":false}' http://127.0.0.1:7788/api/v1/store/download
+{
+    "errmsg": "too few shards given",
+    "code": 1,
+    "Data": ""
+}
+
+```
+
 ## /api/v1/store/downloaddir [POST]
+
 
 ```
 URI:/api/v1/store/downloaddir
@@ -163,6 +211,17 @@ Method: POST
 Request Body: {
   parent:string
   }
+```
+
+Example 
+
+```
+curl -X POST -H "Content-Type:application/json" -d '{"parent":"/tmp/abc"}' http://127.0.0.1:7788/api/v1/store/downloaddir
+{
+    "errmsg": "",
+    "code": 0,
+    "Data": "success"
+}
 ```
 
 ## /api/v1/store/remove [POST]
@@ -175,6 +234,17 @@ Request Body: {
    folder:bool
    recursion:bool
    }
+```
+
+Exmaple 
+
+```
+curl -X POST -H "Content-Type:application/json" -d '{"target":"62633239633363392d373462332d343961632d396633312d363731336331376433633334", "ispath":false, "recursion":false }' http://127.0.0.1:7788/api/v1/store/remove
+{
+    "errmsg": "",
+    "code": 0,
+    "Data": "success"
+}
 ```
 
 ## /api/v1/store/progress [POST]
