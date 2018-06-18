@@ -150,6 +150,59 @@ func BuyPackageHandler(s *HTTPServer) http.HandlerFunc {
 	}
 }
 
+type DiscountPackageReq struct {
+	ID uint64 `json:"id"`
+}
+
+func DiscountPackageHandler(s *HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		if !s.CanBeWork() {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
+			return
+		}
+		log := s.cm.Log
+		w.Header().Set("Accept", "application/json")
+		defer r.Body.Close()
+
+		if !validMethod(ctx, w, r, []string{http.MethodGet}) {
+			return
+		}
+
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("id must not empty"))
+			return
+		}
+
+		packageID, err := strconv.ParseUint(id, 10, 0)
+		if err != nil {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("id incorrect"))
+			return
+		}
+		fmt.Printf("pack %d\n", packageID)
+
+		result, err := s.cm.OM.DiscountPackage(packageID)
+		code := 0
+		errmsg := ""
+		if err != nil {
+			log.Errorf("discount package error %v", err)
+			code = 1
+			errmsg = err.Error()
+			result = nil
+		}
+
+		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
+		if err != nil {
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+		if err := JSONResponse(w, rsp); err != nil {
+			fmt.Printf("error %v\n", err)
+		}
+	}
+}
+
 func MyAllOrderHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()

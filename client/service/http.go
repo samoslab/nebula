@@ -307,6 +307,7 @@ func (s *HTTPServer) setupMux() *http.ServeMux {
 	handleAPI("/api/v1/package/all", GetAllPackageHandler(s))
 	handleAPI("/api/v1/package", GetPackageInfoHandler(s))
 	handleAPI("/api/v1/package/buy", BuyPackageHandler(s))
+	handleAPI("/api/v1/package/discount", DiscountPackageHandler(s))
 	handleAPI("/api/v1/order/all", MyAllOrderHandler(s))
 	handleAPI("/api/v1/order/getinfo", GetOrderInfoHandler(s))
 	handleAPI("/api/v1/order/recharge/address", RechargeAddressHandler(s))

@@ -17,6 +17,7 @@ Index
 | [/api/v1/package/all](#apiv1packageall-get)                             | GET |
 | [/api/v1/package](#apiv1package-get)                             | GET |
 | [/api/v1/package/buy](#apiv1packagebuy-post)                             | POST|
+| [/api/v1/package/discount](#apiv1packagediscount-get)                             | GET|
 | [/api/v1/order/all](#apiv1orderall-get)                             | GET |
 | [/api/v1/order/getinfo](#apiv1ordergetinfo-get)                             | GET |
 | [/api/v1/order/recharge/address](#apiv1orderrechargeaddress-get)                             | GET|
@@ -390,6 +391,24 @@ curl  -X POST  http://127.0.0.1:7788/api/v1/package/buy  -H "Content-Type:applic
         "validDays": 30
     }
 }
+```
+
+## /api/v1/package/discount [GET]
+
+discount package
+
+```
+URI:/api/v1/package/discount GET
+Method: GET
+Args:
+   id:uint64,
+```
+
+Example
+
+```
+curl http://127.0.0.1:7788/api/v1/package/discount?id=357096341043478529
+
 ```
 
 ## /api/v1/order/all [GET]

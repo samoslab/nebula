@@ -27,7 +27,7 @@ type Order struct {
 	Quanlity    uint32      `json:"quanlity,omitempty"`
 	TotalAmount uint64      `json:"totalAmount,omitempty"`
 	Upgraded    bool        `json:"upgraded,omitempty"`
-	Discount    float32     `json:"discount,omitempty"`
+	Discount    string      `json:"discount,omitempty"`
 	Volume      uint32      `json:"volume,omitempty"`
 	Netflow     uint32      `json:"netflow,omitempty"`
 	UpNetflow   uint32      `json:"upNetflow,omitempty"`
@@ -129,6 +129,20 @@ func (om *OrderManager) BuyPackage(id uint64, canceled bool, quanlity uint32) (*
 	}
 	log.Infof("%+v", rsp)
 	return NewOrderFromPbOrder(rsp.GetOrder()), nil
+}
+
+func (om *OrderManager) DiscountPackage(id uint64) (map[uint32]string, error) {
+	log := om.Log
+	req := &pb.PackageDiscountReq{
+		Version:   common.Version,
+		PackageId: int64(id),
+	}
+	rsp, err := om.orderClient.PackageDiscount(context.Background(), req)
+	if err != nil {
+		return nil, err
+	}
+	log.Infof("%+v", rsp)
+	return rsp.GetDiscount(), nil
 }
 
 func (om *OrderManager) MyAllOrders(expired bool) ([]*Order, error) {
