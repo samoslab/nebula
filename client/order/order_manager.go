@@ -85,9 +85,8 @@ func (om *OrderManager) GetAllPackages() ([]*pb.Package, error) {
 	}
 	rsp, err := om.orderClient.AllPackage(context.Background(), req)
 	if err != nil {
-		return nil, err
+		return nil, common.StatusErrFromError(err)
 	}
-
 	log.Infof("%+v", rsp)
 	return rsp.GetAllPackage(), nil
 }
@@ -100,7 +99,7 @@ func (om *OrderManager) GetPackageInfo(id uint64) (*pb.Package, error) {
 	}
 	rsp, err := om.orderClient.PackageInfo(context.Background(), req)
 	if err != nil {
-		return nil, err
+		return nil, common.StatusErrFromError(err)
 	}
 	log.Infof("%+v", rsp)
 	return rsp.GetPackage(), nil
@@ -122,7 +121,7 @@ func (om *OrderManager) BuyPackage(id uint64, canceled bool, quanlity uint32) (*
 	}
 	rsp, err := om.orderClient.BuyPackage(context.Background(), req)
 	if err != nil {
-		return nil, err
+		return nil, common.StatusErrFromError(err)
 	}
 	if rsp.GetCode() != 0 {
 		return nil, fmt.Errorf("buy packge error %s", rsp.GetErrMsg())
@@ -139,7 +138,7 @@ func (om *OrderManager) DiscountPackage(id uint64) (map[uint32]string, error) {
 	}
 	rsp, err := om.orderClient.PackageDiscount(context.Background(), req)
 	if err != nil {
-		return nil, err
+		return nil, common.StatusErrFromError(err)
 	}
 	log.Infof("%+v", rsp)
 	return rsp.GetDiscount(), nil
@@ -159,7 +158,7 @@ func (om *OrderManager) MyAllOrders(expired bool) ([]*Order, error) {
 	}
 	rsp, err := om.orderClient.MyAllOrder(context.Background(), req)
 	if err != nil {
-		return nil, err
+		return nil, common.StatusErrFromError(err)
 	}
 	log.Infof("%+v", rsp)
 	allOrder := []*Order{}
@@ -188,7 +187,7 @@ func (om *OrderManager) GetOrderInfo(orderId string) (*Order, error) {
 
 	rsp, err := om.orderClient.OrderInfo(context.Background(), req)
 	if err != nil {
-		return nil, err
+		return nil, common.StatusErrFromError(err)
 	}
 	log.Infof("%+v", rsp)
 
@@ -213,7 +212,7 @@ func (om *OrderManager) RechargeAddress() (*AddressBalance, error) {
 	}
 	rsp, err := om.orderClient.RechargeAddress(context.Background(), req)
 	if err != nil {
-		return nil, err
+		return nil, common.StatusErrFromError(err)
 	}
 	log.Infof("%+v", rsp)
 
@@ -246,7 +245,7 @@ func (om *OrderManager) PayOrdor(orderId string) (*pb.PayOrderResp, error) {
 	}
 	rsp, err := om.orderClient.PayOrder(context.Background(), req)
 	if err != nil {
-		return nil, err
+		return nil, common.StatusErrFromError(err)
 	}
 	log.Infof("%+v", rsp)
 
@@ -266,7 +265,7 @@ func (om *OrderManager) UsageAmount() (*pb.UsageAmountResp, error) {
 	}
 	rsp, err := om.orderClient.UsageAmount(context.Background(), req)
 	if err != nil {
-		return nil, err
+		return nil, common.StatusErrFromError(err)
 	}
 	log.Infof("%+v", rsp)
 	return rsp, nil

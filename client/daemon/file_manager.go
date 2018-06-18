@@ -185,7 +185,7 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 	log := c.Log
 	req, rsp, err := c.CheckFileExists(filename, interactive, newVersion)
 	if err != nil {
-		return err
+		return common.StatusErrFromError(err)
 	}
 
 	log.Infof("check file exists rsp code:%d", rsp.GetCode())
@@ -302,7 +302,7 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 		ufprsp, err := c.mclient.UploadFilePrepare(ctx, ufpr)
 		if err != nil {
 			log.Errorf("UploadFilePrepare error %v", err)
-			return err
+			return common.StatusErrFromError(err)
 		}
 
 		rspPartitions := ufprsp.GetPartition()
@@ -407,6 +407,9 @@ func (c *ClientManager) MkFolder(filepath string, folders []string, interactive 
 	}
 	log.Infof("make folder :%+v, parent:%s", req.GetFolder(), filepath)
 	rsp, err := c.mclient.MkFolder(ctx, req)
+	if err != nil {
+		return false, common.StatusErrFromError(err)
+	}
 	if rsp.GetCode() != 0 {
 		if strings.Contains(rsp.GetErrMsg(), "System error: pq: duplicate key value") {
 			log.Warning("folder exists %s", rsp.GetErrMsg())
@@ -587,7 +590,7 @@ func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitio
 	c.Log.Infof("upload file %s done request", req.GetFileName())
 	ufdrsp, err := c.mclient.UploadFileDone(ctx, req)
 	if err != nil {
-		return err
+		return common.StatusErrFromError(err)
 	}
 	c.Log.Infof("upload done code: %d", ufdrsp.GetCode())
 	if ufdrsp.GetCode() != 0 {
@@ -627,7 +630,7 @@ func (c *ClientManager) ListFiles(path string, pageSize, pageNum uint32, sortTyp
 	rsp, err := c.mclient.ListFiles(ctx, req)
 
 	if err != nil {
-		return nil, err
+		return nil, common.StatusErrFromError(err)
 	}
 
 	if rsp.GetCode() != 0 {
@@ -688,7 +691,7 @@ func (c *ClientManager) DownloadDir(path string) error {
 					err = c.DownloadFile(currentFile, fileInfo.FileHash, fileInfo.FileSize)
 					if err != nil {
 						log.Errorf("download file %s error %v", currentFile, err)
-						errResult = append(errResult, fmt.Errorf("%s %v", currentFile, err))
+						errResult = append(errResult, fmt.Errorf("%s %v", currentFile, common.StatusErrFromError(err)))
 						//return err
 					}
 				}
@@ -728,7 +731,7 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 	log.Infof("download file request hash:%x, size %d", fileHash, fileSize)
 	rsp, err := c.mclient.RetrieveFile(ctx, req)
 	if err != nil {
-		return err
+		return common.StatusErrFromError(err)
 	}
 	if rsp.GetCode() != 0 {
 		return fmt.Errorf("%s", rsp.GetErrMsg())
@@ -951,7 +954,7 @@ func (c *ClientManager) RemoveFile(target string, recursive bool, isPath bool) e
 	log.Infof("remove file :%+v, recursion %v", req.Target, req.GetRecursive())
 	rsp, err := c.mclient.Remove(context.Background(), req)
 	if err != nil {
-		return err
+		return common.StatusErrFromError(err)
 	}
 	log.Infof("remove file rsp code :%d msg: %s", rsp.GetCode(), rsp.GetErrMsg())
 	if rsp.GetCode() != 0 {
