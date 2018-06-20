@@ -23,6 +23,8 @@ Index
 | [/api/v1/order/recharge/address](#apiv1orderrechargeaddress-get)                             | GET|
 | [/api/v1/order/pay](#apiv1orderpay-post)                             | POST |
 | [/api/v1/usage/amount](#apiv1usageamount-get)                             | GET |
+| [/api/v1/encryfile](#apiv1encryfile-post)                             | POST |
+| [/api/v1/decryfile](#apiv1decryfile-post)                             | POST |
 
 统一说明 返回json object结构统一为： 成功：{"code":0, "data":object} 失败：{"code":1,"errmsg":"errmsg","data":object}  
 
@@ -574,6 +576,43 @@ curl http://127.0.0.1:7788/api/v1/usage/amount
 }
 ```
 
+## /api/v1/encryfile [POST]
+
+encrypt file
+```
+URI:/api/v1/encryfile POST
+Method: POST
+Request Body: {
+   file:string,
+   password:string,
+   output_file:string,
+   }
+
+```
+
+Exmpale 
+
+```
+```
+
+## /api/v1/decryfile [POST]
+
+decrypt file
+```
+URI:/api/v1/decryfile POST
+Method: POST
+Request Body: {
+   file:string,
+   password:string,
+   output_file:string,
+   }
+
+```
+
+Exmpale 
+
+```
+```
 # specification
 
 ```
