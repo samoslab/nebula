@@ -104,8 +104,8 @@ func (c *ClientManager) Shutdown() {
 	collectClient.Stop()
 }
 
-func (c *ClientManager) getPingTime(pro *mpb.BlockProviderAuth) int {
-	server := fmt.Sprintf("%s:%d", pro.GetServer(), pro.GetPort())
+func (c *ClientManager) getPingTime(ip string, port uint32) int {
+	server := fmt.Sprintf("%s:%d", ip, port)
 	timeStart := time.Now().Unix()
 	conn, err := grpc.Dial(server, grpc.WithInsecure())
 	if err != nil {
@@ -138,10 +138,11 @@ func (c *ClientManager) PingProvider(pros []*mpb.BlockProviderAuth, needNum int)
 	sortPros := []SortablePro{}
 	// TODO can ping concurrent
 	for _, bpa := range pros {
-		pingTime := c.getPingTime(bpa)
+		pingTime := c.getPingTime(bpa.GetServer(), bpa.GetPort())
 		sortPros = append(sortPros, SortablePro{Pro: bpa, Delay: pingTime})
 	}
 
+	// TODO need consider Spare , Spare = false is backup provider
 	sort.Slice(sortPros, func(i, j int) bool { return sortPros[i].Delay < sortPros[j].Delay })
 
 	availablePros := []*mpb.BlockProviderAuth{}
@@ -151,6 +152,31 @@ func (c *ClientManager) PingProvider(pros []*mpb.BlockProviderAuth, needNum int)
 
 	//return availablePros[0:needNum], nil
 	return pros, nil
+}
+
+// BestRetrieveNode ping retrieve node
+func (c *ClientManager) BestRetrieveNode(pros []*mpb.RetrieveNode) *mpb.RetrieveNode {
+	//todo if provider ip is same
+	type SortablePro struct {
+		Pro   *mpb.RetrieveNode
+		Delay int
+	}
+
+	sortPros := []SortablePro{}
+	// TODO can ping concurrent
+	for _, bpa := range pros {
+		pingTime := c.getPingTime(bpa.GetServer(), bpa.GetPort())
+		sortPros = append(sortPros, SortablePro{Pro: bpa, Delay: pingTime})
+	}
+
+	sort.Slice(sortPros, func(i, j int) bool { return sortPros[i].Delay < sortPros[j].Delay })
+
+	availablePros := []*mpb.RetrieveNode{}
+	for _, proInfo := range sortPros {
+		availablePros = append(availablePros, proInfo.Pro)
+	}
+
+	return availablePros[0]
 }
 
 // UploadDir upload all files in dir to provider
@@ -185,7 +211,7 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 	log := c.Log
 	req, rsp, err := c.CheckFileExists(filename, interactive, newVersion)
 	if err != nil {
-		return err
+		return common.StatusErrFromError(err)
 	}
 
 	log.Infof("check file exists rsp code:%d", rsp.GetCode())
@@ -302,7 +328,7 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 		ufprsp, err := c.mclient.UploadFilePrepare(ctx, ufpr)
 		if err != nil {
 			log.Errorf("UploadFilePrepare error %v", err)
-			return err
+			return common.StatusErrFromError(err)
 		}
 
 		rspPartitions := ufprsp.GetPartition()
@@ -407,6 +433,9 @@ func (c *ClientManager) MkFolder(filepath string, folders []string, interactive 
 	}
 	log.Infof("make folder :%+v, parent:%s", req.GetFolder(), filepath)
 	rsp, err := c.mclient.MkFolder(ctx, req)
+	if err != nil {
+		return false, common.StatusErrFromError(err)
+	}
 	if rsp.GetCode() != 0 {
 		if strings.Contains(rsp.GetErrMsg(), "System error: pq: duplicate key value") {
 			log.Warning("folder exists %s", rsp.GetErrMsg())
@@ -587,7 +616,7 @@ func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitio
 	c.Log.Infof("upload file %s done request", req.GetFileName())
 	ufdrsp, err := c.mclient.UploadFileDone(ctx, req)
 	if err != nil {
-		return err
+		return common.StatusErrFromError(err)
 	}
 	c.Log.Infof("upload done code: %d", ufdrsp.GetCode())
 	if ufdrsp.GetCode() != 0 {
@@ -627,7 +656,7 @@ func (c *ClientManager) ListFiles(path string, pageSize, pageNum uint32, sortTyp
 	rsp, err := c.mclient.ListFiles(ctx, req)
 
 	if err != nil {
-		return nil, err
+		return nil, common.StatusErrFromError(err)
 	}
 
 	if rsp.GetCode() != 0 {
@@ -688,7 +717,7 @@ func (c *ClientManager) DownloadDir(path string) error {
 					err = c.DownloadFile(currentFile, fileInfo.FileHash, fileInfo.FileSize)
 					if err != nil {
 						log.Errorf("download file %s error %v", currentFile, err)
-						errResult = append(errResult, fmt.Errorf("%s %v", currentFile, err))
+						errResult = append(errResult, fmt.Errorf("%s %v", currentFile, common.StatusErrFromError(err)))
 						//return err
 					}
 				}
@@ -728,7 +757,7 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 	log.Infof("download file request hash:%x, size %d", fileHash, fileSize)
 	rsp, err := c.mclient.RetrieveFile(ctx, req)
 	if err != nil {
-		return err
+		return common.StatusErrFromError(err)
 	}
 	if rsp.GetCode() != 0 {
 		return fmt.Errorf("%s", rsp.GetErrMsg())
@@ -869,8 +898,7 @@ func (c *ClientManager) saveFileByPartition(filename string, partition *mpb.Retr
 		} else {
 			dataShards++
 		}
-		nodes := block.GetStoreNode()
-		node := nodes[0]
+		node := c.BestRetrieveNode(block.GetStoreNode())
 		server := fmt.Sprintf("%s:%d", node.GetServer(), node.GetPort())
 		tempFileName := filename
 		if !multiReplica {
@@ -951,7 +979,7 @@ func (c *ClientManager) RemoveFile(target string, recursive bool, isPath bool) e
 	log.Infof("remove file :%+v, recursion %v", req.Target, req.GetRecursive())
 	rsp, err := c.mclient.Remove(context.Background(), req)
 	if err != nil {
-		return err
+		return common.StatusErrFromError(err)
 	}
 	log.Infof("remove file rsp code :%d msg: %s", rsp.GetCode(), rsp.GetErrMsg())
 	if rsp.GetCode() != 0 {

@@ -307,11 +307,15 @@ func (s *HTTPServer) setupMux() *http.ServeMux {
 	handleAPI("/api/v1/package/all", GetAllPackageHandler(s))
 	handleAPI("/api/v1/package", GetPackageInfoHandler(s))
 	handleAPI("/api/v1/package/buy", BuyPackageHandler(s))
+	handleAPI("/api/v1/package/discount", DiscountPackageHandler(s))
 	handleAPI("/api/v1/order/all", MyAllOrderHandler(s))
 	handleAPI("/api/v1/order/getinfo", GetOrderInfoHandler(s))
 	handleAPI("/api/v1/order/recharge/address", RechargeAddressHandler(s))
 	handleAPI("/api/v1/order/pay", PayOrderHandler(s))
 	handleAPI("/api/v1/usage/amount", UsageAmountHandler(s))
+
+	handleAPI("/api/v1/secret/encrypt", EncryFileHandler(s))
+	handleAPI("/api/v1/secret/decrypt", DecryFileHandler(s))
 
 	return mux
 }
@@ -373,6 +377,18 @@ type ProgressReq struct {
 
 type ProgressRsp struct {
 	Progress map[string]float64 `json:"progress"`
+}
+
+type EncryFileReq struct {
+	FileName   string `json:"file"`
+	Password   string `json:"password"`
+	OutputFile string `json:output_file`
+}
+
+type DecryFileReq struct {
+	FileName   string `json:"file"`
+	Password   string `json:"password"`
+	OutputFile string `json:output_file`
 }
 
 func RegisterHandler(s *HTTPServer) http.HandlerFunc {
@@ -950,6 +966,140 @@ func ProgressHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, progressRsp, errmsg)
+		if err != nil {
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+		if err := JSONResponse(w, rsp); err != nil {
+			fmt.Printf("error %v\n", err)
+		}
+	}
+}
+
+func EncryFileHandler(s *HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		if !s.CanBeWork() {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
+			return
+		}
+		log := s.cm.Log
+		w.Header().Set("Accept", "application/json")
+
+		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
+			return
+		}
+
+		if r.Header.Get("Content-Type") != "application/json" {
+			errorResponse(ctx, w, http.StatusUnsupportedMediaType, errors.New("Invalid content type"))
+			return
+		}
+
+		req := &EncryFileReq{}
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&req); err != nil {
+			err = fmt.Errorf("Invalid json request body: %v", err)
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+
+		defer r.Body.Close()
+		if req.FileName == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument file must not empty"))
+			return
+		}
+		if req.Password == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument password must not empty"))
+			return
+		}
+		if len(req.Password) != 16 {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("password lenght must 16"))
+			return
+		}
+
+		log.Infof("encrypt file %+v\n", req.FileName)
+		if req.OutputFile == "" {
+			req.OutputFile = req.FileName
+		}
+		err := common.EncryptFile(req.FileName, []byte(req.Password), req.OutputFile)
+		code := 0
+		errmsg := ""
+		result := true
+		if err != nil {
+			log.Errorf("encrypt file %+v error %v", req.FileName, err)
+			code = 1
+			errmsg = err.Error()
+			result = false
+		}
+
+		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
+		if err != nil {
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+		if err := JSONResponse(w, rsp); err != nil {
+			fmt.Printf("error %v\n", err)
+		}
+	}
+}
+
+func DecryFileHandler(s *HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		if !s.CanBeWork() {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
+			return
+		}
+		log := s.cm.Log
+		w.Header().Set("Accept", "application/json")
+
+		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
+			return
+		}
+
+		if r.Header.Get("Content-Type") != "application/json" {
+			errorResponse(ctx, w, http.StatusUnsupportedMediaType, errors.New("Invalid content type"))
+			return
+		}
+
+		req := &DecryFileReq{}
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&req); err != nil {
+			err = fmt.Errorf("Invalid json request body: %v", err)
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+
+		defer r.Body.Close()
+		if req.FileName == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument file must not empty"))
+			return
+		}
+		if req.Password == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument password must not empty"))
+			return
+		}
+		if len(req.Password) != 16 {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("password lenght must 16"))
+			return
+		}
+
+		log.Infof("encrypt file %+v\n", req.FileName)
+		if req.OutputFile == "" {
+			req.OutputFile = req.FileName
+		}
+		err := common.DecryptFile(req.FileName, []byte(req.Password), req.OutputFile)
+		code := 0
+		errmsg := ""
+		result := true
+		if err != nil {
+			log.Errorf("decrypt file %+v error %v", req.FileName, err)
+			code = 1
+			errmsg = err.Error()
+			result = false
+		}
+
+		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
 		if err != nil {
 			errorResponse(ctx, w, http.StatusBadRequest, err)
 			return

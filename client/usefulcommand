@@ -81,7 +81,7 @@ curl -X POST -H "Content-Type:application/json" -d '{"files":[]}' http://127.0.0
 }
 
 curl -X POST -H "Content-Type:application/json" -d '{"parent":"/tmp/abc"}' http://127.0.0.1:7788/api/v1/store/downloaddir
-curl -X POST -H "Content-Type:application/json" -d '{"parent":"/tmp/bak"}' http://127.0.0.1:7788/api/v1/store/uploaddi
+curl -X POST -H "Content-Type:application/json" -d '{"parent":"/tmp/bak"}' http://127.0.0.1:7788/api/v1/store/uploaddir
 
 alter table file_version DROP CONSTRAINT fk_node_id_ref_client;
 alter table file_version DROP CONSTRAINT fk_owner_id_ref_file_owner;
