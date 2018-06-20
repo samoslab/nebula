@@ -314,8 +314,8 @@ func (s *HTTPServer) setupMux() *http.ServeMux {
 	handleAPI("/api/v1/order/pay", PayOrderHandler(s))
 	handleAPI("/api/v1/usage/amount", UsageAmountHandler(s))
 
-	handleAPI("/api/v1/encryfile", EncryFileHandler(s))
-	handleAPI("/api/v1/decryfile", DecryFileHandler(s))
+	handleAPI("/api/v1/secret/encrypt", EncryFileHandler(s))
+	handleAPI("/api/v1/secret/decrypt", DecryFileHandler(s))
 
 	return mux
 }
