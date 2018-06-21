@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc"
 )
 
+// OrderManager order manager
 type OrderManager struct {
 	orderClient pb.OrderServiceClient
 	Log         logrus.FieldLogger
@@ -19,6 +20,7 @@ type OrderManager struct {
 	NodeId      []byte
 }
 
+// Order order infos that return to front-end
 type Order struct {
 	Id          string      `json:"id,omitempty"`
 	Creation    uint64      `json:"creation,omitempty"`
@@ -40,6 +42,7 @@ type Order struct {
 	Remark      string      `json:"remark,omitempty"`
 }
 
+// NewOrderFromPbOrder create Order from protobuf Order, diff is Id
 func NewOrderFromPbOrder(o *pb.Order) *Order {
 	return &Order{
 		Id:          hex.EncodeToString(o.Id),
@@ -63,6 +66,7 @@ func NewOrderFromPbOrder(o *pb.Order) *Order {
 	}
 }
 
+// NewOrderManager create order manager ,only communicate with tracker server
 func NewOrderManager(trackerServer string, log logrus.FieldLogger, privateKey *rsa.PrivateKey, nodeId []byte) *OrderManager {
 	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
 	if err != nil {
@@ -78,6 +82,7 @@ func NewOrderManager(trackerServer string, log logrus.FieldLogger, privateKey *r
 	}
 }
 
+// GetAllPackages return all packges
 func (om *OrderManager) GetAllPackages() ([]*pb.Package, error) {
 	log := om.Log
 	req := &pb.AllPackageReq{
@@ -91,6 +96,7 @@ func (om *OrderManager) GetAllPackages() ([]*pb.Package, error) {
 	return rsp.GetAllPackage(), nil
 }
 
+// GetPackageInfo returns package by package id
 func (om *OrderManager) GetPackageInfo(id uint64) (*pb.Package, error) {
 	log := om.Log
 	req := &pb.PackageInfoReq{
@@ -105,6 +111,7 @@ func (om *OrderManager) GetPackageInfo(id uint64) (*pb.Package, error) {
 	return rsp.GetPackage(), nil
 }
 
+// BuyPackage buy package
 func (om *OrderManager) BuyPackage(id uint64, canceled bool, quanlity uint32) (*Order, error) {
 	log := om.Log
 	req := &pb.BuyPackageReq{
@@ -130,6 +137,7 @@ func (om *OrderManager) BuyPackage(id uint64, canceled bool, quanlity uint32) (*
 	return NewOrderFromPbOrder(rsp.GetOrder()), nil
 }
 
+// DiscountPackage package discount
 func (om *OrderManager) DiscountPackage(id uint64) (map[uint32]string, error) {
 	log := om.Log
 	req := &pb.PackageDiscountReq{
@@ -144,6 +152,7 @@ func (om *OrderManager) DiscountPackage(id uint64) (map[uint32]string, error) {
 	return rsp.GetDiscount(), nil
 }
 
+// MyAllOrders returns all orders of current client
 func (om *OrderManager) MyAllOrders(expired bool) ([]*Order, error) {
 	log := om.Log
 	req := &pb.MyAllOrderReq{
@@ -168,6 +177,7 @@ func (om *OrderManager) MyAllOrders(expired bool) ([]*Order, error) {
 	return allOrder, nil
 }
 
+// GetOrderInfo returns order info by order id
 func (om *OrderManager) GetOrderInfo(orderId string) (*Order, error) {
 	log := om.Log
 	orderid, err := hex.DecodeString(orderId)
@@ -194,11 +204,13 @@ func (om *OrderManager) GetOrderInfo(orderId string) (*Order, error) {
 	return NewOrderFromPbOrder(rsp.GetOrder()), nil
 }
 
+// AddressBalance balance of current client
 type AddressBalance struct {
 	Address string `json:"address"`
 	Balance uint64 `json:"balance"`
 }
 
+// RechargeAddress get balance of current client
 func (om *OrderManager) RechargeAddress() (*AddressBalance, error) {
 	log := om.Log
 	req := &pb.RechargeAddressReq{
@@ -227,6 +239,7 @@ func (om *OrderManager) RechargeAddress() (*AddressBalance, error) {
 	return ab, nil
 }
 
+// PayOrder pay order
 func (om *OrderManager) PayOrdor(orderId string) (*pb.PayOrderResp, error) {
 	log := om.Log
 	orderid, err := hex.DecodeString(orderId)
@@ -252,6 +265,7 @@ func (om *OrderManager) PayOrdor(orderId string) (*pb.PayOrderResp, error) {
 	return rsp, nil
 }
 
+// UsageAmount usage amount of package
 func (om *OrderManager) UsageAmount() (*pb.UsageAmountResp, error) {
 	log := om.Log
 	req := &pb.UsageAmountReq{

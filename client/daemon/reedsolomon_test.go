@@ -30,16 +30,13 @@ func TestEncoder(t *testing.T) {
 	parShards := 1
 	currentDir, err := os.Getwd()
 	require.NoError(t, err)
-	fmt.Printf("current dir %s\n", currentDir)
 	fname := filepath.Join(currentDir, "testdata/test.zip")
 	log, err := NewLogger("", true)
 	require.NoError(t, err)
 	originMd5, err := getFileMd5(fname)
 	require.NoError(t, err)
-	fmt.Printf("origin md5 %s\n", originMd5)
 	originSize, err := GetFileSize(fname)
 	require.NoError(t, err)
-	fmt.Printf("origin size %d\n", originSize)
 	hashFiles, err := RsEncoder(log, outDir, fname, dataShards, parShards)
 	require.NoError(t, err)
 	require.Equal(t, 3, len(hashFiles))
@@ -54,10 +51,8 @@ func TestEncoder(t *testing.T) {
 	err = RsDecoder(log, fname, "", originSize, dataShards, parShards)
 	require.NoError(t, err)
 	recoveryMd5, err := getFileMd5(fname)
-	fmt.Printf("recovery md5 %s\n", recoveryMd5)
 	require.Equal(t, originMd5, recoveryMd5)
 	for _, fileInfo := range hashFiles {
-		fmt.Printf("%s\n", fileInfo.FileName)
 		if err := os.Remove(fileInfo.FileName); err != nil {
 			log.Errorf("delete %s failed, error %v", fileInfo.FileName, err)
 		}
@@ -74,16 +69,13 @@ func TestOddFileSize(t *testing.T) {
 		for parShards := 2; parShards < dataShards; parShards++ {
 			currentDir, err := os.Getwd()
 			require.NoError(t, err)
-			fmt.Printf("current dir %s\n", currentDir)
 			fname := filepath.Join(currentDir, "testdata/odd_filesize.txt")
 			log, err := NewLogger("", false)
 			require.NoError(t, err)
 			originMd5, err := getFileMd5(fname)
-			fmt.Printf("origin md5 %s\n", originMd5)
 			require.NoError(t, err)
 			originSize, err := GetFileSize(fname)
 			require.NoError(t, err)
-			fmt.Printf("origin size %d\n", originSize)
 			hashFiles, err := RsEncoder(log, outDir, fname, dataShards, parShards)
 			require.NoError(t, err)
 			require.Equal(t, dataShards+parShards, len(hashFiles))
@@ -98,10 +90,8 @@ func TestOddFileSize(t *testing.T) {
 			err = RsDecoder(log, fname, "", originSize, dataShards, parShards)
 			require.NoError(t, err)
 			recoveryMd5, err := getFileMd5(fname)
-			fmt.Printf("recovery md5 %s\n", recoveryMd5)
 			require.Equal(t, originMd5, recoveryMd5)
 			for _, fileInfo := range hashFiles {
-				fmt.Printf("%s\n", fileInfo.FileName)
 				if err := os.Remove(fileInfo.FileName); err != nil {
 					log.Errorf("delete %s failed, error %v", fileInfo.FileName, err)
 				}

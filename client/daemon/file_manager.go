@@ -72,17 +72,15 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 
 	c := &ClientManager{
 		serverConn: conn,
-		//collectConn:   connCollect,
-		Log:     log,
-		cfg:     cfg,
-		TempDir: DefaultTempDir,
-		NodeId:  cfg.Node.NodeId,
-		PM:      common.NewProgressManager(),
-		mclient: mpb.NewMatadataServiceClient(conn),
-		OM:      om,
+		Log:        log,
+		cfg:        cfg,
+		TempDir:    DefaultTempDir,
+		NodeId:     cfg.Node.NodeId,
+		PM:         common.NewProgressManager(),
+		mclient:    mpb.NewMatadataServiceClient(conn),
+		OM:         om,
 	}
 
-	// set collect node
 	collectClient.NodePtr = cfg.Node
 
 	log.Infof("temp dir %s", c.TempDir)
@@ -163,7 +161,6 @@ func (c *ClientManager) BestRetrieveNode(pros []*mpb.RetrieveNode) *mpb.Retrieve
 	}
 
 	sortPros := []SortablePro{}
-	// TODO can ping concurrent
 	for _, bpa := range pros {
 		pingTime := c.getPingTime(bpa.GetServer(), bpa.GetPort())
 		sortPros = append(sortPros, SortablePro{Pro: bpa, Delay: pingTime})
@@ -450,7 +447,7 @@ func (c *ClientManager) MkFolder(filepath string, folders []string, interactive 
 func (c *ClientManager) onlyFileSplit(filename string, dataNum, verifyNum int) ([]common.HashFile, error) {
 	fileSlices, err := RsEncoder(c.Log, c.TempDir, filename, dataNum, verifyNum)
 	if err != nil {
-		c.Log.Errorf("reed se error %v", err)
+		c.Log.Errorf("reedsolomon encoder error %v", err)
 		return nil, err
 	}
 	return fileSlices, nil
@@ -499,11 +496,6 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 		return partition, errResult[0]
 	}
 	return partition, nil
-}
-
-func getOneOfPartition(pro *mpb.ErasureCodePartition) *mpb.BlockProviderAuth {
-	pa := pro.GetProviderAuth()[0]
-	return pa
 }
 
 func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, tm uint64, uploadPara *common.UploadParameter) (*mpb.StoreBlock, error) {
@@ -795,7 +787,7 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 		for j, block := range partition.GetBlock() {
 			c.PM.SetPartitionMap(hex.EncodeToString(block.GetHash()), downFileName)
 			realSizeAfterRS += block.GetSize()
-			fmt.Printf("partition %d block %d hash %x size %d checksum %v seq %d\n", i, j, block.Hash, block.Size, block.Checksum, block.BlockSeq)
+			log.Infof("partition %d block %d hash %x size %d checksum %v seq %d\n", i, j, block.Hash, block.Size, block.Checksum, block.BlockSeq)
 		}
 	}
 	c.PM.SetProgress(downFileName, 0, realSizeAfterRS)
@@ -842,7 +834,7 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 	}
 	partFiles := []string{}
 	for i, partition := range partitions {
-		partFileName := fmt.Sprintf("%s.part.%d", downFileName, i)
+		partFileName := fmt.Sprintf("%s.%s.%d", downFileName, TEMP_NAMESPACE, i)
 		datas, paritys, failedCount, middleFiles, err := c.saveFileByPartition(partFileName, partition, rsp.GetTimestamp(), req.FileHash, req.FileSize, false)
 		if failedCount > paritys {
 			log.Errorf("middle file %s cannot be recoved!!!", partFileName)

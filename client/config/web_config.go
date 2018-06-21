@@ -12,11 +12,15 @@ import (
 )
 
 const (
-	DefaultConfig  = ".samos-nebula-client/config.json"
+	// DefaultConfig default store filename of config
+	DefaultConfig = ".samos-nebula-client/config.json"
+	// DefaultTracker default tracker server
 	DefaultTracker = "127.0.0.1:6677"
+	// DefaultCollect default collect server
 	DefaultCollect = "127.0.0.1:6688"
 )
 
+// Config config for web
 type Config struct {
 	TrackerServer    string        `json:"tracker_server"`
 	CollectServer    string        `json:"collect_server"`
@@ -34,6 +38,7 @@ type Config struct {
 	APIEnabled       bool          `json:"api_enabled"`
 }
 
+// SetDefault set default value
 func (cfg *Config) SetDefault() {
 	if cfg.TrackerServer == "" {
 		cfg.TrackerServer = DefaultTracker
@@ -50,6 +55,7 @@ func (cfg *Config) SetDefault() {
 	}
 }
 
+// Validate validate config correctness
 func (cfg *Config) Validate() error {
 	if cfg.TrackerServer == "" {
 		return errors.New("need tracker server")
@@ -60,6 +66,7 @@ func (cfg *Config) Validate() error {
 	return nil
 }
 
+// LoadWebConfig load web config
 func LoadWebConfig(configFilePath string) (*Config, error) {
 	jsonFile, err := os.Open(configFilePath)
 	if err != nil {

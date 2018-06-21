@@ -54,6 +54,7 @@ type HTTPServer struct {
 	done          chan struct{}
 }
 
+// InitClientManager init client manager
 func InitClientManager(log logrus.FieldLogger, webcfg config.Config) (*daemon.ClientManager, error) {
 	_, defaultConfig := daemon.GetConfigFile()
 	clientConfig, err := config.LoadConfig(defaultConfig)

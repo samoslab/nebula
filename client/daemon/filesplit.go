@@ -1,7 +1,6 @@
 package daemon
 
 import (
-	"fmt"
 	"io/ioutil"
 	"math"
 	"os"
@@ -10,6 +9,7 @@ import (
 )
 
 const chunkSize int64 = 1024 * 1024
+const TEMP_NAMESPACE = "part"
 
 // Slice record file slice for split
 type Slice struct {
@@ -17,6 +17,7 @@ type Slice struct {
 	End   int64
 }
 
+// FileSlice split file into slices
 func FileSlice(fileName string, chunkSize int64) ([]Slice, error) {
 	fileInfo, err := os.Stat(fileName)
 	if err != nil {
@@ -24,7 +25,7 @@ func FileSlice(fileName string, chunkSize int64) ([]Slice, error) {
 	}
 	num := int64(math.Ceil(float64(fileInfo.Size()) / float64(chunkSize)))
 	sliceArray := make([]Slice, num)
-	var i int64 = 0
+	var i int64
 	for ; i < int64(num); i++ {
 		if i+1 == num {
 			sliceArray[i].Begin = i * chunkSize
@@ -34,11 +35,11 @@ func FileSlice(fileName string, chunkSize int64) ([]Slice, error) {
 			sliceArray[i].End = (i+1)*chunkSize - 1
 		}
 	}
-	fmt.Printf("slice %+v\n", sliceArray)
 
 	return sliceArray, nil
 }
 
+// FileShardNum calculate sharding number according to chunk size
 func FileShardNum(fileName string, chunkSize int64) (int, error) {
 	fileInfo, err := os.Stat(fileName)
 	if err != nil {
@@ -76,10 +77,9 @@ func FileSplit(outDir, fileName string, fileSize int64, chunkSize, chunkNum int6
 
 		fi.Read(b)
 
-		filename := filepath.Join(outDir, onlyFileName+".part."+strconv.Itoa(int(i-1)))
+		filename := filepath.Join(outDir, onlyFileName+"."+TEMP_NAMESPACE+"."+strconv.Itoa(int(i-1)))
 		f, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
-			fmt.Println(err)
 			return nil, err
 		}
 		f.Write(b)
@@ -100,19 +100,16 @@ func FileSplit(outDir, fileName string, fileSize int64, chunkSize, chunkNum int6
 func FileJoin(filename string, partfiles []string) error {
 	fii, err := os.OpenFile(filename, os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		fmt.Println(err)
 		return err
 	}
 	defer fii.Close()
 	for _, file := range partfiles {
 		f, err := os.OpenFile(file, os.O_RDONLY, 0644)
 		if err != nil {
-			fmt.Println(err)
 			return err
 		}
 		b, err := ioutil.ReadAll(f)
 		if err != nil {
-			fmt.Println(err)
 			return err
 		}
 		fii.Write(b)
@@ -121,6 +118,7 @@ func FileJoin(filename string, partfiles []string) error {
 	return nil
 }
 
+// GetDirsAndFiles returns dirs and files in path root
 func GetDirsAndFiles(root string) ([]DirPair, []string, error) {
 	dirs := []DirPair{}
 	files := []string{}

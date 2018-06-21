@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 )
 
+// RandStr return random string
 func RandStr(str_size int) string {
 	alphanum := "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 	var bytes = make([]byte, str_size)
@@ -20,6 +21,7 @@ func RandStr(str_size int) string {
 	return string(bytes)
 }
 
+// EncryptFile encrypt file using aes alg
 func EncryptFile(inputfile string, key []byte, outputfile string) error {
 	b, err := ioutil.ReadFile(inputfile) //Read the target file
 	if err != nil {
@@ -40,6 +42,7 @@ func EncryptFile(inputfile string, key []byte, outputfile string) error {
 	return nil
 }
 
+// DecryptFile decrypt file
 func DecryptFile(inputfile string, key []byte, outputfile string) error {
 	z, err := ioutil.ReadFile(inputfile)
 	if err != nil {
