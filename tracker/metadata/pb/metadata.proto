@@ -17,6 +17,8 @@ service MatadataService {
 
     rpc Remove(RemoveReq) returns (RemoveResp){}
 
+    rpc Move(MoveReq) returns (MoveResp){}
+
 }
 
 message MkFolderReq{
@@ -236,6 +238,20 @@ message RemoveReq{
 }
 
 message RemoveResp{
+    uint32 code = 1;//0:success, 1: failed
+    string errMsg=2;
+}
+
+message MoveReq{
+    uint32 version =1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    FilePath source=4;
+    string dest=5;
+    bytes sign=9;
+}
+
+message MoveResp{
     uint32 code = 1;//0:success, 1: failed
     string errMsg=2;
 }
