@@ -29,6 +29,7 @@ type UnifiedResponse struct {
 	Data   json.RawMessage
 }
 
+// MakeUnifiedHTTPResponse make uniformed format http response
 func MakeUnifiedHTTPResponse(code int, data interface{}, errmsg string) (UnifiedResponse, error) {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
@@ -41,6 +42,7 @@ func MakeUnifiedHTTPResponse(code int, data interface{}, errmsg string) (Unified
 	}, nil
 }
 
+// DecodeUnifiedHTTPResponse decode to uniform response
 func DecodeUnifiedHTTPResponse(rsp *http.Response) (*UnifiedResponse, error) {
 	byteBody, err := ioutil.ReadAll(rsp.Body)
 	if err != nil {
@@ -49,6 +51,7 @@ func DecodeUnifiedHTTPResponse(rsp *http.Response) (*UnifiedResponse, error) {
 	return DecodeResponse(byteBody)
 }
 
+// DecodeResponse decode http body
 func DecodeResponse(response []byte) (*UnifiedResponse, error) {
 	result := &UnifiedResponse{}
 	if err := json.Unmarshal(response, result); err != nil {
@@ -58,6 +61,7 @@ func DecodeResponse(response []byte) (*UnifiedResponse, error) {
 	return result, nil
 }
 
+// SendRequest send http request with signature header
 func SendRequest(method, url, token string, reqBody io.Reader) (*http.Response, error) {
 	client := &http.Client{}
 	req, err := http.NewRequest(method, url, reqBody)
@@ -105,7 +109,6 @@ type HashFile struct {
 }
 
 // ProgressManager progress stats
-
 type ProgressManager struct {
 	Progress             map[string]ProgressCell
 	PartitionToOriginMap map[string]string // a.txt.1 -> a.txt ; a.txt.2 -> a.txt for progress
@@ -175,6 +178,7 @@ func (pm *ProgressManager) GetProgress(files []string) (map[string]float64, erro
 	return a, nil
 }
 
+// Now return current unix timestamp
 func Now() uint64 {
 	return uint64(time.Now().UTC().Unix())
 }

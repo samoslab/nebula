@@ -32,6 +32,7 @@ func doGetPubkey(registClient pb.ClientRegisterServiceClient) ([]byte, error) {
 	return pubKey.GetPublicKey(), nil
 }
 
+// DoRegister register client
 func DoRegister(registClient pb.ClientRegisterServiceClient, cfg *config.ClientConfig) (*pb.RegisterResp, error) {
 	ctx := context.Background()
 	pubkey, err := doGetPubkey(registClient)
@@ -66,6 +67,7 @@ func DoRegister(registClient pb.ClientRegisterServiceClient, cfg *config.ClientC
 	return rsp, nil
 }
 
+// VerifyContactEmail verify email
 func VerifyContactEmail(client pb.ClientRegisterServiceClient, verifyCode string, node *node.Node) (code uint32, errMsg string, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -148,6 +150,7 @@ func RegisterClient(log logrus.FieldLogger, configDir, trackerServer, emailAddre
 	return nil
 }
 
+// VerifyEmail verify email
 func VerifyEmail(configDir string, trackerServer string, verifyCode string) error {
 	cc, err := config.LoadConfig(configDir)
 	if err != nil {
@@ -185,6 +188,7 @@ func VerifyEmail(configDir string, trackerServer string, verifyCode string) erro
 	return nil
 }
 
+// ResendVerifyCode send verify code again
 func ResendVerifyCode(configDir string, trackerServer string) error {
 	cc, err := config.LoadConfig(configDir)
 	if err != nil {

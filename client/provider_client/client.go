@@ -16,13 +16,14 @@ import (
 	"golang.org/x/net/context"
 )
 
-const stream_data_size = 32 * 1024
-const small_file_size = 512 * 1024
+const streamDataSize = 32 * 1024
+const smallFileSize = 512 * 1024
 
 func now() uint64 {
 	return uint64(time.Now().UnixNano())
 }
 
+// SetActionLog set action log for collect
 func SetActionLog(err error, al *tcppb.ActionLog) {
 	if al != nil {
 		al.EndTime, al.Info = now(), err.Error()
@@ -49,6 +50,7 @@ func newActionLogFromRetrieveReq(req *pb.RetrieveReq) *tcppb.ActionLog {
 		BeginTime: now()}
 }
 
+// Ping test connectivity
 func Ping(client pb.ProviderServiceClient) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -56,6 +58,7 @@ func Ping(client pb.ProviderServiceClient) error {
 	return err
 }
 
+// StorePiece store blocks to privider
 func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadPara *common.UploadParameter, auth []byte, ticket string, tm uint64, pm *common.ProgressManager) error {
 	fileInfo := uploadPara.HF
 	filePath := fileInfo.FileName
@@ -80,7 +83,7 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadP
 		BlockSize: fileSize}
 	al := newActionLogFromStoreReq(req)
 	defer collectClient.Collect(al)
-	if fileSize < small_file_size {
+	if fileSize < smallFileSize {
 		req.Data, err = ioutil.ReadAll(file)
 		if err != nil {
 			SetActionLog(err, al)
@@ -114,7 +117,7 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadP
 		return err
 	}
 	defer stream.CloseSend()
-	buf := make([]byte, stream_data_size)
+	buf := make([]byte, streamDataSize)
 	first := true
 	for {
 		bytesRead, err := file.Read(buf)
@@ -153,7 +156,7 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadP
 				log.Errorf("file %s not in progress map", realfile)
 			}
 		}
-		if bytesRead < stream_data_size {
+		if bytesRead < streamDataSize {
 			break
 		}
 	}
@@ -198,7 +201,7 @@ func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath 
 		BlockSize: blockSize}
 	al := newActionLogFromRetrieveReq(req)
 	defer collectClient.Collect(al)
-	if fileSize < small_file_size {
+	if fileSize < smallFileSize {
 		resp, err := client.RetrieveSmall(context.Background(), req)
 		if err != nil {
 			SetActionLog(err, al)

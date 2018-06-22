@@ -113,13 +113,6 @@ func readConfig(configFilePath string) (*ClientConfig, error) {
 		return nil, err
 	}
 
-	//m := multiconfig.NewWithPath(configFilePath) // supports TOML, JSON and YAML
-	//fmt.Printf("-----config path --%v\n", configFilePath)
-	//err := m.Load(cc) // Check for error
-	//if err != nil {
-	//return nil, err
-	//}
-	//m.MustLoad(cc) // Panic's if there is any error
 	return cc, nil
 }
 

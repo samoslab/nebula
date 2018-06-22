@@ -48,6 +48,7 @@ func GetChunkSizeAndNum(fileSize int64, partitionSize int64) (int64, int) {
 	return chunkSize, chunkNum
 }
 
+// ReverseCalcuatePartFileSize calculate part.file size
 func ReverseCalcuatePartFileSize(fileSize int64, partitionNum, currentPartition int) int64 {
 	chunkSize := fileSize / int64(partitionNum)
 	// last part
@@ -57,6 +58,7 @@ func ReverseCalcuatePartFileSize(fileSize int64, partitionNum, currentPartition 
 	return chunkSize
 }
 
+// Fping ping ips using fping commands
 func Fping(ips []string) ([]string, error) {
 	commands := "fping " + strings.Join(ips, " ")
 	cmd := exec.Command("/bin/sh", "-c", commands)
