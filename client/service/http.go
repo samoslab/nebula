@@ -304,6 +304,7 @@ func (s *HTTPServer) setupMux() *http.ServeMux {
 	handleAPI("/api/v1/store/progress", ProgressHandler(s))
 	handleAPI("/api/v1/store/uploaddir", UploadDirHandler(s))
 	handleAPI("/api/v1/store/downloaddir", DownloadDirHandler(s))
+	handleAPI("/api/v1/store/rename", RenameHandler(s))
 
 	handleAPI("/api/v1/package/all", GetAllPackageHandler(s))
 	handleAPI("/api/v1/package", GetPackageInfoHandler(s))
@@ -358,6 +359,12 @@ type UploadDirReq struct {
 // DownloadDirReq request struct for download directory
 type DownloadDirReq struct {
 	Parent string `json:"parent"`
+}
+
+// RenameReq request struct for move file, src is source file id which get by list
+type RenameReq struct {
+	Source string `json:"src"`
+	Dest   string `json:"dest"`
 }
 
 // DownloadReq request struct for download file
@@ -824,9 +831,9 @@ func DownloadDirHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		downReq := &DownloadDirReq{}
+		req := &DownloadDirReq{}
 		decoder := json.NewDecoder(r.Body)
-		if err := decoder.Decode(&downReq); err != nil {
+		if err := decoder.Decode(&req); err != nil {
 			err = fmt.Errorf("Invalid json request body: %v", err)
 			errorResponse(ctx, w, http.StatusBadRequest, err)
 			return
@@ -834,18 +841,76 @@ func DownloadDirHandler(s *HTTPServer) http.HandlerFunc {
 
 		defer r.Body.Close()
 
-		if downReq.Parent == "" {
+		if req.Parent == "" {
 			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument parent must not empty"))
 			return
 		}
 
-		log.Infof("download  %+v", downReq)
-		err := s.cm.DownloadDir(downReq.Parent)
+		log.Infof("downloaddir request %+v", req)
+		err := s.cm.DownloadDir(req.Parent)
 		code := 0
 		errmsg := ""
 		result := "success"
 		if err != nil {
-			log.Errorf("download files %+v error %v", downReq, err)
+			log.Errorf("download dirs %+v error %v", req, err)
+			code = 1
+			errmsg = err.Error()
+			result = ""
+		}
+
+		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
+		if err != nil {
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+		if err := JSONResponse(w, rsp); err != nil {
+			fmt.Printf("error %v\n", err)
+		}
+	}
+}
+
+// RenameHandler rename file handler
+func RenameHandler(s *HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		if !s.CanBeWork() {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
+			return
+		}
+		log := s.cm.Log
+		w.Header().Set("Accept", "application/json")
+
+		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
+			return
+		}
+
+		if r.Header.Get("Content-Type") != "application/json" {
+			errorResponse(ctx, w, http.StatusUnsupportedMediaType, errors.New("Invalid content type"))
+			return
+		}
+
+		req := &RenameReq{}
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&req); err != nil {
+			err = fmt.Errorf("Invalid json request body: %v", err)
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+
+		defer r.Body.Close()
+
+		if req.Dest == "" || req.Source == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument dest or src must not empty"))
+			return
+		}
+
+		log.Infof("rename request %+v", req)
+		err := s.cm.MoveFile(req.Source, req.Dest)
+		code := 0
+		errmsg := ""
+		result := "success"
+		if err != nil {
+			log.Errorf("move file %+v error %v", req, err)
 			code = 1
 			errmsg = err.Error()
 			result = ""

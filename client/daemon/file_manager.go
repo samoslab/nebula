@@ -943,7 +943,7 @@ func saveFile(fileName string, content []byte) error {
 	return nil
 }
 
-// RemoveFile download file
+// RemoveFile remove file
 func (c *ClientManager) RemoveFile(target string, recursive bool, isPath bool) error {
 	log := c.Log
 	req := &mpb.RemoveReq{
@@ -974,6 +974,40 @@ func (c *ClientManager) RemoveFile(target string, recursive bool, isPath bool) e
 		return common.StatusErrFromError(err)
 	}
 	log.Infof("remove file rsp code :%d msg: %s", rsp.GetCode(), rsp.GetErrMsg())
+	if rsp.GetCode() != 0 {
+		return fmt.Errorf("%s", rsp.GetErrMsg())
+	}
+	return nil
+
+}
+
+// MoveFile move file
+func (c *ClientManager) MoveFile(source, dest string) error {
+	log := c.Log
+	req := &mpb.MoveReq{
+		Version:   common.Version,
+		NodeId:    c.NodeId,
+		Timestamp: common.Now(),
+	}
+	id, err := hex.DecodeString(source)
+	if err != nil {
+		return err
+	}
+	log.Infof("rename file by id %s, binary id %s", source, id)
+	req.Source = &mpb.FilePath{&mpb.FilePath_Id{id}}
+	req.Dest = dest
+
+	err = req.SignReq(c.cfg.Node.PriKey)
+	if err != nil {
+		return err
+	}
+
+	log.Infof("move file from %+v, to %v", source, dest)
+	rsp, err := c.mclient.Move(context.Background(), req)
+	if err != nil {
+		return common.StatusErrFromError(err)
+	}
+	log.Infof("move file rsp code :%d msg: %s", rsp.GetCode(), rsp.GetErrMsg())
 	if rsp.GetCode() != 0 {
 		return fmt.Errorf("%s", rsp.GetErrMsg())
 	}

@@ -13,6 +13,7 @@ Index
 | [/api/v1/store/download](#apiv1storedownload-post)                             | POST      |
 | [/api/v1/store/downloaddir](#apiv1storedownloaddir-post)                             | POST      |
 | [/api/v1/store/remove](#apiv1storeremove-post)                             | POST      |
+| [/api/v1/store/rename](#apiv1storerename-post)                             | POST      |
 | [/api/v1/store/progress](#apiv1storeprogress-post)                             | POST      |
 | [/api/v1/package/all](#apiv1packageall-get)                             | GET |
 | [/api/v1/package](#apiv1package-get)                             | GET |
@@ -243,6 +244,28 @@ Exmaple
 
 ```
 curl -X POST -H "Content-Type:application/json" -d '{"target":"62633239633363392d373462332d343961632d396633312d363731336331376433633334", "ispath":false, "recursion":false }' http://127.0.0.1:7788/api/v1/store/remove
+{
+    "errmsg": "",
+    "code": 0,
+    "Data": "success"
+}
+```
+
+## /api/v1/store/rename [POST]
+
+```
+URI:/api/v1/store/rename post
+Method: POST
+Request Body: {
+   src:string
+   dest:string
+   }
+```
+
+Exmaple 
+
+```
+curl -X POST -H "Content-Type:application/json" -d '{"src":"62633239633363392d373462332d343961632d396633312d363731336331376433633334",  "dest":"newfile.txt"}' http://127.0.0.1:7788/api/v1/store/rename
 {
     "errmsg": "",
     "code": 0,
