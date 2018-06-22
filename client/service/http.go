@@ -318,46 +318,56 @@ func (s *HTTPServer) setupMux() *http.ServeMux {
 	handleAPI("/api/v1/secret/encrypt", EncryFileHandler(s))
 	handleAPI("/api/v1/secret/decrypt", DecryFileHandler(s))
 
+	handleAPI("/api/v1/service/status", ServiceStatusHandler(s))
+
 	return mux
 }
 
+// RegisterReq request struct for register
 type RegisterReq struct {
 	Email  string `json:"email"`
 	Resend bool   `josn:"resend"`
 }
 
+// VerifyEmailReq request struct for verify email
 type VerifyEmailReq struct {
 	Code string `json:"code"`
 }
 
+// MkfolderReq request struct for make folder
 type MkfolderReq struct {
 	Folders     []string `json:"folders"`
 	Parent      string   `json:"parent"`
 	Interactive bool     `json:"interactive"`
 }
 
+// UploadReq request struct for upload file
 type UploadReq struct {
 	Filename    string `json:"filename"`
 	Interactive bool   `json:"interactive"`
 	NewVersion  bool   `json:"newversion"`
 }
 
+// UploadDirReq request struct for upload directory
 type UploadDirReq struct {
 	Parent      string `json:"parent"`
 	Interactive bool   `json:"interactive"`
 	NewVersion  bool   `json:"newversion"`
 }
 
+// DownloadDirReq request struct for download directory
 type DownloadDirReq struct {
 	Parent string `json:"parent"`
 }
 
+// DownloadReq request struct for download file
 type DownloadReq struct {
 	FileHash string `json:"filehash"`
 	FileSize uint64 `json:"filesize"`
 	FileName string `json:"filename"`
 }
 
+// ListReq request struct for list files
 type ListReq struct {
 	Path     string `json:"path"`
 	PageSize uint32 `json:"pagesize"`
@@ -366,32 +376,61 @@ type ListReq struct {
 	AscOrder bool   `json:"ascorder"`
 }
 
+// RemoveReq request struct for remove file
 type RemoveReq struct {
 	Target    string `json:"target"`
 	Recursion bool   `json:"recursion"`
 	IsPath    bool   `json:"ispath"`
 }
 
+// ProgressReq request struct for progress bar
 type ProgressReq struct {
 	Files []string `json:"files"`
 }
 
+// ProgressRsp response for progress bar
 type ProgressRsp struct {
 	Progress map[string]float64 `json:"progress"`
 }
 
+// EncryFileReq encrypt file request
 type EncryFileReq struct {
 	FileName   string `json:"file"`
 	Password   string `json:"password"`
 	OutputFile string `json:output_file`
 }
 
+// DecryFileReq decrypt file request
 type DecryFileReq struct {
 	FileName   string `json:"file"`
 	Password   string `json:"password"`
 	OutputFile string `json:output_file`
 }
 
+// ServiceStatus service status request
+type ServiceStatus struct {
+	Status bool `json:"status"`
+}
+
+// ServiceStatusHandler returns service status
+func ServiceStatusHandler(s *HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		if !validMethod(ctx, w, r, []string{http.MethodGet}) {
+			return
+		}
+
+		ss := ServiceStatus{
+			Status: s.CanBeWork(),
+		}
+
+		if err := JSONResponse(w, ss); err != nil {
+			fmt.Printf("error %v\n", err)
+		}
+	}
+}
+
+// RegisterHandler client register handler, client must register first then can be using service
 func RegisterHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log := s.log
@@ -458,6 +497,7 @@ func RegisterHandler(s *HTTPServer) http.HandlerFunc {
 	}
 }
 
+// EmailHandler email verified handler
 func EmailHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -581,6 +621,7 @@ func MkfolderHandler(s *HTTPServer) http.HandlerFunc {
 	}
 }
 
+// UploadDirHandler upload file handler
 func UploadHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -642,6 +683,7 @@ func UploadHandler(s *HTTPServer) http.HandlerFunc {
 	}
 }
 
+// UploadDirHandler upload directory handler
 func UploadDirHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -703,6 +745,8 @@ func UploadDirHandler(s *HTTPServer) http.HandlerFunc {
 		}
 	}
 }
+
+// DownloadHandler download file handler
 func DownloadHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -760,6 +804,7 @@ func DownloadHandler(s *HTTPServer) http.HandlerFunc {
 	}
 }
 
+// DownloadDirHandler download directory from provider
 func DownloadDirHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -817,6 +862,7 @@ func DownloadDirHandler(s *HTTPServer) http.HandlerFunc {
 	}
 }
 
+// ListHandler list files handler
 func ListHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -872,6 +918,7 @@ func ListHandler(s *HTTPServer) http.HandlerFunc {
 	}
 }
 
+// RemoveHandler remove file handler
 func RemoveHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -928,6 +975,7 @@ func RemoveHandler(s *HTTPServer) http.HandlerFunc {
 	}
 }
 
+// ProgressHandler progress bar handler
 func ProgressHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -977,6 +1025,7 @@ func ProgressHandler(s *HTTPServer) http.HandlerFunc {
 	}
 }
 
+// EncryFileHandler encrypt file handler
 func EncryFileHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -1044,6 +1093,7 @@ func EncryFileHandler(s *HTTPServer) http.HandlerFunc {
 	}
 }
 
+// DecryFileHandler decrypt file handler
 func DecryFileHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()

@@ -10,6 +10,7 @@ import (
 	"github.com/samoslab/nebula/client/common"
 )
 
+// GetAllPackageHandler all package handler
 func GetAllPackageHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -45,6 +46,7 @@ func GetAllPackageHandler(s *HTTPServer) http.HandlerFunc {
 	}
 }
 
+// GetPackageInfoHandler get package handler
 func GetPackageInfoHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -90,12 +92,14 @@ func GetPackageInfoHandler(s *HTTPServer) http.HandlerFunc {
 	}
 }
 
+// BuyPackageReq request struct for buy package
 type BuyPackageReq struct {
 	ID       uint64 `json:"id"`
 	Canceled bool   `json:"canceled"`
 	Quanlity uint32 `json:"quanlity"`
 }
 
+// BuyPackageHandler buy package handler
 func BuyPackageHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -150,10 +154,12 @@ func BuyPackageHandler(s *HTTPServer) http.HandlerFunc {
 	}
 }
 
+// DiscountPackageReq request struct for discount
 type DiscountPackageReq struct {
 	ID uint64 `json:"id"`
 }
 
+// DiscountPackageHandler discount handler
 func DiscountPackageHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -203,6 +209,7 @@ func DiscountPackageHandler(s *HTTPServer) http.HandlerFunc {
 	}
 }
 
+// MyAllOrderHandler return all orders
 func MyAllOrderHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -248,6 +255,7 @@ func MyAllOrderHandler(s *HTTPServer) http.HandlerFunc {
 	}
 }
 
+// GetOrderInfoHandler returns order
 func GetOrderInfoHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -288,10 +296,12 @@ func GetOrderInfoHandler(s *HTTPServer) http.HandlerFunc {
 	}
 }
 
+// PayOrdorReq request struct for pay order
 type PayOrderReq struct {
 	ID string `json:"order_id"`
 }
 
+// PayOrderHandler  pay order handler
 func PayOrderHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -346,6 +356,7 @@ func PayOrderHandler(s *HTTPServer) http.HandlerFunc {
 	}
 }
 
+// RechargeAddressHandler get balance handler
 func RechargeAddressHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -381,6 +392,7 @@ func RechargeAddressHandler(s *HTTPServer) http.HandlerFunc {
 	}
 }
 
+// UsageAmountHandler get usage amount info
 func UsageAmountHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
