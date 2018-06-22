@@ -17,6 +17,8 @@ service ProviderRegisterService {
 
     rpc GetCollectorServer(GetCollectorServerReq)returns (GetCollectorServerResp){}
 
+    rpc RefreshIp(RefreshIpReq)returns (RefreshIpResp){}
+
 }
 message GetPublicKeyReq {
     uint32 version =1;
@@ -119,4 +121,15 @@ message GetCollectorServerResp{
 message CollectorServer{
     string server=1;
     uint32 port=2;
+}
+
+message RefreshIpReq{
+    uint32 version = 1;
+    bytes nodeId = 2;
+    uint64 timestamp=3;
+    bytes sign = 4;
+}
+
+message RefreshIpResp{
+    string ip=1;
 }
