@@ -11,7 +11,7 @@ import (
 func TestSaveClientConfig(t *testing.T) {
 	configFilePath := "/tmp/config-test.json"
 	removeConfigFile(configFilePath)
-	clientConfig = &ClientConfig{
+	clientConfig := &ClientConfig{
 		NodeId:        "4e57d6415305f079ebc8d644d85048252ac6e86a",
 		TrackerServer: "127.0.0.1:8080",
 		PublicKey:     "3082010a0282010100c798aa4ae73808ed6b96a5afc84c4626aa84cb6e5a64b772b62faa92c2a0fbbeebf9d1b5711b212a8484e1ac053f816bfa213cd619f12932d9f52d9535b997f9834604d65b6eb1c40b28e8c69f30a88a3afe6eb33f78ca0829467ad6701f0e48cda70c354bf1acc5db88de77eae37172080b6e2188fa59d450160190e215202a063bff5e751ec10e256ed5a17ae8b7946f427d6763fd7b0422b39e7aabf9c7fba52356a5af589bf1b99e33f8417227079380f7fb38ed76a7ccdd2ce8abf5341f99efb011bc8e86b4584be7b6fd0c297c50de14cff9222a0049d6875866018541765b9350dbd6728fb1ad150f8fcf501e5511240c722e01f6b39f617345fac3a70203010001",

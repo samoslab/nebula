@@ -1,0 +1,19 @@
+sudo: required
+dist: trusty
+language: go
+go:
+  - "1.10.x"
+
+matrix:
+  include:
+    - os: linux
+    - os: osx
+      # Do not start osx build for PR
+      if: type != pull_request
+
+script:
+  - make test
+
+notifications:
+  email:
+    - liuben5918@gmail.com

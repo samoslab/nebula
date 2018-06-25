@@ -125,31 +125,114 @@ func (c *ClientManager) getPingTime(ip string, port uint32) int {
 	return int(timeEnd - timeStart)
 }
 
-// PingProvider ping provider
-func (c *ClientManager) PingProvider(pros []*mpb.BlockProviderAuth, needNum int) ([]*mpb.BlockProviderAuth, error) {
+// UsingBestProvider ping provider
+func (c *ClientManager) UsingBestProvider(pros []*mpb.BlockProviderAuth, needNum int) ([]*mpb.BlockProviderAuth, error) {
 	//todo if provider ip is same
 	type SortablePro struct {
-		Pro   *mpb.BlockProviderAuth
-		Delay int
+		Pro         *mpb.BlockProviderAuth
+		Delay       int
+		OriginIndex int
 	}
+
+	log := c.Log
 
 	sortPros := []SortablePro{}
 	// TODO can ping concurrent
-	for _, bpa := range pros {
-		pingTime := c.getPingTime(bpa.GetServer(), bpa.GetPort())
-		sortPros = append(sortPros, SortablePro{Pro: bpa, Delay: pingTime})
+	pingResultMap := map[int]int{}
+	var pingResultMutex sync.Mutex
+
+	var wg sync.WaitGroup
+
+	for i, bpa := range pros {
+		wg.Add(1)
+		go func(i int, bpa *mpb.BlockProviderAuth) {
+			defer wg.Done()
+			pingTime := c.getPingTime(bpa.GetServer(), bpa.GetPort())
+			pingResultMutex.Lock()
+			defer pingResultMutex.Unlock()
+			pingResultMap[i] = pingTime
+		}(i, bpa)
+	}
+	wg.Wait()
+	for i, bpa := range pros {
+		pingTime, _ := pingResultMap[i]
+		sortPros = append(sortPros, SortablePro{Pro: bpa, Delay: pingTime, OriginIndex: i})
 	}
 
 	// TODO need consider Spare , Spare = false is backup provider
-	sort.Slice(sortPros, func(i, j int) bool { return sortPros[i].Delay < sortPros[j].Delay })
-
-	availablePros := []*mpb.BlockProviderAuth{}
+	//sort.Slice(sortPros, func(i, j int) bool { return sortPros[i].Delay < sortPros[j].Delay })
+	workPros := []SortablePro{}
+	backupPros := []SortablePro{}
 	for _, proInfo := range sortPros {
-		availablePros = append(availablePros, proInfo.Pro)
+		if proInfo.Pro.GetSpare() {
+			workPros = append(workPros, proInfo)
+		} else {
+			backupPros = append(backupPros, proInfo)
+		}
 	}
 
-	//return availablePros[0:needNum], nil
-	return pros, nil
+	workedNum := len(workPros)
+	backupNum := len(backupPros)
+
+	backupMap := createBackupProvicer(workedNum, backupNum)
+
+	availablePros := []*mpb.BlockProviderAuth{}
+	for _, proInfo := range workPros {
+		if proInfo.Delay == 99999 {
+			// provider cannot connect , choose one from backup
+			log.Errorf("provider %v cannot connected")
+			if backupNum == 0 {
+				log.Errorf("no backup provider")
+				return nil, fmt.Errorf("one of provider cannot connected and no backup provider")
+			}
+			choosed := chooseBackupProvicer(proInfo.OriginIndex, backupMap)
+			if choosed == -1 {
+				log.Errorf("no availbe provider")
+				return nil, fmt.Errorf("no more backup provider can be choosed")
+			}
+			availablePros = append(availablePros, backupPros[choosed].Pro)
+		} else {
+			availablePros = append(availablePros, proInfo.Pro)
+		}
+	}
+
+	return availablePros[0:needNum], nil
+	//return pros, nil
+}
+
+type IndexStatus struct {
+	Index int
+	Used  bool
+}
+
+func chooseBackupProvicer(current int, backupMap map[int][]IndexStatus) int {
+	choosed := -1
+	if arr, ok := backupMap[current]; ok {
+		for i, _ := range arr {
+			if !arr[i].Used {
+				choosed = arr[i].Index
+				arr[i].Used = true
+				backupMap[current] = arr
+				return choosed
+			}
+		}
+	}
+	return choosed
+}
+
+func createBackupProvicer(workedNum, backupNum int) map[int][]IndexStatus {
+	// workedNum = 40 , backupNum = 10
+	// span = 40 /10 * 2 = 8 nextGroup = 10 /2 = 5
+	// 0-7 --> [0, 5] ; 8-15 --> [1, 6] ; 16-23 --> [2, 7] ; 24-31 -->[3, 8]; 32-39 --> [4, 9]
+	backupMap := map[int][]IndexStatus{}
+	span := (workedNum / backupNum) * 2
+	nextGroup := backupNum / 2
+	for i := 0; i < workedNum; i++ {
+		backupMap[i] = append(backupMap[i], IndexStatus{Index: i / span, Used: false})
+		backupMap[i] = append(backupMap[i], IndexStatus{Index: i/span + nextGroup, Used: false})
+	}
+
+	return backupMap
 }
 
 // BestRetrieveNode ping retrieve node
@@ -459,7 +542,7 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 	partition := &mpb.StorePartition{}
 	partition.Block = []*mpb.StoreBlock{}
 	phas := rspPartition.GetProviderAuth()
-	providers, err := c.PingProvider(phas, len(phas))
+	providers, err := c.UsingBestProvider(phas, len(phas))
 	if err != nil {
 		return nil, err
 	}
