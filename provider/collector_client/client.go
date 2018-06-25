@@ -38,7 +38,7 @@ func sendLockOff() {
 func Start() {
 	sendLockOff()
 	var err error
-	conn, err = grpc.Dial("127.0.0.1:6688", grpc.WithInsecure())
+	conn, err = grpc.Dial("collector.store.samos.io:6688", grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("dial collector failed: %s", err)
 	}
