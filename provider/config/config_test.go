@@ -17,11 +17,11 @@ func TestSaveProviderConfig(t *testing.T) {
 		MainStorageVolume: 200000000000,
 		UpBandwidth:       4,
 		DownBandwidth:     100,
-		ExtraStorage: map[string]ExtraStorageInfo{
-			"1": ExtraStorageInfo{Path: "/extra/storage/path1",
+		ExtraStorage: []ExtraStorageInfo{
+			ExtraStorageInfo{Path: "/extra/storage/path1",
 				Volume: 200000000000,
 				Index:  1},
-			"2": ExtraStorageInfo{Path: "/extra/storage/path2",
+			ExtraStorageInfo{Path: "/extra/storage/path2",
 				Volume: 100000000000,
 				Index:  2},
 		},
