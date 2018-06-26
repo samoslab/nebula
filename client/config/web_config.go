@@ -18,6 +18,9 @@ const (
 	DefaultTracker = "127.0.0.1:6677"
 	// DefaultCollect default collect server
 	DefaultCollect = "127.0.0.1:6688"
+
+	// DefaultWebDir default web dir
+	DefaultWebDir = "./web/build"
 )
 
 // Config config for web
@@ -52,6 +55,10 @@ func (cfg *Config) SetDefault() {
 			log.Fatalf("Get OS current user failed: %s", err)
 		}
 		cfg.ConfigDir = filepath.Join(usr.HomeDir, DefaultConfig)
+	}
+
+	if cfg.StaticDir == "" {
+		cfg.StaticDir = DefaultWebDir
 	}
 }
 

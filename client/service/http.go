@@ -281,14 +281,11 @@ func setupHTTPListener(addr string, handler http.Handler) *http.Server {
 
 func (s *HTTPServer) setupMux() *http.ServeMux {
 	mux := http.NewServeMux()
-
 	handleAPI := func(path string, h http.Handler) {
 		// Allow requests from a local samos client
 		h = cors.New(cors.Options{
 			AllowedOrigins: []string{"http://127.0.0.1:7788"},
 		}).Handler(h)
-
-		//h = gziphandler.GzipHandler(h)
 
 		mux.Handle(path, h)
 	}
@@ -321,6 +318,8 @@ func (s *HTTPServer) setupMux() *http.ServeMux {
 
 	handleAPI("/api/v1/service/status", ServiceStatusHandler(s))
 
+	// Static files
+	mux.Handle("/", http.FileServer(http.Dir(s.cfg.StaticDir)))
 	return mux
 }
 
