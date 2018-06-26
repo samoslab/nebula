@@ -129,3 +129,18 @@ func GetCollectorServer(client pb.ProviderRegisterServiceClient) (server map[str
 	}
 	return res, nil
 }
+
+func RefreshIp(client pb.ProviderRegisterServiceClient) (ip string, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	node := node.LoadFormConfig()
+	req := &pb.RefreshIpReq{NodeId: node.NodeId,
+		Timestamp: uint64(time.Now().Unix())}
+	req.SignReq(node.PriKey)
+	resp, err := client.RefreshIp(ctx, req)
+	if err != nil {
+		return "", err
+	}
+	return resp.Ip, nil
+
+}

@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"github.com/prestonTao/upnp"
+	"github.com/robfig/cron"
 	collector "github.com/samoslab/nebula/provider/collector_client"
 	"github.com/samoslab/nebula/provider/config"
 	"github.com/samoslab/nebula/provider/disk"
@@ -25,11 +26,12 @@ import (
 	trp_pb "github.com/samoslab/nebula/tracker/register/provider/pb"
 	util_rsa "github.com/samoslab/nebula/util/rsa"
 	"github.com/skycoin/skycoin/src/cipher"
+	"github.com/yanzay/log"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 )
 
-const home_config_folder = ".spo-nebula-provider"
+const home_config_folder = ".samos-nebula-provider"
 
 func main() {
 	usr, err := user.Current()
@@ -40,12 +42,12 @@ func main() {
 
 	daemonCommand := flag.NewFlagSet("daemon", flag.ExitOnError)
 	daemonConfigDirFlag := daemonCommand.String("configDir", usr.HomeDir+string(os.PathSeparator)+home_config_folder, "config director")
-	daemonTrackerServerFlag := daemonCommand.String("trackerServer", "127.0.0.1:6677", "tracker server address, eg: 127.0.0.1:6677")
+	daemonTrackerServerFlag := daemonCommand.String("trackerServer", "tracker.store.samos.io:6677", "tracker server address, eg: tracker.store.samos.io:6677")
 	listenFlag := daemonCommand.String("listen", ":6666", "listen address and port, eg: 111.111.111.111:6666 or :6666")
 
 	registerCommand := flag.NewFlagSet("register", flag.ExitOnError)
 	registerConfigDirFlag := registerCommand.String("configDir", usr.HomeDir+string(os.PathSeparator)+home_config_folder, "config director")
-	registerTrackerServerFlag := registerCommand.String("trackerServer", "127.0.0.1:6677", "tracker server address, eg: 127.0.0.1:6677")
+	registerTrackerServerFlag := registerCommand.String("trackerServer", "tracker.store.samos.io:6677", "tracker server address, eg: tracker.store.samos.io:6677")
 	registerListenFlag := registerCommand.String("listen", ":6666", "listen address and port, eg: 111.111.111.111:6666 or :6666")
 	walletAddressFlag := registerCommand.String("walletAddress", "", "SPO wallet address to accept earnings")
 	billEmailFlag := registerCommand.String("billEmail", "", "email where send bill to")
@@ -61,16 +63,16 @@ func main() {
 
 	verifyEmailCommand := flag.NewFlagSet("verifyEmail", flag.ExitOnError)
 	verifyEmailConfigDirFlag := verifyEmailCommand.String("configDir", usr.HomeDir+string(os.PathSeparator)+home_config_folder, "config director")
-	verifyEmailTrackerServerFlag := verifyEmailCommand.String("trackerServer", "127.0.0.1:6677", "tracker server address, eg: 127.0.0.1:6677")
+	verifyEmailTrackerServerFlag := verifyEmailCommand.String("trackerServer", "tracker.store.samos.io:6677", "tracker server address, eg: tracker.store.samos.io:6677")
 	verifyCodeFlag := verifyEmailCommand.String("verifyCode", "", "verify code from verify email")
 
 	resendVerifyCodeCommand := flag.NewFlagSet("resendVerifyCode", flag.ExitOnError)
 	resendVerifyCodeConfigDirFlag := resendVerifyCodeCommand.String("configDir", usr.HomeDir+string(os.PathSeparator)+home_config_folder, "config director")
-	resendVerifyCodeTrackerServerFlag := resendVerifyCodeCommand.String("trackerServer", "127.0.0.1:6677", "tracker server address, eg: 127.0.0.1:6677")
+	resendVerifyCodeTrackerServerFlag := resendVerifyCodeCommand.String("trackerServer", "tracker.store.samos.io:6677", "tracker server address, eg: tracker.store.samos.io:6677")
 
 	addStorageCommand := flag.NewFlagSet("addStorage", flag.ExitOnError)
 	addStorageConfigDirFlag := addStorageCommand.String("configDir", usr.HomeDir+string(os.PathSeparator)+home_config_folder, "config director")
-	addStorageTrackerServerFlag := addStorageCommand.String("trackerServer", "127.0.0.1:6677", "tracker server address, eg: 127.0.0.1:6677")
+	addStorageTrackerServerFlag := addStorageCommand.String("trackerServer", "tracker.store.samos.io:6677", "tracker server address, eg: tracker.store.samos.io:6677")
 	pathFlag := addStorageCommand.String("path", "", "add storage path")
 	volumeFlag := addStorageCommand.String("volume", "", "add storage volume size, unit TB or GB, eg: 2TB or 500GB")
 	if len(os.Args) == 1 {
@@ -192,6 +194,13 @@ func daemon(configDir string, trackerServer string, listen string) {
 		fmt.Println("failed to load config, can not start daemon: " + err.Error())
 		os.Exit(202)
 	}
+	refreshIp(trackerServer, true)
+	cronRunner := cron.New()
+	cronRunner.AddFunc("37 */2 * * * *", func() {
+		refreshIp(trackerServer, false)
+	})
+	cronRunner.Start()
+	defer cronRunner.Stop()
 	config.StartAutoCheck()
 	defer config.StopAutoCheck()
 	collector.Start()
@@ -569,4 +578,30 @@ func externalIpAddr() (string, error) {
 		return "", err
 	}
 	return upnpMan.GatewayOutsideIP, nil
+}
+
+func refreshIp(trackerServer string, exitOnError bool) (ip string) {
+	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
+	if err != nil {
+		if exitOnError {
+			fmt.Printf("RPC Dial failed: %s\n", err.Error())
+			os.Exit(61)
+		} else {
+			log.Errorf("RPC Dial failed when refresh ip, error info: %s", err)
+			return
+		}
+	}
+	defer conn.Close()
+	prsc := trp_pb.NewProviderRegisterServiceClient(conn)
+	ip, err = client.RefreshIp(prsc)
+	if err != nil {
+		if exitOnError {
+			fmt.Printf("refresh ip failed: %s\n", err.Error())
+			os.Exit(62)
+		} else {
+			log.Errorf("refresh ip failed, error info: %s", err)
+			return
+		}
+	}
+	return
 }
