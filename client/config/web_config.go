@@ -4,11 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"io/ioutil"
-	"log"
 	"os"
-	"os/user"
 	"path/filepath"
 	"time"
+
+	"github.com/samoslab/nebula/client/util/file"
 )
 
 const (
@@ -50,11 +50,7 @@ func (cfg *Config) SetDefault() {
 		cfg.CollectServer = DefaultCollect
 	}
 	if cfg.ConfigDir == "" {
-		usr, err := user.Current()
-		if err != nil {
-			log.Fatalf("Get OS current user failed: %s", err)
-		}
-		cfg.ConfigDir = filepath.Join(usr.HomeDir, DefaultConfig)
+		cfg.ConfigDir = filepath.Join(file.UserHome(), DefaultConfig)
 	}
 
 	if cfg.StaticDir == "" {

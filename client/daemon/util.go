@@ -1,24 +1,19 @@
 package daemon
 
 import (
-	"log"
 	"math"
 	"os"
 	"os/exec"
-	"os/user"
 	"path/filepath"
 	"strings"
 
 	"github.com/samoslab/nebula/client/config"
+	"github.com/samoslab/nebula/client/util/file"
 )
 
 // GetConfigFile get config file
 func GetConfigFile() (string, string) {
-	usr, err := user.Current()
-	if err != nil {
-		log.Fatalf("Get OS current user failed: %s", err)
-	}
-	defaultConfig := filepath.Join(usr.HomeDir, config.DefaultConfig)
+	defaultConfig := filepath.Join(file.UserHome(), config.DefaultConfig)
 	defaultAppDir, _ := filepath.Split(defaultConfig)
 	return defaultAppDir, defaultConfig
 }
