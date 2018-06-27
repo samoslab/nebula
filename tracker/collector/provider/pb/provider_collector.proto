@@ -7,11 +7,14 @@ service ProviderCollectorService {
 
 }
 
-message CollectResp{
-
+message CollectReq{
+    bytes data=1;
 }
 
-message CollectReq{
+message CollectResp{
+}
+
+message Batch{
     uint32 version =1;
     bytes nodeId=2;
     uint64 timestamp=3;
