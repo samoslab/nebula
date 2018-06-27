@@ -26,6 +26,7 @@ Index
 | [/api/v1/usage/amount](#apiv1usageamount-get)                             | GET |
 | [/api/v1/secret/encrypt](#apiv1secretencrypt-post)                             | POST |
 | [/api/v1/secret/decrypt](#apiv1secretdecrypt-post)                             | POST |
+| [/api/v1/service/status](#apiv1servicestatus-get)                             | GET |
 
 统一说明 返回json object结构统一为： 成功：{"code":0, "data":object} 失败：{"code":1,"errmsg":"errmsg","data":object}  
 
@@ -636,6 +637,22 @@ Exmpale
 
 ```
 ```
+
+## /api/v1/service/status [GET]
+
+returns service status
+```
+URI:/api/v1/service/status
+Method: GET
+Args: None
+
+```
+
+Example 
+
+```
+```
+
 # specification
 
 ```
