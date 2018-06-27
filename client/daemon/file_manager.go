@@ -74,7 +74,7 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 		serverConn: conn,
 		Log:        log,
 		cfg:        cfg,
-		TempDir:    DefaultTempDir,
+		TempDir:    os.TempDir(),
 		NodeId:     cfg.Node.NodeId,
 		PM:         common.NewProgressManager(),
 		mclient:    mpb.NewMatadataServiceClient(conn),
