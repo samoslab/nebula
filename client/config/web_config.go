@@ -19,6 +19,9 @@ const (
 	// DefaultCollect default collect server
 	DefaultCollect = "127.0.0.1:6688"
 
+	// DefaultServer default listen addr
+	DefaultServer = "127.0.0.1:7788"
+
 	// DefaultWebDir default web dir
 	DefaultWebDir = "./web/build"
 )
@@ -51,6 +54,9 @@ func (cfg *Config) SetDefault() {
 	}
 	if cfg.ConfigDir == "" {
 		cfg.ConfigDir = filepath.Join(file.UserHome(), DefaultConfig)
+	}
+	if cfg.HTTPAddr == "" {
+		cfg.HTTPAddr = DefaultServer
 	}
 
 	if cfg.StaticDir == "" {

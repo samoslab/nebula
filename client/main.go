@@ -17,6 +17,8 @@ import (
 func main() {
 	configFile := pflag.StringP("conf", "c", "config.json", "config file")
 	serverAddr := pflag.StringP("server", "s", "127.0.0.1:7788", "listen address ip:port")
+	collectAddr := pflag.StringP("collect", "", "", "collect server format is ip:port")
+	trackerAddr := pflag.StringP("tracker", "", "", "tracker server format is ip:port")
 	webDir := pflag.StringP("webdir", "d", "./web/build", "web static directory")
 	launchBrowser := pflag.BoolP("launch-browser", "l", true, "launch system default webbrowser at client startup")
 	pflag.Parse()
@@ -39,10 +41,20 @@ func main() {
 		webcfg = &config.Config{}
 		webcfg.SetDefault()
 	}
-	webcfg.HTTPAddr = *serverAddr
-	//*webDir = "/Users/liuguirong/go/src/github.com/samoslab/nebula/client/web/build"
-	path := file.ResolveResourceDirectory(*webDir)
-	webcfg.StaticDir = path
+	if *serverAddr != "" {
+		webcfg.HTTPAddr = *serverAddr
+	}
+
+	if *webDir != "" {
+		path := file.ResolveResourceDirectory(*webDir)
+		webcfg.StaticDir = path
+	}
+	if *collectAddr != "" {
+		webcfg.CollectServer = *collectAddr
+	}
+	if *trackerAddr != "" {
+		webcfg.TrackerServer = *trackerAddr
+	}
 
 	fmt.Printf("webcfg %+v\n", webcfg)
 	server := service.NewHTTPServer(log, *webcfg)
@@ -64,7 +76,7 @@ func main() {
 			time.Sleep(time.Millisecond * 100)
 
 			fullAddress := "http://" + *serverAddr + "/index.html"
-			fmt.Printf("Launching System Browser with %s", fullAddress)
+			fmt.Printf("Launching System Browser with %s\n", fullAddress)
 			if err := browser.Open(fullAddress); err != nil {
 				fmt.Printf("%v", err)
 				return
