@@ -19,6 +19,7 @@ message GetPublicKeyReq {
 
 message GetPublicKeyResp {
     bytes publicKey=1;
+    bytes publicKeyHash=2;
 }
 
 message RegisterReq{
@@ -26,7 +27,7 @@ message RegisterReq{
     bytes nodeId = 2;
     bytes publicKeyEnc = 3;
     bytes contactEmailEnc = 4;
-
+    bytes publicKeyHash = 5;
 }
 
 message RegisterResp{
@@ -209,7 +210,7 @@ message RechargeAddressReq{
 message RechargeAddressResp{
     uint32 code = 1;//0:success, other value: failed
     string errMsg=2;
-    string rechargeAddress=3;
+    bytes rechargeAddressEnc=3;
     uint64 balance=4;
 }
 
