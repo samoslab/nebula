@@ -8,6 +8,7 @@ import (
 
 	"github.com/samoslab/nebula/client/common"
 	pb "github.com/samoslab/nebula/tracker/register/client/pb"
+	rsalong "github.com/samoslab/nebula/util/rsa"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 )
@@ -231,8 +232,12 @@ func (om *OrderManager) RechargeAddress() (*AddressBalance, error) {
 	if rsp.GetCode() != 0 {
 		return nil, fmt.Errorf("recharge error %v", rsp.GetErrMsg())
 	}
+	address, err := rsalong.DecryptLong(om.privateKey, rsp.GetRechargeAddressEnc(), 256)
+	if err != nil {
+		return nil, err
+	}
 	ab := &AddressBalance{
-		Address: rsp.GetRechargeAddress(),
+		Address: string(address),
 		Balance: rsp.GetBalance(),
 	}
 
