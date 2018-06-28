@@ -129,7 +129,8 @@ message RefreshIpReq{
     uint32 version = 1;
     bytes nodeId = 2;
     uint64 timestamp=3;
-    bytes sign = 4;
+    uint32 port=4;
+    bytes sign = 5;
 }
 
 message RefreshIpResp{
