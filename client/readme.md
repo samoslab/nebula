@@ -320,7 +320,7 @@ curl   http://127.0.0.1:7788/api/v1/package/all
     "code": 0,
     "Data": [
         {
-            "id": 357096341043478529,
+            "id": "357096341043478529",
             "name": "month package",
             "price": 15000000,
             "volume": 1024,
@@ -330,7 +330,7 @@ curl   http://127.0.0.1:7788/api/v1/package/all
             "validDays": 30
         },
         {
-            "id": 357096341154267137,
+            "id": "357096341154267137",
             "name": "season package",
             "price": 40000000,
             "volume": 1024,
@@ -361,7 +361,7 @@ curl   http://127.0.0.1:7788/api/v1/package?id=357096341154267137
     "errmsg": "",
     "code": 0,
     "Data": {
-        "id": 357096341154267137,
+        "id": "357096341154267137",
         "name": "season package",
         "price": 40000000,
         "volume": 1024,
@@ -379,7 +379,7 @@ buy package
 URI:/api/v1/package/buy POST
 Method: POST
 Request Body: {
-   id:int,
+   id:string,
    canceled:bool (default false),
    quanlity:int,
    }
@@ -389,16 +389,16 @@ Request Body: {
 Example 
 
 ```
-curl  -X POST  http://127.0.0.1:7788/api/v1/package/buy  -H "Content-Type:application/json" -d '{"id":357615924202078209, "quanlity":1}'
+curl  -X POST  http://127.0.0.1:7788/api/v1/package/buy  -H "Content-Type:application/json" -d '{"id":"357615924202078209", "quanlity":1}'
 {
     "errmsg": "",
     "code": 0,
     "Data": {
         "id": "31336164303736382d323330362d343736372d626131302d316332306265633131396332",
         "creation": 1529224680,
-        "packageId": 357615924202078209,
+        "packageId": "357615924202078209",
         "package": {
-            "id": 357615924202078209,
+            "id": "357615924202078209",
             "name": "basic package",
             "price": 15000000,
             "volume": 1024,
@@ -427,7 +427,7 @@ discount package
 URI:/api/v1/package/discount GET
 Method: GET
 Args:
-   id:uint64,
+   id:string,
 ```
 
 Example
@@ -458,9 +458,9 @@ curl   http://127.0.0.1:7788/api/v1/order/all?expired=true
         {
             "id": "31336164303736382d323330362d343736372d626131302d316332306265633131396332",
             "creation": 1529224680,
-            "packageId": 357615924202078209,
+            "packageId": "357615924202078209",
             "package": {
-                "id": 357615924202078209,
+                "id": "357615924202078209",
                 "name": "basic package",
                 "price": 15000000,
                 "volume": 1024,
@@ -502,9 +502,9 @@ curl   http://127.0.0.1:7788/api/v1/order/getinfo?orderid=31336164303736382d3233
     "Data": {
         "id": "31336164303736382d323330362d343736372d626131302d316332306265633131396332",
         "creation": 1529224680,
-        "packageId": 357615924202078209,
+        "packageId": "357615924202078209",
         "package": {
-            "id": 357615924202078209,
+            "id": "357615924202078209",
             "name": "basic package",
             "price": 15000000,
             "volume": 1024,

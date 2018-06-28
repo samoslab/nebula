@@ -66,12 +66,7 @@ func GetPackageInfoHandler(s *HTTPServer) http.HandlerFunc {
 			errorResponse(ctx, w, http.StatusBadRequest, errors.New("need paras id"))
 			return
 		}
-		pid, err := strconv.Atoi(id)
-		if err != nil {
-			errorResponse(ctx, w, http.StatusBadRequest, errors.New("need paras id"))
-			return
-		}
-		result, err := s.cm.OM.GetPackageInfo(uint64(pid))
+		result, err := s.cm.OM.GetPackageInfo(id)
 		code := 0
 		errmsg := ""
 		if err != nil {
@@ -94,7 +89,7 @@ func GetPackageInfoHandler(s *HTTPServer) http.HandlerFunc {
 
 // BuyPackageReq request struct for buy package
 type BuyPackageReq struct {
-	ID       uint64 `json:"id"`
+	ID       string `json:"id"`
 	Canceled bool   `json:"canceled"`
 	Quanlity uint32 `json:"quanlity"`
 }
@@ -128,7 +123,7 @@ func BuyPackageHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		defer r.Body.Close()
-		if req.ID == 0 || req.Quanlity == 0 {
+		if req.ID == "" || req.Quanlity == 0 {
 			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument id or quanlity must not empty"))
 			return
 		}
@@ -156,7 +151,7 @@ func BuyPackageHandler(s *HTTPServer) http.HandlerFunc {
 
 // DiscountPackageReq request struct for discount
 type DiscountPackageReq struct {
-	ID uint64 `json:"id"`
+	ID string `json:"id"`
 }
 
 // DiscountPackageHandler discount handler
@@ -181,14 +176,9 @@ func DiscountPackageHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		packageID, err := strconv.ParseUint(id, 10, 0)
-		if err != nil {
-			errorResponse(ctx, w, http.StatusBadRequest, errors.New("id incorrect"))
-			return
-		}
-		fmt.Printf("pack %d\n", packageID)
+		fmt.Printf("package %d\n", id)
 
-		result, err := s.cm.OM.DiscountPackage(packageID)
+		result, err := s.cm.OM.DiscountPackage(id)
 		code := 0
 		errmsg := ""
 		if err != nil {

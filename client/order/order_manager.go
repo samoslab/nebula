@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"encoding/hex"
 	"fmt"
+	"strconv"
 
 	"github.com/samoslab/nebula/client/common"
 	pb "github.com/samoslab/nebula/tracker/register/client/pb"
@@ -21,26 +22,52 @@ type OrderManager struct {
 	NodeId      []byte
 }
 
+// Package descript package, cannot using int64 because js int max is 2^53-1
+type Package struct {
+	Id          string `json:"id,omitempty"`
+	Name        string `json:"name,omitempty"`
+	Price       uint64 `json:"price,omitempty"`
+	Volume      uint32 `json:"volume,omitempty"`
+	Netflow     uint32 `json:"netflow,omitempty"`
+	UpNetflow   uint32 `json:"upNetflow,omitempty"`
+	DownNetflow uint32 `json:"downNetflow,omitempty"`
+	ValidDays   uint32 `json:"validDays,omitempty"`
+	Remark      string `json:"remark,omitempty"`
+}
+
 // Order order infos that return to front-end
 type Order struct {
-	Id          string      `json:"id,omitempty"`
-	Creation    uint64      `json:"creation,omitempty"`
-	PackageId   int64       `json:"packageId,omitempty"`
-	Package     *pb.Package `json:"package,omitempty"`
-	Quanlity    uint32      `json:"quanlity,omitempty"`
-	TotalAmount uint64      `json:"totalAmount,omitempty"`
-	Upgraded    bool        `json:"upgraded,omitempty"`
-	Discount    string      `json:"discount,omitempty"`
-	Volume      uint32      `json:"volume,omitempty"`
-	Netflow     uint32      `json:"netflow,omitempty"`
-	UpNetflow   uint32      `json:"upNetflow,omitempty"`
-	DownNetflow uint32      `json:"downNetflow,omitempty"`
-	ValidDays   uint32      `json:"validDays,omitempty"`
-	StartTime   uint64      `json:"startTime,omitempty"`
-	EndTime     uint64      `json:"endTime,omitempty"`
-	Paid        bool        `json:"paid,omitempty"`
-	PayTime     uint64      `json:"payTime,omitempty"`
-	Remark      string      `json:"remark,omitempty"`
+	Id          string   `json:"id,omitempty"`
+	Creation    uint64   `json:"creation,omitempty"`
+	PackageId   string   `json:"packageId,omitempty"`
+	Package     *Package `json:"package,omitempty"`
+	Quanlity    uint32   `json:"quanlity,omitempty"`
+	TotalAmount uint64   `json:"totalAmount,omitempty"`
+	Upgraded    bool     `json:"upgraded,omitempty"`
+	Discount    string   `json:"discount,omitempty"`
+	Volume      uint32   `json:"volume,omitempty"`
+	Netflow     uint32   `json:"netflow,omitempty"`
+	UpNetflow   uint32   `json:"upNetflow,omitempty"`
+	DownNetflow uint32   `json:"downNetflow,omitempty"`
+	ValidDays   uint32   `json:"validDays,omitempty"`
+	StartTime   uint64   `json:"startTime,omitempty"`
+	EndTime     uint64   `json:"endTime,omitempty"`
+	Paid        bool     `json:"paid,omitempty"`
+	PayTime     uint64   `json:"payTime,omitempty"`
+	Remark      string   `json:"remark,omitempty"`
+}
+
+func newPackageFromPbPackage(p *pb.Package) *Package {
+	return &Package{
+		Id:          strconv.FormatUint(uint64(p.Id), 10),
+		Name:        p.Name,
+		Price:       p.Price,
+		Volume:      p.Volume,
+		Netflow:     p.Netflow,
+		UpNetflow:   p.UpNetflow,
+		DownNetflow: p.DownNetflow,
+		ValidDays:   p.ValidDays,
+	}
 }
 
 // NewOrderFromPbOrder create Order from protobuf Order, diff is Id
@@ -48,8 +75,8 @@ func NewOrderFromPbOrder(o *pb.Order) *Order {
 	return &Order{
 		Id:          hex.EncodeToString(o.Id),
 		Creation:    o.Creation,
-		PackageId:   o.PackageId,
-		Package:     o.Package,
+		PackageId:   strconv.FormatUint(uint64(o.PackageId), 10),
+		Package:     newPackageFromPbPackage(o.Package),
 		Quanlity:    o.Quanlity,
 		TotalAmount: o.TotalAmount,
 		Upgraded:    o.Upgraded,
@@ -84,7 +111,7 @@ func NewOrderManager(trackerServer string, log logrus.FieldLogger, privateKey *r
 }
 
 // GetAllPackages return all packges
-func (om *OrderManager) GetAllPackages() ([]*pb.Package, error) {
+func (om *OrderManager) GetAllPackages() ([]*Package, error) {
 	log := om.Log
 	req := &pb.AllPackageReq{
 		Version: common.Version,
@@ -94,12 +121,20 @@ func (om *OrderManager) GetAllPackages() ([]*pb.Package, error) {
 		return nil, common.StatusErrFromError(err)
 	}
 	log.Infof("%+v", rsp)
-	return rsp.GetAllPackage(), nil
+	packages := []*Package{}
+	for _, p := range rsp.GetAllPackage() {
+		packages = append(packages, newPackageFromPbPackage(p))
+	}
+	return packages, nil
 }
 
 // GetPackageInfo returns package by package id
-func (om *OrderManager) GetPackageInfo(id uint64) (*pb.Package, error) {
+func (om *OrderManager) GetPackageInfo(pid string) (*Package, error) {
 	log := om.Log
+	id, err := strconv.ParseUint(pid, 10, 0)
+	if err != nil {
+		return nil, err
+	}
 	req := &pb.PackageInfoReq{
 		Version:   common.Version,
 		PackageId: int64(id),
@@ -109,12 +144,16 @@ func (om *OrderManager) GetPackageInfo(id uint64) (*pb.Package, error) {
 		return nil, common.StatusErrFromError(err)
 	}
 	log.Infof("%+v", rsp)
-	return rsp.GetPackage(), nil
+	return newPackageFromPbPackage(rsp.GetPackage()), nil
 }
 
 // BuyPackage buy package
-func (om *OrderManager) BuyPackage(id uint64, canceled bool, quanlity uint32) (*Order, error) {
+func (om *OrderManager) BuyPackage(pid string, canceled bool, quanlity uint32) (*Order, error) {
 	log := om.Log
+	id, err := strconv.ParseUint(pid, 10, 0)
+	if err != nil {
+		return nil, err
+	}
 	req := &pb.BuyPackageReq{
 		Version:      common.Version,
 		NodeId:       om.NodeId,
@@ -123,7 +162,7 @@ func (om *OrderManager) BuyPackage(id uint64, canceled bool, quanlity uint32) (*
 		Quanlity:     quanlity,
 		CancelUnpaid: canceled,
 	}
-	err := req.SignReq(om.privateKey)
+	err = req.SignReq(om.privateKey)
 	if err != nil {
 		return nil, err
 	}
@@ -139,8 +178,12 @@ func (om *OrderManager) BuyPackage(id uint64, canceled bool, quanlity uint32) (*
 }
 
 // DiscountPackage package discount
-func (om *OrderManager) DiscountPackage(id uint64) (map[uint32]string, error) {
+func (om *OrderManager) DiscountPackage(pid string) (map[uint32]string, error) {
 	log := om.Log
+	id, err := strconv.ParseUint(pid, 10, 0)
+	if err != nil {
+		return nil, err
+	}
 	req := &pb.PackageDiscountReq{
 		Version:   common.Version,
 		PackageId: int64(id),
