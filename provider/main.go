@@ -9,10 +9,12 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"os/signal"
 	"os/user"
 	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/prestonTao/upnp"
 	"github.com/robfig/cron"
@@ -194,13 +196,6 @@ func daemon(configDir string, trackerServer string, listen string) {
 		fmt.Println("failed to load config, can not start daemon: " + err.Error())
 		os.Exit(202)
 	}
-	refreshIp(trackerServer, true)
-	cronRunner := cron.New()
-	cronRunner.AddFunc("37 */2 * * * *", func() {
-		refreshIp(trackerServer, false)
-	})
-	cronRunner.Start()
-	defer cronRunner.Stop()
 	config.StartAutoCheck()
 	defer config.StopAutoCheck()
 	collector.Start()
@@ -211,12 +206,29 @@ func daemon(configDir string, trackerServer string, listen string) {
 		os.Exit(2)
 	}
 	portMapping(port)
+	grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(520 * 1024))
+	go startServer(listen, grpcServer)
+	defer grpcServer.GracefulStop()
+	if !config.GetProviderConfig().Ddns {
+		refreshIp(trackerServer, true)
+		cronRunner := cron.New()
+		cronRunner.AddFunc("37 */2 * * * *", func() {
+			refreshIp(trackerServer, false)
+		})
+		cronRunner.Start()
+		defer cronRunner.Stop()
+	}
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	<-sigChan
+}
+
+func startServer(listen string, grpcServer *grpc.Server) {
 	lis, err := net.Listen("tcp", listen)
 	if err != nil {
 		fmt.Printf("failed to listen: %s, error: %s\n", listen, err.Error())
 		os.Exit(3)
 	}
-	grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(520 * 1024))
 	providerServer := impl.NewProviderService()
 	defer providerServer.Close()
 	pb.RegisterProviderServiceServer(grpcServer, providerServer)
@@ -429,7 +441,7 @@ func doRegister(configDir string, trackerServer string, listen string, walletAdd
 		fmt.Println("not specify host and dynamic domain, will use: " + clientIp)
 		host = clientIp
 	}
-	grpcServer := grpc.NewServer()
+	grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(520 * 1024))
 	go startPingServer(listen, grpcServer)
 	defer grpcServer.GracefulStop()
 	code, errMsg, err := client.Register(prsc, encrypt(pubKey, no.NodeId),
@@ -443,6 +455,9 @@ func doRegister(configDir string, trackerServer string, listen string, walletAdd
 	if code != 0 {
 		fmt.Println(errMsg)
 		os.Exit(56)
+	}
+	if len(host) == 0 && len(dynamicDomain) > 0 {
+		pc.Ddns = true
 	}
 	path := config.CreateProviderConfig(configDir, pc)
 	fmt.Println("Register success, please recieve verify code email to verify bill email and backup your config file: " + path)

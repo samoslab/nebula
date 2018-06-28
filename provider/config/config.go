@@ -34,6 +34,7 @@ type ProviderConfig struct {
 	BillEmail         string
 	PublicKey         string
 	PrivateKey        string
+	Ddns              bool
 	Availability      float64
 	MainStoragePath   string
 	MainStorageVolume uint64
