@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	proto "github.com/golang/protobuf/proto"
 	"github.com/robfig/cron"
 	"github.com/samoslab/nebula/provider/node"
 	pb "github.com/samoslab/nebula/tracker/collector/provider/pb"
@@ -38,7 +39,7 @@ func sendLockOff() {
 func Start() {
 	sendLockOff()
 	var err error
-	conn, err = grpc.Dial("collector.store.samos.io:6688", grpc.WithInsecure())
+	conn, err = grpc.Dial("127.0.0.1:6688", grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("dial collector failed: %s", err)
 	}
@@ -67,6 +68,7 @@ func send() {
 func doSend() error {
 	pcsc := pb.NewProviderCollectorServiceClient(conn)
 	stream, err := pcsc.Collect(context.Background())
+	var req *pb.CollectReq
 	if err != nil {
 		fmt.Printf("RPC Collect failed: %s", err.Error())
 		return err
@@ -79,7 +81,11 @@ func doSend() error {
 		if size > batch_max {
 			size = batch_max
 		}
-		if err = stream.Send(buildReq(size)); err != nil {
+		req = buildReq(size)
+		if req == nil {
+			continue
+		}
+		if err = stream.Send(req); err != nil {
 			return err
 		}
 	}
@@ -93,9 +99,15 @@ func buildReq(size int) *pb.CollectReq {
 		bs = append(bs, <-queue)
 	}
 	no := node.LoadFormConfig()
-	req := &pb.CollectReq{NodeId: no.NodeId,
+	batch := &pb.Batch{NodeId: no.NodeId,
 		Timestamp: uint64(time.Now().UnixNano()),
 		ActionLog: bs}
-	req.SignReq(no.PriKey)
-	return req
+	batch.SignReq(no.PriKey)
+	data, err := proto.Marshal(batch)
+	if err != nil {
+		log.Errorf("buildReq marshal proto error: %s", err)
+		return nil
+	}
+	fmt.Println(len(data))
+	return &pb.CollectReq{Data: data}
 }
