@@ -26,7 +26,8 @@ message GetPublicKeyReq {
 
 message GetPublicKeyResp {
     bytes publicKey=1;
-    string ip=2;
+    bytes publicKeyHash=2;
+    string ip=3;
 }
 
 message RegisterReq{
@@ -47,7 +48,8 @@ message RegisterReq{
     bytes hostEnc=15;
     bytes dynamicDomainEnc=16;
     repeated uint64 extraStorageVolume=17;
-    bytes sign=18;
+    bytes publicKeyHash=18;
+    bytes sign=19;
 }
 
 message RegisterResp{
