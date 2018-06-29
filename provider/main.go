@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/prestonTao/upnp"
 	"github.com/robfig/cron"
@@ -444,6 +445,7 @@ func doRegister(configDir string, trackerServer string, listen string, walletAdd
 	grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(520 * 1024))
 	go startPingServer(listen, grpcServer)
 	defer grpcServer.GracefulStop()
+	time.Sleep(time.Duration(5) * time.Second) //for loadbalance health check
 	code, errMsg, err := client.Register(prsc, encrypt(pubKey, no.NodeId),
 		encrypt(pubKey, no.PubKeyBytes), encrypt(pubKey, no.EncryptKey["0"]), encrypt(pubKey, []byte(pc.WalletAddress)),
 		encrypt(pubKey, []byte(pc.BillEmail)), mainStorageVolume, upBandwidth, downBandwidth,
