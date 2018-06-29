@@ -176,7 +176,7 @@ func DiscountPackageHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		fmt.Printf("package %d\n", id)
+		fmt.Printf("package %s\n", id)
 
 		result, err := s.cm.OM.DiscountPackage(id)
 		code := 0
