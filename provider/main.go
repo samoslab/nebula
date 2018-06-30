@@ -47,6 +47,7 @@ func main() {
 	daemonConfigDirFlag := daemonCommand.String("configDir", usr.HomeDir+string(os.PathSeparator)+home_config_folder, "config director")
 	daemonTrackerServerFlag := daemonCommand.String("trackerServer", "tracker.store.samos.io:6677", "tracker server address, eg: tracker.store.samos.io:6677")
 	listenFlag := daemonCommand.String("listen", ":6666", "listen address and port, eg: 111.111.111.111:6666 or :6666")
+	disableAutoRefreshIpFlag := daemonCommand.Bool("disableAutoRefreshIp", false, "disable auto refresh provider ip or enable auto refresh provider ip")
 
 	registerCommand := flag.NewFlagSet("register", flag.ExitOnError)
 	registerConfigDirFlag := registerCommand.String("configDir", usr.HomeDir+string(os.PathSeparator)+home_config_folder, "config director")
@@ -87,7 +88,7 @@ func main() {
 		verifyEmailCommand.PrintDefaults()
 		fmt.Println(" resendVerifyCode [-configDir config-dir] [-trackerServer tracker-server-and-port]")
 		resendVerifyCodeCommand.PrintDefaults()
-		fmt.Println(" daemon [-configDir config-dir] [-trackerServer tracker-server-and-port] [-listen listen-address-and-port]")
+		fmt.Println(" daemon [-configDir config-dir] [-trackerServer tracker-server-and-port] [-listen listen-address-and-port] [-disableAutoRefreshIp]")
 		daemonCommand.PrintDefaults()
 		fmt.Println(" addStorage [-configDir config-dir] [-trackerServer tracker-server-and-port] -path storage-path -volume storage-volume")
 		addStorageCommand.PrintDefaults()
@@ -97,7 +98,7 @@ func main() {
 	switch os.Args[1] {
 	case "daemon":
 		daemonCommand.Parse(os.Args[2:])
-		daemon(*daemonConfigDirFlag, *daemonTrackerServerFlag, *listenFlag)
+		daemon(*daemonConfigDirFlag, *daemonTrackerServerFlag, *listenFlag, *disableAutoRefreshIpFlag)
 	case "register":
 		registerCommand.Parse(os.Args[2:])
 		register(*registerConfigDirFlag, *registerTrackerServerFlag, *registerListenFlag, *walletAddressFlag, *billEmailFlag, *availabilityFlag,
@@ -184,7 +185,7 @@ func resendVerifyCode(configDir string, trackerServer string) {
 	fmt.Println("resendVerifyCode success, you can verify bill email.")
 }
 
-func daemon(configDir string, trackerServer string, listen string) {
+func daemon(configDir string, trackerServer string, listen string, disableAutoRefreshIpFlag bool) {
 	err := config.LoadConfig(configDir)
 	if err != nil {
 		if err == config.NoConfErr {
@@ -210,11 +211,11 @@ func daemon(configDir string, trackerServer string, listen string) {
 	grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(520 * 1024))
 	go startServer(listen, grpcServer)
 	defer grpcServer.GracefulStop()
-	if !config.GetProviderConfig().Ddns {
-		refreshIp(trackerServer, true)
+	if !disableAutoRefreshIpFlag && !config.GetProviderConfig().Ddns {
+		refreshIp(trackerServer, port, true)
 		cronRunner := cron.New()
 		cronRunner.AddFunc("37 */2 * * * *", func() {
-			refreshIp(trackerServer, false)
+			refreshIp(trackerServer, port, false)
 		})
 		cronRunner.Start()
 		defer cronRunner.Stop()
@@ -410,6 +411,21 @@ func doRegister(configDir string, trackerServer string, listen string, walletAdd
 	dynamicDomain string, mainStoragePath string, mainStorageVolume uint64, extraStorage []config.ExtraStorageInfo) {
 	no := node.NewNode(10)
 	pc := newProviderConfig(no, walletAddress, billEmail, availability, upBandwidth, downBandwidth, mainStoragePath, mainStorageVolume, extraStorage)
+	extraStorageSlice := make([]uint64, 0, len(extraStorage))
+	for _, v := range extraStorage {
+		extraStorageSlice = append(extraStorageSlice, v.Volume)
+	}
+	portMapping(int(port))
+	externalIp, err := externalIpAddr()
+	if err != nil {
+		fmt.Println("use upnp get outer ip failed: " + err.Error())
+	} else {
+		fmt.Println("use upnp get outer ip is: " + externalIp)
+	}
+	grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(520 * 1024))
+	go startPingServer(listen, grpcServer)
+	defer grpcServer.GracefulStop()
+	time.Sleep(time.Duration(5) * time.Second) //for loadbalance health check
 	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
 	if err != nil {
 		fmt.Printf("RPC Dial failed: %s\n", err.Error())
@@ -422,30 +438,15 @@ func doRegister(configDir string, trackerServer string, listen string, walletAdd
 		fmt.Printf("GetPublicKey failed: %s\n", err.Error())
 		os.Exit(53)
 	}
+	if host == "" && dynamicDomain == "" {
+		fmt.Println("not specify host and dynamic domain, will use: " + clientIp)
+		host = clientIp
+	}
 	pubKey, err := x509.ParsePKCS1PublicKey(pubKeyBytes)
 	if err != nil {
 		fmt.Printf("Parse PublicKey failed: %s\n", err.Error())
 		os.Exit(54)
 	}
-	extraStorageSlice := make([]uint64, 0, len(extraStorage))
-	for _, v := range extraStorage {
-		extraStorageSlice = append(extraStorageSlice, v.Volume)
-	}
-	portMapping(int(port))
-	externalIp, err := externalIpAddr()
-	if err != nil {
-		fmt.Println("use upnp get outer ip failed: " + err.Error())
-	} else {
-		fmt.Println("use upnp get outer ip is: " + externalIp)
-	}
-	if host == "" && dynamicDomain == "" {
-		fmt.Println("not specify host and dynamic domain, will use: " + clientIp)
-		host = clientIp
-	}
-	grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(520 * 1024))
-	go startPingServer(listen, grpcServer)
-	defer grpcServer.GracefulStop()
-	time.Sleep(time.Duration(5) * time.Second) //for loadbalance health check
 	code, errMsg, err := client.Register(prsc, encrypt(pubKey, no.NodeId),
 		encrypt(pubKey, no.PubKeyBytes), encrypt(pubKey, no.EncryptKey["0"]), encrypt(pubKey, []byte(pc.WalletAddress)),
 		encrypt(pubKey, []byte(pc.BillEmail)), mainStorageVolume, upBandwidth, downBandwidth,
@@ -597,7 +598,7 @@ func externalIpAddr() (string, error) {
 	return upnpMan.GatewayOutsideIP, nil
 }
 
-func refreshIp(trackerServer string, exitOnError bool) (ip string) {
+func refreshIp(trackerServer string, providerPort int, exitOnError bool) (ip string) {
 	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
 	if err != nil {
 		if exitOnError {
@@ -610,7 +611,7 @@ func refreshIp(trackerServer string, exitOnError bool) (ip string) {
 	}
 	defer conn.Close()
 	prsc := trp_pb.NewProviderRegisterServiceClient(conn)
-	ip, err = client.RefreshIp(prsc)
+	ip, err = client.RefreshIp(prsc, uint32(providerPort))
 	if err != nil {
 		if exitOnError {
 			fmt.Printf("refresh ip failed: %s\n", err.Error())

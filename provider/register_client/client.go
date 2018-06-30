@@ -24,7 +24,7 @@ func Register(client pb.ProviderRegisterServiceClient, nodeIdEnc []byte, publicK
 	upBandwidth uint64, downBandwidth uint64, testUpBandwidth uint64, testDownBandwidth uint64,
 	availability float64, port uint32, hostEnc []byte, dynamicDomainEnc []byte,
 	extraStorageVolume []uint64, priKey *rsa.PrivateKey) (code uint32, errMsg string, err error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	req := &pb.RegisterReq{Timestamp: uint64(time.Now().Unix()),
 		NodeIdEnc:          nodeIdEnc,
@@ -130,12 +130,13 @@ func GetCollectorServer(client pb.ProviderRegisterServiceClient) (server map[str
 	return res, nil
 }
 
-func RefreshIp(client pb.ProviderRegisterServiceClient) (ip string, err error) {
+func RefreshIp(client pb.ProviderRegisterServiceClient, port uint32) (ip string, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	node := node.LoadFormConfig()
 	req := &pb.RefreshIpReq{NodeId: node.NodeId,
-		Timestamp: uint64(time.Now().Unix())}
+		Timestamp: uint64(time.Now().Unix()),
+		Port:      port}
 	req.SignReq(node.PriKey)
 	resp, err := client.RefreshIp(ctx, req)
 	if err != nil {
