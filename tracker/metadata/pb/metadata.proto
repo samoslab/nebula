@@ -36,6 +36,7 @@ message FilePath{
         string path=1;//parent path in net disk, eg: /foloder1/folder2
         bytes id=2;//nil if top level, better performance
     }
+    uint32 spaceNo=3;//0 is base space, 1 is the first private space, 2 is the second private space 
 }
 
 message MkFolderResp{
@@ -50,12 +51,14 @@ message CheckFileExistReq {
     FilePath parent=4;
     bytes fileHash=5;
     uint64 fileSize=6;
-    string fileName=7;
-    uint64 fileModTime=8;
-    bytes fileData=9;//file content if file size less than or equal 8k
-    bool interactive=10;//if false, will auto add suffix timestamp when exists same name file
-    bool newVersion=11;
-    bytes sign=12;
+    string fileType=7;
+    bytes encryptKey=8;//not nil when fileData is not nil and file is cryptographic 
+    string fileName=9;
+    uint64 fileModTime=10;
+    bytes fileData=11;//file content if file size less than or equal 8k
+    bool interactive=12;//if false, will auto add suffix timestamp when exists same name file
+    bool newVersion=13;
+    bytes sign=14;
 }
 
 message CheckFileExistResp{
@@ -132,12 +135,14 @@ message UploadFileDoneReq{
     FilePath parent=4;
     bytes fileHash=5;
     uint64 fileSize=6;
-    string fileName=7;
-    uint64 fileModTime=8;
-    repeated StorePartition partition=9;// size is one if use MultiReplica
-    bool interactive=10;//if false, will auto add suffix timestamp when exists same name file 
-    bool newVersion=11;
-    bytes sign=12;
+    bytes encryptKey=7;
+    string fileName=8;
+    uint64 fileModTime=9;
+    repeated StorePartition partition=10;// size is one if use MultiReplica
+    bool interactive=11;//if false, will auto add suffix timestamp when exists same name file 
+    bool newVersion=12;
+    bytes sign=13;
+   
 }
 
 message StorePartition{
@@ -189,6 +194,7 @@ message FileOrFolder{
     uint64 modTime=4;
     bytes fileHash=5;//nil if folder
     uint64 fileSize=6;//0 if folder
+    string fileType=7;
 }
 
 message RetrieveFileReq{
@@ -197,7 +203,8 @@ message RetrieveFileReq{
     uint64 timestamp=3;
     bytes fileHash=4;
     uint64 fileSize=5;
-    bytes sign=6;
+    bytes encryptKey=6;
+    bytes sign=7;
 }
 
 message RetrieveFileResp{
