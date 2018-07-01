@@ -22,6 +22,7 @@ func (self *MkFolderReq) hash() []byte {
 	case *FilePath_Id:
 		hasher.Write(v.Id)
 	}
+	hasher.Write(util_bytes.FromUint32(self.Parent.SpaceNo))
 	for _, f := range self.Folder {
 		hasher.Write([]byte(f))
 	}
@@ -52,8 +53,11 @@ func (self *CheckFileExistReq) hash() []byte {
 	case *FilePath_Id:
 		hasher.Write(v.Id)
 	}
+	hasher.Write(util_bytes.FromUint32(self.Parent.SpaceNo))
 	hasher.Write(self.FileHash)
 	hasher.Write(util_bytes.FromUint64(self.FileSize))
+	hasher.Write([]byte(self.FileType))
+	hasher.Write(self.EncryptKey)
 	hasher.Write([]byte(self.FileName))
 	hasher.Write(util_bytes.FromUint64(self.FileModTime))
 	if len(self.FileData) > 0 {
@@ -115,8 +119,10 @@ func (self *UploadFileDoneReq) hash() []byte {
 	case *FilePath_Id:
 		hasher.Write(v.Id)
 	}
+	hasher.Write(util_bytes.FromUint32(self.Parent.SpaceNo))
 	hasher.Write(self.FileHash)
 	hasher.Write(util_bytes.FromUint64(self.FileSize))
+	hasher.Write(self.EncryptKey)
 	hasher.Write([]byte(self.FileName))
 	hasher.Write(util_bytes.FromUint64(self.FileModTime))
 	for _, p := range self.Partition {
@@ -166,6 +172,7 @@ func (self *ListFilesReq) hash() []byte {
 	case *FilePath_Id:
 		hasher.Write(v.Id)
 	}
+	hasher.Write(util_bytes.FromUint32(self.Parent.SpaceNo))
 	hasher.Write(util_bytes.FromUint32(self.PageSize))
 	hasher.Write(util_bytes.FromUint32(self.PageNum))
 	hasher.Write([]byte(self.SortType.String()))
@@ -214,6 +221,7 @@ func (self *RemoveReq) hash() []byte {
 	case *FilePath_Id:
 		hasher.Write(v.Id)
 	}
+	hasher.Write(util_bytes.FromUint32(self.Target.SpaceNo))
 	if self.Recursive {
 		hasher.Write(byte_slice_true)
 	} else {
@@ -241,6 +249,7 @@ func (self *MoveReq) hash() []byte {
 	case *FilePath_Id:
 		hasher.Write(v.Id)
 	}
+	hasher.Write(util_bytes.FromUint32(self.Source.SpaceNo))
 	hasher.Write([]byte(self.Dest))
 	return hasher.Sum(nil)
 }

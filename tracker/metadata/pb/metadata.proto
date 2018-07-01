@@ -203,16 +203,17 @@ message RetrieveFileReq{
     uint64 timestamp=3;
     bytes fileHash=4;
     uint64 fileSize=5;
-    bytes encryptKey=6;
-    bytes sign=7;
+    bytes sign=6;
 }
 
 message RetrieveFileResp{
     uint32 code = 1;//0:success, 1: failed
     string errMsg=2;
     bytes fileData=3;// not nil if tiny file
-    repeated RetrievePartition partition=4;// nil if tiny file
-    uint64 timestamp=5;// // use as req timestamp argument to call provider api 
+    string fileType=4;
+    bytes encryptKey=5;
+    repeated RetrievePartition partition=6;// nil if tiny file
+    uint64 timestamp=7;// // use as req timestamp argument to call provider api 
 }
 
 message RetrievePartition{

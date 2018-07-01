@@ -15,6 +15,8 @@ service ProviderService {
 	rpc Remove(RemoveReq) returns (RemoveResp){}
 
 	rpc GetFragment(GetFragmentReq) returns (GetFragmentResp){}
+
+	rpc CheckAvailable(CheckAvailableReq) returns (CheckAvailableResp){}
 	
 }
 
@@ -80,4 +82,14 @@ message GetFragmentReq {
 
 message GetFragmentResp {
 	repeated bytes data=1;
+}
+
+message CheckAvailableReq{
+	uint32 version =1;
+	bytes auth =2;
+	uint64 timestamp=3;
+}
+
+message CheckAvailableResp{
+	bool available=1;
 }
