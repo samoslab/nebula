@@ -542,3 +542,15 @@ func (self *ProviderService) querySubPath(key []byte) (found bool, smallFile boo
 		return true, false, bytes[0], string(bytes[1:])
 	}
 }
+
+func (self *ProviderService) CheckAvailable(ctx context.Context, req *pb.CheckAvailableReq) (resp *pb.CheckAvailableResp, err error) {
+	if !skip_check_auth {
+		if err = req.CheckAuth(self.node.PubKeyBytes); err != nil {
+			err = status.Errorf(codes.Unauthenticated, "check auth failed,  error: %s", err)
+			log.Warnln(err)
+			return
+		}
+	}
+	total, max := config.AvailableVolume()
+	return &pb.CheckAvailableResp{Total: total, MaxFileSize: max}, nil
+}
