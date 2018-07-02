@@ -13,6 +13,7 @@ import (
 	"time"
 
 	collectClient "github.com/samoslab/nebula/client/collector_client"
+	"github.com/samoslab/nebula/client/util/filetype"
 
 	"github.com/samoslab/nebula/client/common"
 	"github.com/samoslab/nebula/client/config"
@@ -260,7 +261,7 @@ func (c *ClientManager) BestRetrieveNode(pros []*mpb.RetrieveNode) *mpb.Retrieve
 }
 
 // UploadDir upload all files in dir to provider
-func (c *ClientManager) UploadDir(parent string, interactive, newVersion bool) error {
+func (c *ClientManager) UploadDir(parent string, interactive, newVersion bool, sno uint32) error {
 	log := c.Log
 	if !filepath.IsAbs(parent) {
 		return fmt.Errorf("path %s must absolute", parent)
@@ -272,13 +273,13 @@ func (c *ClientManager) UploadDir(parent string, interactive, newVersion bool) e
 	log.Debugf("dirs %+v", dirs)
 	log.Debugf("files %+v", files)
 	for _, dpair := range dirs {
-		_, err := c.MkFolder(dpair.Parent, []string{dpair.Name}, interactive)
+		_, err := c.MkFolder(dpair.Parent, []string{dpair.Name}, interactive, sno)
 		if err != nil {
 			return err
 		}
 	}
 	for _, fname := range files {
-		err := c.UploadFile(fname, interactive, newVersion)
+		err := c.UploadFile(fname, interactive, newVersion, sno)
 		if err != nil {
 			return nil
 		}
@@ -287,9 +288,9 @@ func (c *ClientManager) UploadDir(parent string, interactive, newVersion bool) e
 }
 
 // UploadFile upload file to provider
-func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool) error {
+func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool, sno uint32) error {
 	log := c.Log
-	req, rsp, err := c.CheckFileExists(filename, interactive, newVersion)
+	req, rsp, err := c.CheckFileExists(filename, interactive, newVersion, sno)
 	if err != nil {
 		return common.StatusErrFromError(err)
 	}
@@ -450,7 +451,7 @@ func deleteTemporaryFile(log logrus.FieldLogger, filename string) {
 	}
 }
 
-func (c *ClientManager) CheckFileExists(filename string, interactive, newVersion bool) (*mpb.CheckFileExistReq, *mpb.CheckFileExistResp, error) {
+func (c *ClientManager) CheckFileExists(filename string, interactive, newVersion bool, sno uint32) (*mpb.CheckFileExistReq, *mpb.CheckFileExistResp, error) {
 	log := c.Log
 	hash, err := util_hash.Sha1File(filename)
 	if err != nil {
@@ -460,6 +461,8 @@ func (c *ClientManager) CheckFileExists(filename string, interactive, newVersion
 	if err != nil {
 		return nil, nil, err
 	}
+	fileType := filetype.FileType(filename)
+	var encryptKey []byte
 	dir, fname := filepath.Split(filename)
 	ctx := context.Background()
 	req := &mpb.CheckFileExistReq{
@@ -467,11 +470,12 @@ func (c *ClientManager) CheckFileExists(filename string, interactive, newVersion
 		FileSize:    uint64(fileInfo.Size()),
 		Interactive: interactive,
 		NewVersion:  newVersion,
-		Parent:      &mpb.FilePath{&mpb.FilePath_Path{dir}},
+		Parent:      &mpb.FilePath{OneOfPath: &mpb.FilePath_Path{dir}, SpaceNo: sno},
 		FileHash:    hash,
 		NodeId:      c.NodeId,
 		FileName:    fname,
 		Timestamp:   common.Now(),
+		FileType:    fileType.Value,
 	}
 	mtime, err := GetFileModTime(filename)
 	if err != nil {
@@ -485,6 +489,10 @@ func (c *ClientManager) CheckFileExists(filename string, interactive, newVersion
 			return nil, nil, err
 		}
 		req.FileData = fileData
+		if sno != 0 {
+			encryptKey = []byte(common.RandStr(16))
+			req.EncryptKey = encryptKey
+		}
 	}
 	err = req.SignReq(c.cfg.Node.PriKey)
 	if err != nil {
@@ -496,12 +504,12 @@ func (c *ClientManager) CheckFileExists(filename string, interactive, newVersion
 }
 
 // MkFolder create folder
-func (c *ClientManager) MkFolder(filepath string, folders []string, interactive bool) (bool, error) {
+func (c *ClientManager) MkFolder(filepath string, folders []string, interactive bool, sno uint32) (bool, error) {
 	log := c.Log
 	ctx := context.Background()
 	req := &mpb.MkFolderReq{
 		Version:     common.Version,
-		Parent:      &mpb.FilePath{&mpb.FilePath_Path{filepath}},
+		Parent:      &mpb.FilePath{OneOfPath: &mpb.FilePath_Path{filepath}, SpaceNo: sno},
 		Folder:      folders,
 		NodeId:      c.NodeId,
 		Interactive: interactive,
@@ -701,7 +709,7 @@ func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitio
 }
 
 // ListFiles list files on dir
-func (c *ClientManager) ListFiles(path string, pageSize, pageNum uint32, sortType string, ascOrder bool) ([]*DownFile, error) {
+func (c *ClientManager) ListFiles(path string, pageSize, pageNum uint32, sortType string, ascOrder bool, sno uint32) ([]*DownFile, error) {
 	c.Log.Infof("path %s, size %d, num %d, sortype %s, asc %v", path, pageSize, pageNum, sortType, ascOrder)
 	req := &mpb.ListFilesReq{
 		Version:   common.Version,
@@ -720,7 +728,7 @@ func (c *ClientManager) ListFiles(path string, pageSize, pageNum uint32, sortTyp
 	default:
 		req.SortType = mpb.SortType_Name
 	}
-	req.Parent = &mpb.FilePath{&mpb.FilePath_Path{path}}
+	req.Parent = &mpb.FilePath{OneOfPath: &mpb.FilePath_Path{path}, SpaceNo: sno}
 	req.AscOrder = ascOrder
 	err := req.SignReq(c.cfg.Node.PriKey)
 	if err != nil {
@@ -753,7 +761,7 @@ func (c *ClientManager) ListFiles(path string, pageSize, pageNum uint32, sortTyp
 }
 
 // DownloadDir download dir
-func (c *ClientManager) DownloadDir(path string) error {
+func (c *ClientManager) DownloadDir(path string, sno uint32) error {
 	log := c.Log
 	if !filepath.IsAbs(path) {
 		return fmt.Errorf("path %s must absolute", path)
@@ -762,7 +770,7 @@ func (c *ClientManager) DownloadDir(path string) error {
 	page := uint32(1)
 	for {
 		// list 1 page 100 items order by name
-		downFiles, err := c.ListFiles(path, 100, page, "name", true)
+		downFiles, err := c.ListFiles(path, 100, page, "name", true, sno)
 		if err != nil {
 			return err
 		}
@@ -778,7 +786,7 @@ func (c *ClientManager) DownloadDir(path string) error {
 				if _, err := os.Stat(currentFile); os.IsNotExist(err) {
 					os.Mkdir(currentFile, 0744)
 				}
-				err = c.DownloadDir(currentFile)
+				err = c.DownloadDir(currentFile, sno)
 				if err != nil {
 					log.Errorf("recursive download %s failed %v", currentFile, err)
 					return err
@@ -1027,7 +1035,7 @@ func saveFile(fileName string, content []byte) error {
 }
 
 // RemoveFile remove file
-func (c *ClientManager) RemoveFile(target string, recursive bool, isPath bool) error {
+func (c *ClientManager) RemoveFile(target string, recursive bool, isPath bool, sno uint32) error {
 	log := c.Log
 	req := &mpb.RemoveReq{
 		Version:   common.Version,
@@ -1036,14 +1044,14 @@ func (c *ClientManager) RemoveFile(target string, recursive bool, isPath bool) e
 		Recursive: recursive,
 	}
 	if isPath {
-		req.Target = &mpb.FilePath{&mpb.FilePath_Path{target}}
+		req.Target = &mpb.FilePath{OneOfPath: &mpb.FilePath_Path{target}, SpaceNo: sno}
 	} else {
 		id, err := hex.DecodeString(target)
 		if err != nil {
 			return err
 		}
 		log.Infof("delete file by id %s, binary id %s", target, id)
-		req.Target = &mpb.FilePath{&mpb.FilePath_Id{id}}
+		req.Target = &mpb.FilePath{OneOfPath: &mpb.FilePath_Id{id}, SpaceNo: sno}
 	}
 
 	err := req.SignReq(c.cfg.Node.PriKey)
@@ -1065,7 +1073,7 @@ func (c *ClientManager) RemoveFile(target string, recursive bool, isPath bool) e
 }
 
 // MoveFile move file
-func (c *ClientManager) MoveFile(source, dest string) error {
+func (c *ClientManager) MoveFile(source, dest string, sno uint32) error {
 	log := c.Log
 	req := &mpb.MoveReq{
 		Version:   common.Version,
@@ -1077,7 +1085,7 @@ func (c *ClientManager) MoveFile(source, dest string) error {
 		return err
 	}
 	log.Infof("rename file by id %s, binary id %s", source, id)
-	req.Source = &mpb.FilePath{&mpb.FilePath_Id{id}}
+	req.Source = &mpb.FilePath{OneOfPath: &mpb.FilePath_Id{id}, SpaceNo: sno}
 	req.Dest = dest
 
 	err = req.SignReq(c.cfg.Node.PriKey)

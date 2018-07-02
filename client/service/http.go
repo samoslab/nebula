@@ -339,6 +339,7 @@ type MkfolderReq struct {
 	Folders     []string `json:"folders"`
 	Parent      string   `json:"parent"`
 	Interactive bool     `json:"interactive"`
+	Sno         uint32   `json:"space_no"`
 }
 
 // UploadReq request struct for upload file
@@ -346,6 +347,7 @@ type UploadReq struct {
 	Filename    string `json:"filename"`
 	Interactive bool   `json:"interactive"`
 	NewVersion  bool   `json:"newversion"`
+	Sno         uint32 `json:"space_no"`
 }
 
 // UploadDirReq request struct for upload directory
@@ -353,17 +355,20 @@ type UploadDirReq struct {
 	Parent      string `json:"parent"`
 	Interactive bool   `json:"interactive"`
 	NewVersion  bool   `json:"newversion"`
+	Sno         uint32 `json:"space_no"`
 }
 
 // DownloadDirReq request struct for download directory
 type DownloadDirReq struct {
 	Parent string `json:"parent"`
+	Sno    uint32 `json:"space_no"`
 }
 
 // RenameReq request struct for move file, src is source file id which get by list
 type RenameReq struct {
 	Source string `json:"src"`
 	Dest   string `json:"dest"`
+	Sno    uint32 `json:"space_no"`
 }
 
 // DownloadReq request struct for download file
@@ -371,6 +376,7 @@ type DownloadReq struct {
 	FileHash string `json:"filehash"`
 	FileSize uint64 `json:"filesize"`
 	FileName string `json:"filename"`
+	Sno      uint32 `json:"space_no"`
 }
 
 // ListReq request struct for list files
@@ -380,6 +386,7 @@ type ListReq struct {
 	PageNum  uint32 `json:"pagenum"`
 	SortType string `json:"sorttype"`
 	AscOrder bool   `json:"ascorder"`
+	Sno      uint32 `json:"space_no"`
 }
 
 // RemoveReq request struct for remove file
@@ -387,6 +394,7 @@ type RemoveReq struct {
 	Target    string `json:"target"`
 	Recursion bool   `json:"recursion"`
 	IsPath    bool   `json:"ispath"`
+	Sno       uint32 `json:"space_no"`
 }
 
 // ProgressReq request struct for progress bar
@@ -604,7 +612,7 @@ func MkfolderHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		log.Infof("mkfolder parent %s folders %+v", mkReq.Parent, mkReq.Folders)
-		result, err := s.cm.MkFolder(mkReq.Parent, mkReq.Folders, mkReq.Interactive)
+		result, err := s.cm.MkFolder(mkReq.Parent, mkReq.Folders, mkReq.Interactive, mkReq.Sno)
 		if err != nil {
 			log.Errorf("create folder %+v error %v", mkReq.Parent, mkReq.Folders, err)
 		}
@@ -663,7 +671,7 @@ func UploadHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		log.Infof("upload files %+v", upReq.Filename)
-		err := s.cm.UploadFile(upReq.Filename, upReq.Interactive, upReq.NewVersion)
+		err := s.cm.UploadFile(upReq.Filename, upReq.Interactive, upReq.NewVersion, upReq.Sno)
 		st, ok := status.FromError(err)
 		if !ok {
 			log.Infof("err code %d msg %s", st.Code(), st.Message())
@@ -725,7 +733,7 @@ func UploadDirHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		log.Infof("upload parent %s", upReq.Parent)
-		err := s.cm.UploadDir(upReq.Parent, upReq.Interactive, upReq.NewVersion)
+		err := s.cm.UploadDir(upReq.Parent, upReq.Interactive, upReq.NewVersion, upReq.Sno)
 		st, ok := status.FromError(err)
 		if !ok {
 			log.Infof("err code %d msg %s", st.Code(), st.Message())
@@ -846,7 +854,7 @@ func DownloadDirHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		log.Infof("downloaddir request %+v", req)
-		err := s.cm.DownloadDir(req.Parent)
+		err := s.cm.DownloadDir(req.Parent, req.Sno)
 		code := 0
 		errmsg := ""
 		result := "success"
@@ -904,7 +912,7 @@ func RenameHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		log.Infof("rename request %+v", req)
-		err := s.cm.MoveFile(req.Source, req.Dest)
+		err := s.cm.MoveFile(req.Source, req.Dest, req.Sno)
 		code := 0
 		errmsg := ""
 		result := "success"
@@ -961,7 +969,7 @@ func ListHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		log.Infof("list %+v", listReq)
-		result, err := s.cm.ListFiles(listReq.Path, listReq.PageSize, listReq.PageNum, listReq.SortType, listReq.AscOrder)
+		result, err := s.cm.ListFiles(listReq.Path, listReq.PageSize, listReq.PageNum, listReq.SortType, listReq.AscOrder, listReq.Sno)
 		code := 0
 		errmsg := ""
 		if err != nil {
@@ -1017,7 +1025,7 @@ func RemoveHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		log.Infof("remove %+v", rmReq)
-		err := s.cm.RemoveFile(rmReq.Target, rmReq.Recursion, false)
+		err := s.cm.RemoveFile(rmReq.Target, rmReq.Recursion, false, rmReq.Sno)
 		code := 0
 		errmsg := ""
 		result := true
