@@ -47,7 +47,7 @@ message FilePath{
         string path=1;//parent path in net disk, eg: /foloder1/folder2
         bytes id=2;//nil if top level, better performance
     }
-    uint32 spaceNo=3;//0 is base space, 1 is the first private space, 2 is the second private space 
+    uint32 spaceNo=3;//0 is default space, 1 is the first private space, 2 is the second private space 
 }
 
 message MkFolderResp{
@@ -147,14 +147,15 @@ message UploadFileDoneReq{
     FilePath parent=4;
     bytes fileHash=5;
     uint64 fileSize=6;
-    bytes encryptKey=7;
-    bytes publicKeyHash=8;
-    string fileName=9;
-    uint64 fileModTime=10;
-    repeated StorePartition partition=11;// size is one if use MultiReplica
-    bool interactive=12;//if false, will auto add suffix timestamp when exists same name file 
-    bool newVersion=13;
-    bytes sign=14;
+    string fileType=7;
+    bytes encryptKey=8;
+    bytes publicKeyHash=9;
+    string fileName=10;
+    uint64 fileModTime=11;
+    repeated StorePartition partition=12;// size is one if use MultiReplica
+    bool interactive=13;//if false, will auto add suffix timestamp when exists same name file 
+    bool newVersion=14;
+    bytes sign=15;
    
 }
 

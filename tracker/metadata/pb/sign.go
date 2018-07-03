@@ -123,6 +123,7 @@ func (self *UploadFileDoneReq) hash() []byte {
 	hasher.Write(util_bytes.FromUint32(self.Parent.SpaceNo))
 	hasher.Write(self.FileHash)
 	hasher.Write(util_bytes.FromUint64(self.FileSize))
+	hasher.Write([]byte(self.FileType))
 	hasher.Write(self.EncryptKey)
 	hasher.Write(self.PublicKeyHash)
 	hasher.Write([]byte(self.FileName))
