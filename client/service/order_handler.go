@@ -41,7 +41,7 @@ func GetAllPackageHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -82,7 +82,7 @@ func GetPackageInfoHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -144,7 +144,7 @@ func BuyPackageHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -176,7 +176,7 @@ func DiscountPackageHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		fmt.Printf("package %s\n", id)
+		log.Infof("package %s\n", id)
 
 		result, err := s.cm.OM.DiscountPackage(id)
 		code := 0
@@ -194,7 +194,7 @@ func DiscountPackageHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -240,7 +240,7 @@ func MyAllOrderHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -281,7 +281,7 @@ func GetOrderInfoHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -341,7 +341,7 @@ func PayOrderHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -377,7 +377,7 @@ func RechargeAddressHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -413,7 +413,7 @@ func UsageAmountHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }

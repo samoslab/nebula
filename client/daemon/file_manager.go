@@ -21,6 +21,7 @@ import (
 	client "github.com/samoslab/nebula/client/provider_client"
 	pb "github.com/samoslab/nebula/provider/pb"
 	mpb "github.com/samoslab/nebula/tracker/metadata/pb"
+	"github.com/samoslab/nebula/util/aes"
 	util_file "github.com/samoslab/nebula/util/file"
 	util_hash "github.com/samoslab/nebula/util/hash"
 	"github.com/sirupsen/logrus"
@@ -49,6 +50,8 @@ type ClientManager struct {
 	serverConn *grpc.ClientConn
 	PM         *common.ProgressManager
 	OM         *order.OrderManager
+	Root       string
+	SpaceM     *SpaceManager
 }
 
 // NewClientManager create manager
@@ -71,6 +74,11 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 
 	om := order.NewOrderManager(webcfg.TrackerServer, log, cfg.Node.PriKey, cfg.Node.NodeId)
 
+	spaceM := NewSpaceManager()
+	for _, sp := range cfg.Space {
+		spaceM.AddSpace(sp.SpaceNo, sp.Password, sp.Home)
+	}
+
 	c := &ClientManager{
 		serverConn: conn,
 		Log:        log,
@@ -80,6 +88,7 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 		PM:         common.NewProgressManager(),
 		mclient:    mpb.NewMatadataServiceClient(conn),
 		OM:         om,
+		SpaceM:     spaceM,
 	}
 
 	collectClient.NodePtr = cfg.Node
@@ -101,6 +110,17 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 func (c *ClientManager) Shutdown() {
 	c.serverConn.Close()
 	collectClient.Stop()
+}
+
+// SetRoot set user root directory
+func (c *ClientManager) SetRoot(path string) error {
+	if !util_file.Exists(path) {
+		return fmt.Errorf("%s not exists", path)
+	}
+	c.Root = path
+	c.cfg.Root = path
+	// todo save root into config
+	return nil
 }
 
 func (c *ClientManager) getPingTime(ip string, port uint32) int {
@@ -310,6 +330,25 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 	case mpb.FileStoreType_MultiReplica:
 		log.Infof("upload manner is multi-replication")
 		c.PM.SetProgress(filename, 0, req.FileSize)
+		// encrypt file
+		encry, err := c.SpaceM.GetSpacePasswd(sno)
+		if err != nil {
+			log.Errorf("get encrypt key of space no %d error %v", sno, err)
+			return err
+		}
+		if len(encry) != 0 {
+			_, onlyFileName := filepath.Split(filename)
+			encryptedFileName := filepath.Join(c.TempDir, onlyFileName)
+			err := aes.EncryptFile(filename, encry, encryptedFileName)
+			if err != nil {
+				log.Errorf("encrypt %s error %v", filename, err)
+				return err
+			}
+			filename = encryptedFileName
+			defer func() {
+				deleteTemporaryFile(log, encryptedFileName)
+			}()
+		}
 		partitions, err := c.uploadFileByMultiReplica(filename, req, rsp)
 		if err != nil {
 			return err
@@ -341,7 +380,7 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 
 		realSizeAfterRS := int64(0)
 		for _, fname := range partFiles {
-			fileSlices, err := c.onlyFileSplit(fname, dataShards, verifyShards)
+			fileSlices, err := c.onlyFileSplit(fname, dataShards, verifyShards, sno)
 			if err != nil {
 				return err
 			}
@@ -462,7 +501,6 @@ func (c *ClientManager) CheckFileExists(filename string, interactive, newVersion
 		return nil, nil, err
 	}
 	fileType := filetype.FileType(filename)
-	var encryptKey []byte
 	dir, fname := filepath.Split(filename)
 	ctx := context.Background()
 	req := &mpb.CheckFileExistReq{
@@ -483,16 +521,25 @@ func (c *ClientManager) CheckFileExists(filename string, interactive, newVersion
 	}
 	req.FileModTime = uint64(mtime)
 	if fileInfo.Size() < ReplicaFileSize {
+		encry, err := c.SpaceM.GetSpacePasswd(sno)
+		if err != nil {
+			log.Errorf("get encrypt key of space no %d error %v", sno, err)
+			return nil, nil, err
+		}
+		req.EncryptKey = encry
 		fileData, err := util_hash.GetFileData(filename)
 		if err != nil {
 			log.Errorf("get file %s data error %v", filename, err)
 			return nil, nil, err
 		}
-		req.FileData = fileData
-		if sno != 0 {
-			encryptKey = []byte(common.RandStr(16))
-			req.EncryptKey = encryptKey
+		if len(encry) != 0 {
+			fileData, err = aes.Encrypt(fileData, encry)
+			if err != nil {
+				log.Errorf("encrypt %s error %v", filename, err)
+				return nil, nil, err
+			}
 		}
+		req.FileData = fileData
 	}
 	err = req.SignReq(c.cfg.Node.PriKey)
 	if err != nil {
@@ -535,11 +582,27 @@ func (c *ClientManager) MkFolder(filepath string, folders []string, interactive 
 	return true, nil
 }
 
-func (c *ClientManager) onlyFileSplit(filename string, dataNum, verifyNum int) ([]common.HashFile, error) {
+func (c *ClientManager) onlyFileSplit(filename string, dataNum, verifyNum int, sno uint32) ([]common.HashFile, error) {
+	log := c.Log
 	fileSlices, err := RsEncoder(c.Log, c.TempDir, filename, dataNum, verifyNum)
 	if err != nil {
-		c.Log.Errorf("reedsolomon encoder error %v", err)
+		log.Errorf("reedsolomon encoder error %v", err)
 		return nil, err
+	}
+	encry, err := c.SpaceM.GetSpacePasswd(sno)
+	if err != nil {
+		log.Errorf("get encrypt key of space no %d error %v", sno, err)
+		return nil, err
+	}
+	if len(encry) != 0 {
+		for _, ff := range fileSlices {
+			err := aes.EncryptFile(ff.FileName, encry, ff.FileName)
+			if err != nil {
+				log.Errorf("encrypt %s error %v", filename, err)
+				return nil, err
+			}
+
+		}
 	}
 	return fileSlices, nil
 
@@ -709,7 +772,7 @@ func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitio
 }
 
 // ListFiles list files on dir
-func (c *ClientManager) ListFiles(path string, pageSize, pageNum uint32, sortType string, ascOrder bool, sno uint32) ([]*DownFile, error) {
+func (c *ClientManager) ListFiles(path string, pageSize, pageNum uint32, sortType string, ascOrder bool, sno uint32) (*FilePages, error) {
 	c.Log.Infof("path %s, size %d, num %d, sortype %s, asc %v", path, pageSize, pageNum, sortType, ascOrder)
 	req := &mpb.ListFilesReq{
 		Version:   common.Version,
@@ -757,7 +820,11 @@ func (c *ClientManager) ListFiles(path string, pageSize, pageNum uint32, sortTyp
 			FileSize: info.GetFileSize()}
 		fileLists = append(fileLists, df)
 	}
-	return fileLists, nil
+
+	return &FilePages{
+		Total: rsp.GetTotalRecord(),
+		Files: fileLists,
+	}, nil
 }
 
 // DownloadDir download dir
@@ -774,12 +841,12 @@ func (c *ClientManager) DownloadDir(path string, sno uint32) error {
 		if err != nil {
 			return err
 		}
-		if len(downFiles) == 0 {
+		if downFiles.Total == 0 {
 			break
 		}
 		// next page
 		page++
-		for _, fileInfo := range downFiles {
+		for _, fileInfo := range downFiles.Files {
 			currentFile := filepath.Join(path, fileInfo.FileName)
 			if fileInfo.Folder {
 				log.Infof("create folder %s", currentFile)

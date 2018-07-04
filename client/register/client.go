@@ -14,6 +14,7 @@ import (
 	"github.com/samoslab/nebula/provider/node"
 	pb "github.com/samoslab/nebula/tracker/register/client/pb"
 	regpb "github.com/samoslab/nebula/tracker/register/client/pb"
+	"github.com/samoslab/nebula/util/aes"
 	rsalong "github.com/samoslab/nebula/util/rsa"
 	"github.com/sirupsen/logrus"
 )
@@ -128,6 +129,10 @@ func RegisterClient(log logrus.FieldLogger, configDir, trackerServer, emailAddre
 			Email:         emailAddress,
 			TrackerServer: trackerServer,
 			Node:          no,
+			Space: []config.ReadableSpace{
+				config.ReadableSpace{SpaceNo: 0, Password: aes.RandStr(16), Home: "default", Name: "default"},
+				config.ReadableSpace{SpaceNo: 1, Password: aes.RandStr(16), Home: "private1", Name: "privacy space"},
+			},
 		}
 		err = config.SaveClientConfig(configDir, cc)
 		if err != nil {

@@ -19,6 +19,7 @@ import (
 	"github.com/samoslab/nebula/client/config"
 	"github.com/samoslab/nebula/client/daemon"
 	regclient "github.com/samoslab/nebula/client/register"
+	"github.com/samoslab/nebula/util/aes"
 	"github.com/sirupsen/logrus"
 	"github.com/unrolled/secure"
 	"golang.org/x/crypto/acme/autocert"
@@ -67,7 +68,7 @@ func InitClientManager(log logrus.FieldLogger, webcfg config.Config) (*daemon.Cl
 	}
 	cm, err := daemon.NewClientManager(log, webcfg, clientConfig)
 	if err != nil {
-		fmt.Printf("new client manager failed %v\n", err)
+		log.Infof("new client manager failed %v\n", err)
 		return cm, err
 	}
 	return cm, nil
@@ -317,6 +318,7 @@ func (s *HTTPServer) setupMux() *http.ServeMux {
 	handleAPI("/api/v1/secret/decrypt", DecryFileHandler(s))
 
 	handleAPI("/api/v1/service/status", ServiceStatusHandler(s))
+	handleAPI("/api/v1/service/root", RootPathHandler(s))
 
 	// Static files
 	mux.Handle("/", http.FileServer(http.Dir(s.cfg.StaticDir)))
@@ -426,10 +428,16 @@ type ServiceStatus struct {
 	Status bool `json:"status"`
 }
 
+// RootPath root path
+type RootPath struct {
+	Root string `json:"root"`
+}
+
 // ServiceStatusHandler returns service status
 func ServiceStatusHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+		log := s.log
 		if !validMethod(ctx, w, r, []string{http.MethodGet}) {
 			return
 		}
@@ -439,7 +447,58 @@ func ServiceStatusHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		if err := JSONResponse(w, ss); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
+		}
+	}
+}
+
+// RootPathHandler set user root path handler
+func RootPathHandler(s *HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log := s.log
+		ctx := r.Context()
+		w.Header().Set("Accept", "application/json")
+
+		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
+			return
+		}
+
+		if r.Header.Get("Content-Type") != "application/json" {
+			errorResponse(ctx, w, http.StatusUnsupportedMediaType, errors.New("Invalid content type"))
+			return
+		}
+
+		req := &RootPath{}
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&req); err != nil {
+			err = fmt.Errorf("Invalid json request body: %v", err)
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+
+		defer r.Body.Close()
+		if req.Root == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument root must not empty"))
+			return
+		}
+
+		err := s.cm.SetRoot(req.Root)
+		code := 0
+		errmsg := ""
+		result := "ok"
+		if err != nil {
+			code = 1
+			errmsg = err.Error()
+			result = ""
+		}
+
+		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
+		if err != nil {
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+		if err := JSONResponse(w, rsp); err != nil {
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -506,7 +565,7 @@ func RegisterHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -563,7 +622,7 @@ func EmailHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -630,7 +689,7 @@ func MkfolderHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -692,7 +751,7 @@ func UploadHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -755,7 +814,7 @@ func UploadDirHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -813,7 +872,7 @@ func DownloadHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -871,7 +930,7 @@ func DownloadDirHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -929,7 +988,7 @@ func RenameHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -985,7 +1044,7 @@ func ListHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -1042,7 +1101,7 @@ func RemoveHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -1092,7 +1151,7 @@ func ProgressHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -1143,7 +1202,7 @@ func EncryFileHandler(s *HTTPServer) http.HandlerFunc {
 		if req.OutputFile == "" {
 			req.OutputFile = req.FileName
 		}
-		err := common.EncryptFile(req.FileName, []byte(req.Password), req.OutputFile)
+		err := aes.EncryptFile(req.FileName, []byte(req.Password), req.OutputFile)
 		code := 0
 		errmsg := ""
 		result := true
@@ -1160,7 +1219,7 @@ func EncryFileHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -1211,7 +1270,7 @@ func DecryFileHandler(s *HTTPServer) http.HandlerFunc {
 		if req.OutputFile == "" {
 			req.OutputFile = req.FileName
 		}
-		err := common.DecryptFile(req.FileName, []byte(req.Password), req.OutputFile)
+		err := aes.DecryptFile(req.FileName, []byte(req.Password), req.OutputFile)
 		code := 0
 		errmsg := ""
 		result := true
@@ -1228,7 +1287,7 @@ func DecryFileHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -1257,8 +1316,9 @@ func errorResponse(ctx context.Context, w http.ResponseWriter, code int, err err
 
 // Shutdown stops the HTTPServer
 func (s *HTTPServer) Shutdown() {
-	s.log.Info("Shutting down HTTP server(s)")
-	defer s.log.Info("Shutdown HTTP server(s)")
+	log := s.log
+	log.Info("Shutting down HTTP server(s)")
+	defer log.Info("Shutdown HTTP server(s)")
 	close(s.quit)
 
 	var wg sync.WaitGroup
@@ -1269,7 +1329,7 @@ func (s *HTTPServer) Shutdown() {
 		if ln == nil {
 			return
 		}
-		log := s.log.WithFields(logrus.Fields{
+		log := log.WithFields(logrus.Fields{
 			"proto":   proto,
 			"timeout": shutdownTimeout,
 		})

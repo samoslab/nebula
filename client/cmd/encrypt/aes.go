@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/samoslab/nebula/client/common"
+	"github.com/samoslab/nebula/util/aes"
 
 	"github.com/spf13/pflag"
 )
@@ -45,9 +45,9 @@ func main() {
 
 	switch *method {
 	case "enc":
-		err = common.EncryptFile(*input, []byte(*password), *output)
+		err = aes.EncryptFile(*input, []byte(*password), *output)
 	case "dec":
-		err = common.DecryptFile(*input, []byte(*password), *output)
+		err = aes.DecryptFile(*input, []byte(*password), *output)
 	default:
 		err = fmt.Errorf("only support enc|dec\n")
 	}
