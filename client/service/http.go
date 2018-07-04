@@ -319,6 +319,7 @@ func (s *HTTPServer) setupMux() *http.ServeMux {
 
 	handleAPI("/api/v1/service/status", ServiceStatusHandler(s))
 	handleAPI("/api/v1/service/root", RootPathHandler(s))
+	handleAPI("/api/v1/service/password", PasswordHandler(s))
 
 	// Static files
 	mux.Handle("/", http.FileServer(http.Dir(s.cfg.StaticDir)))
@@ -433,6 +434,12 @@ type RootPath struct {
 	Root string `json:"root"`
 }
 
+// PasswordReq set password for privacy space
+type PasswordReq struct {
+	Password string `json:"password"`
+	SpacoNo  uint32 `json:"space_no"`
+}
+
 // ServiceStatusHandler returns service status
 func ServiceStatusHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -483,6 +490,57 @@ func RootPathHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		err := s.cm.SetRoot(req.Root)
+		code := 0
+		errmsg := ""
+		result := "ok"
+		if err != nil {
+			code = 1
+			errmsg = err.Error()
+			result = ""
+		}
+
+		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
+		if err != nil {
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+		if err := JSONResponse(w, rsp); err != nil {
+			log.Infof("error %v\n", err)
+		}
+	}
+}
+
+// PasswordHandler set user root path handler
+func PasswordHandler(s *HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log := s.log
+		ctx := r.Context()
+		w.Header().Set("Accept", "application/json")
+
+		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
+			return
+		}
+
+		if r.Header.Get("Content-Type") != "application/json" {
+			errorResponse(ctx, w, http.StatusUnsupportedMediaType, errors.New("Invalid content type"))
+			return
+		}
+
+		req := &PasswordReq{}
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&req); err != nil {
+			err = fmt.Errorf("Invalid json request body: %v", err)
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+
+		defer r.Body.Close()
+		if req.Password == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument password must not empty"))
+			return
+		}
+
+		err := s.cm.SetPassword(req.SpacoNo, req.Password)
 		code := 0
 		errmsg := ""
 		result := "ok"

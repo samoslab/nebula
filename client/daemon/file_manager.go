@@ -120,7 +120,17 @@ func (c *ClientManager) SetRoot(path string) error {
 	c.Root = path
 	c.cfg.Root = path
 	// todo save root into config
-	return nil
+	return config.SaveClientConfig(c.cfg.SelfFileName, c.cfg)
+}
+
+// SetPassword set user privacy space password
+func (c *ClientManager) SetPassword(sno uint32, password string) error {
+	err := c.SpaceM.SetSpacePasswd(sno, password)
+	if err != nil {
+		return err
+	}
+	c.cfg.Space[sno].Password = password
+	return config.SaveClientConfig(c.cfg.SelfFileName, c.cfg)
 }
 
 func (c *ClientManager) getPingTime(ip string, port uint32) int {

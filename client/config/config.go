@@ -44,6 +44,7 @@ type ClientConfig struct {
 	Node          *node.Node      `json:"-"`
 	Root          string          `json:"root"`
 	Space         []ReadableSpace `json:"space"`
+	SelfFileName  string          `json:"self_filename"`
 }
 
 // LoadConfig load config from config file
@@ -127,6 +128,7 @@ func readConfig(configFilePath string) (*ClientConfig, error) {
 }
 
 func saveClientConfig(configPath string, cc *ClientConfig) error {
+	cc.SelfFileName = configPath
 	b, err := json.Marshal(cc)
 	if err != nil {
 		return err

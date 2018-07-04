@@ -27,6 +27,8 @@ Index
 | [/api/v1/secret/encrypt](#apiv1secretencrypt-post)                             | POST |
 | [/api/v1/secret/decrypt](#apiv1secretdecrypt-post)                             | POST |
 | [/api/v1/service/status](#apiv1servicestatus-get)                             | GET |
+| [/api/v1/service/root](#apiv1serviceroot-post)                             | POST|
+| [/api/v1/service/password](#apiv1servicepassword-post)                             | POST|
 
 统一说明 返回json object结构统一为： 成功：{"code":0, "data":object} 失败：{"code":1,"errmsg":"errmsg","data":object}  
 
