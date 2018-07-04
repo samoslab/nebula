@@ -855,7 +855,7 @@ func DownloadHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		log.Infof("download  %+v", downReq)
-		err := s.cm.DownloadFile(downReq.FileName, downReq.FileHash, downReq.FileSize)
+		err := s.cm.DownloadFile(downReq.FileName, downReq.FileHash, downReq.FileSize, downReq.Sno)
 		code := 0
 		errmsg := ""
 		result := "success"
