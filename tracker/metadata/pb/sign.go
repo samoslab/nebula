@@ -58,6 +58,7 @@ func (self *CheckFileExistReq) hash() []byte {
 	hasher.Write(util_bytes.FromUint64(self.FileSize))
 	hasher.Write([]byte(self.FileType))
 	hasher.Write(self.EncryptKey)
+	hasher.Write(self.PublicKeyHash)
 	hasher.Write([]byte(self.FileName))
 	hasher.Write(util_bytes.FromUint64(self.FileModTime))
 	if len(self.FileData) > 0 {
@@ -122,7 +123,9 @@ func (self *UploadFileDoneReq) hash() []byte {
 	hasher.Write(util_bytes.FromUint32(self.Parent.SpaceNo))
 	hasher.Write(self.FileHash)
 	hasher.Write(util_bytes.FromUint64(self.FileSize))
+	hasher.Write([]byte(self.FileType))
 	hasher.Write(self.EncryptKey)
+	hasher.Write(self.PublicKeyHash)
 	hasher.Write([]byte(self.FileName))
 	hasher.Write(util_bytes.FromUint64(self.FileModTime))
 	for _, p := range self.Partition {
@@ -197,6 +200,7 @@ func (self *RetrieveFileReq) hash() []byte {
 	hasher := sha256.New()
 	hasher.Write(self.NodeId)
 	hasher.Write(util_bytes.FromUint64(self.Timestamp))
+	hasher.Write(util_bytes.FromUint32(self.SpaceNo))
 	hasher.Write(self.FileHash)
 	hasher.Write(util_bytes.FromUint64(self.FileSize))
 	return hasher.Sum(nil)

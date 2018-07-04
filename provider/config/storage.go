@@ -218,7 +218,7 @@ func checkStorageAvailableSpace() {
 			log.Warnf("get storage %s free space error:%s", s.Path, err)
 			continue
 		}
-		if (s.Index == 0 && free <= 3*min_available_volume) || (s.Index != 0 && free <= min_available_volume) {
+		if (s.Index == 0 && free <= min_available_volume_of_main) || (s.Index != 0 && free <= min_available_volume) {
 			log.Warnf("storage path %s available space less than 1GB", s.Path)
 			continue
 		}
@@ -228,6 +228,8 @@ func checkStorageAvailableSpace() {
 }
 
 var min_available_volume uint64 = 1024 * 1024 * 1024
+
+var min_available_volume_of_main uint64 = 3 * min_available_volume
 
 var checkStorageOfConf *sync.Mutex = &sync.Mutex{}
 var checkStorageOfConfFirst = true
@@ -250,7 +252,7 @@ func checkStorageAvailableSpaceOfConf() {
 		storageMap["0"] = s
 	}
 	s.cleanTemp()
-	if s.Volume > 3*min_available_volume {
+	if s.Volume > min_available_volume_of_main {
 		sl = append(sl, s)
 	} else {
 		log.Errorf("main storage available space less than 1GB")
@@ -287,4 +289,31 @@ func stopStorage() {
 			v.SmallFileDb.Close()
 		}
 	}
+}
+
+var min_available_volume_plus uint64 = 1024 * 1024 * 1024
+
+func AvailableVolume() (total uint64, max uint64) {
+	if len(storageSlice) == 0 {
+		return
+	}
+	for _, s := range storageSlice {
+		_, free, err := disk.Space(s.Path)
+		if err != nil {
+			log.Errorf("get disk space of path %s error: %s", s.Path, err)
+			continue
+		}
+		if s.Index == 0 {
+			free -= min_available_volume_of_main
+		} else {
+			free -= min_available_volume
+		}
+		if free > min_available_volume_plus {
+			total += free
+			if free > max {
+				max = free
+			}
+		}
+	}
+	return
 }

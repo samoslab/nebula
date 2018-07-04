@@ -91,5 +91,6 @@ message CheckAvailableReq{
 }
 
 message CheckAvailableResp{
-	bool available=1;
+	uint64 total=1;
+	uint64 maxFileSize=2;
 }

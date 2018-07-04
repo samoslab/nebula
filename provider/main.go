@@ -500,7 +500,9 @@ func (self *pingProviderService) Remove(ctx context.Context, req *pb.RemoveReq) 
 func (self *pingProviderService) GetFragment(ctx context.Context, req *pb.GetFragmentReq) (*pb.GetFragmentResp, error) {
 	return nil, nil
 }
-
+func (self *pingProviderService) CheckAvailable(ctx context.Context, req *pb.CheckAvailableReq) (resp *pb.CheckAvailableResp, err error) {
+	return nil, nil
+}
 func addStorage(configDir string, trackerServer string, path string, volumeStr string) {
 	volume, err := parseStorageVolume(volumeStr)
 	if err != nil {

@@ -3,6 +3,8 @@ package metadata.pb;
 
 service MatadataService {
 
+    rpc GetPublicKey(GetPublicKeyReq) returns (GetPublicKeyResp){}
+
     rpc MkFolder(MkFolderReq)returns(MkFolderResp){}
 
     rpc CheckFileExist(CheckFileExistReq)returns(CheckFileExistResp){}
@@ -21,6 +23,15 @@ service MatadataService {
 
 }
 
+message GetPublicKeyReq {
+    uint32 version =1;
+}
+
+message GetPublicKeyResp {
+    bytes publicKey=1;
+    bytes publicKeyHash=2;
+}
+
 message MkFolderReq{
     uint32 version =1;
     bytes nodeId=2;
@@ -36,7 +47,7 @@ message FilePath{
         string path=1;//parent path in net disk, eg: /foloder1/folder2
         bytes id=2;//nil if top level, better performance
     }
-    uint32 spaceNo=3;//0 is base space, 1 is the first private space, 2 is the second private space 
+    uint32 spaceNo=3;//0 is default space, 1 is the first private space, 2 is the second private space 
 }
 
 message MkFolderResp{
@@ -53,12 +64,13 @@ message CheckFileExistReq {
     uint64 fileSize=6;
     string fileType=7;
     bytes encryptKey=8;//not nil when fileData is not nil and file is cryptographic 
-    string fileName=9;
-    uint64 fileModTime=10;
-    bytes fileData=11;//file content if file size less than or equal 8k
-    bool interactive=12;//if false, will auto add suffix timestamp when exists same name file
-    bool newVersion=13;
-    bytes sign=14;
+    bytes publicKeyHash=9;
+    string fileName=10;
+    uint64 fileModTime=11;
+    bytes fileData=12;//file content if file size less than or equal 8k
+    bool interactive=13;//if false, will auto add suffix timestamp when exists same name file
+    bool newVersion=14;
+    bytes sign=15;
 }
 
 message CheckFileExistResp{
@@ -135,13 +147,15 @@ message UploadFileDoneReq{
     FilePath parent=4;
     bytes fileHash=5;
     uint64 fileSize=6;
-    bytes encryptKey=7;
-    string fileName=8;
-    uint64 fileModTime=9;
-    repeated StorePartition partition=10;// size is one if use MultiReplica
-    bool interactive=11;//if false, will auto add suffix timestamp when exists same name file 
-    bool newVersion=12;
-    bytes sign=13;
+    string fileType=7;
+    bytes encryptKey=8;
+    bytes publicKeyHash=9;
+    string fileName=10;
+    uint64 fileModTime=11;
+    repeated StorePartition partition=12;// size is one if use MultiReplica
+    bool interactive=13;//if false, will auto add suffix timestamp when exists same name file 
+    bool newVersion=14;
+    bytes sign=15;
    
 }
 
@@ -201,9 +215,10 @@ message RetrieveFileReq{
     uint32 version =1;
     bytes nodeId=2;
     uint64 timestamp=3;
-    bytes fileHash=4;
-    uint64 fileSize=5;
-    bytes sign=6;
+    uint32 spaceNo=4;
+    bytes fileHash=5;
+    uint64 fileSize=6;
+    bytes sign=7;
 }
 
 message RetrieveFileResp{
