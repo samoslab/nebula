@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"crypto/rsa"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -24,6 +25,7 @@ import (
 	"github.com/samoslab/nebula/util/aes"
 	util_file "github.com/samoslab/nebula/util/file"
 	util_hash "github.com/samoslab/nebula/util/hash"
+	rsalong "github.com/samoslab/nebula/util/rsa"
 	"github.com/sirupsen/logrus"
 
 	"google.golang.org/grpc"
@@ -42,16 +44,17 @@ var (
 
 // ClientManager client manager
 type ClientManager struct {
-	mclient    mpb.MatadataServiceClient
-	NodeId     []byte
-	TempDir    string
-	Log        logrus.FieldLogger
-	cfg        *config.ClientConfig
-	serverConn *grpc.ClientConn
-	PM         *common.ProgressManager
-	OM         *order.OrderManager
-	Root       string
-	SpaceM     *SpaceManager
+	mclient       mpb.MatadataServiceClient
+	NodeId        []byte
+	TempDir       string
+	Log           logrus.FieldLogger
+	cfg           *config.ClientConfig
+	serverConn    *grpc.ClientConn
+	PM            *common.ProgressManager
+	OM            *order.OrderManager
+	Root          string
+	SpaceM        *SpaceManager
+	TrackerPubkey *rsa.PublicKey
 }
 
 // NewClientManager create manager
@@ -320,12 +323,12 @@ func (c *ClientManager) UploadDir(parent string, interactive, newVersion bool, s
 // UploadFile upload file to provider
 func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool, sno uint32) error {
 	log := c.Log
-	encryptKey, err := c.SpaceM.GetSpacePasswd(sno)
+	password, err := c.SpaceM.GetSpacePasswd(sno)
 	if err != nil {
 		log.Errorf("get encrypt key of space no %d error %v", sno, err)
 		return err
 	}
-	req, rsp, err := c.CheckFileExists(filename, interactive, newVersion, encryptKey, sno)
+	req, rsp, err := c.CheckFileExists(filename, interactive, newVersion, password, sno)
 	if err != nil {
 		return common.StatusErrFromError(err)
 	}
@@ -368,7 +371,7 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 		if err != nil {
 			return err
 		}
-		return c.UploadFileDone(req, partitions, encryptKey)
+		return c.UploadFileDone(req, partitions, password)
 	case mpb.FileStoreType_ErasureCode:
 		log.Infof("upload manner is erasure")
 		partFiles := []string{}
@@ -492,7 +495,7 @@ func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool
 		}
 		log.Infof("there are %d store partitions", len(partitions))
 
-		return c.UploadFileDone(req, partitions, encryptKey)
+		return c.UploadFileDone(req, partitions, password)
 
 	}
 	return nil
@@ -505,7 +508,7 @@ func deleteTemporaryFile(log logrus.FieldLogger, filename string) {
 	}
 }
 
-func (c *ClientManager) CheckFileExists(filename string, interactive, newVersion bool, encryptKey []byte, sno uint32) (*mpb.CheckFileExistReq, *mpb.CheckFileExistResp, error) {
+func (c *ClientManager) CheckFileExists(filename string, interactive, newVersion bool, password []byte, sno uint32) (*mpb.CheckFileExistReq, *mpb.CheckFileExistResp, error) {
 	log := c.Log
 	hash, err := util_hash.Sha1File(filename)
 	if err != nil {
@@ -518,6 +521,10 @@ func (c *ClientManager) CheckFileExists(filename string, interactive, newVersion
 	fileType := filetype.FileType(filename)
 	dir, fname := filepath.Split(filename)
 	ctx := context.Background()
+	encryptKey, err := rsalong.EncryptLong(c.TrackerPubkey, password, 256)
+	if err != nil {
+		return nil, nil, err
+	}
 	req := &mpb.CheckFileExistReq{
 		Version:     common.Version,
 		FileSize:    uint64(fileInfo.Size()),
@@ -542,8 +549,8 @@ func (c *ClientManager) CheckFileExists(filename string, interactive, newVersion
 			log.Errorf("get file %s data error %v", filename, err)
 			return nil, nil, err
 		}
-		if len(encryptKey) != 0 {
-			fileData, err = aes.Encrypt(fileData, encryptKey)
+		if len(password) != 0 {
+			fileData, err = aes.Encrypt(fileData, password)
 			if err != nil {
 				log.Errorf("encrypt %s error %v", filename, err)
 				return nil, nil, err
@@ -750,7 +757,11 @@ func (c *ClientManager) uploadFileByMultiReplica(filename string, req *mpb.Check
 	return partitions, nil
 }
 
-func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitions []*mpb.StorePartition, encryptKey []byte) error {
+func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitions []*mpb.StorePartition, password []byte) error {
+	encryptKey, err := rsalong.EncryptLong(c.TrackerPubkey, password, 256)
+	if err != nil {
+		return err
+	}
 	req := &mpb.UploadFileDoneReq{
 		Version:     common.Version,
 		NodeId:      c.NodeId,
@@ -765,7 +776,7 @@ func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitio
 		Partition:   partitions,
 		EncryptKey:  encryptKey,
 	}
-	err := req.SignReq(c.cfg.Node.PriKey)
+	err = req.SignReq(c.cfg.Node.PriKey)
 	if err != nil {
 		return err
 	}
@@ -926,10 +937,14 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 	}
 
 	encryptKey := rsp.GetEncryptKey()
+	password, err := rsalong.DecryptLong(c.cfg.Node.PriKey, encryptKey, 256)
+	if err != nil {
+		return err
+	}
 	// tiny file
 	if filedata := rsp.GetFileData(); filedata != nil {
-		if len(encryptKey) != 0 {
-			filedata, err = aes.Decrypt(filedata, encryptKey)
+		if len(password) != 0 {
+			filedata, err = aes.Decrypt(filedata, password)
 			if err != nil {
 				log.Errorf("decrypted %s error %v", downFileName, err)
 				return err
@@ -956,8 +971,8 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 			if err != nil {
 				return err
 			}
-			if len(encryptKey) != 0 {
-				return aes.DecryptFile(downFileName, encryptKey, downFileName)
+			if len(password) != 0 {
+				return aes.DecryptFile(downFileName, password, downFileName)
 			}
 			return nil
 		}
@@ -987,9 +1002,9 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 			log.Errorf("save file by partition error: %v, but file still can be recoverd", err)
 		}
 
-		if len(encryptKey) != 0 {
+		if len(password) != 0 {
 			for _, file := range middleFiles {
-				if err := aes.DecryptFile(file, encryptKey, file); err != nil {
+				if err := aes.DecryptFile(file, password, file); err != nil {
 					return err
 				}
 			}
@@ -1035,9 +1050,9 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 		if err != nil {
 			log.Errorf("save file by partition error %v, but file still can be recoverd", err)
 		}
-		if len(encryptKey) != 0 {
+		if len(password) != 0 {
 			for _, file := range middleFiles {
-				if err := aes.DecryptFile(file, encryptKey, file); err != nil {
+				if err := aes.DecryptFile(file, password, file); err != nil {
 					return err
 				}
 			}
