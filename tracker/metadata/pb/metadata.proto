@@ -215,9 +215,10 @@ message RetrieveFileReq{
     uint32 version =1;
     bytes nodeId=2;
     uint64 timestamp=3;
-    bytes fileHash=4;
-    uint64 fileSize=5;
-    bytes sign=6;
+    uint32 spaceNo=4;
+    bytes fileHash=5;
+    uint64 fileSize=6;
+    bytes sign=7;
 }
 
 message RetrieveFileResp{
