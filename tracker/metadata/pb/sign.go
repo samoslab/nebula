@@ -200,6 +200,7 @@ func (self *RetrieveFileReq) hash() []byte {
 	hasher := sha256.New()
 	hasher.Write(self.NodeId)
 	hasher.Write(util_bytes.FromUint64(self.Timestamp))
+	hasher.Write(util_bytes.FromUint32(self.SpaceNo))
 	hasher.Write(self.FileHash)
 	hasher.Write(util_bytes.FromUint64(self.FileSize))
 	return hasher.Sum(nil)
