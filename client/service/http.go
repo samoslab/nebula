@@ -348,6 +348,7 @@ type MkfolderReq struct {
 // UploadReq request struct for upload file
 type UploadReq struct {
 	Filename    string `json:"filename"`
+	Dest        string `json:"dest_dir"`
 	Interactive bool   `json:"interactive"`
 	NewVersion  bool   `json:"newversion"`
 	Sno         uint32 `json:"space_no"`
@@ -356,6 +357,7 @@ type UploadReq struct {
 // UploadDirReq request struct for upload directory
 type UploadDirReq struct {
 	Parent      string `json:"parent"`
+	Dest        string `json:"dest_dir"`
 	Interactive bool   `json:"interactive"`
 	NewVersion  bool   `json:"newversion"`
 	Sno         uint32 `json:"space_no"`
@@ -782,13 +784,13 @@ func UploadHandler(s *HTTPServer) http.HandlerFunc {
 
 		defer r.Body.Close()
 
-		if upReq.Filename == "" {
-			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument filename must not empty"))
+		if upReq.Filename == "" || upReq.Dest == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument filename or dest_dir must not empty"))
 			return
 		}
 
 		log.Infof("upload files %+v", upReq.Filename)
-		err := s.cm.UploadFile(upReq.Filename, upReq.Interactive, upReq.NewVersion, upReq.Sno)
+		err := s.cm.UploadFile(upReq.Filename, upReq.Dest, upReq.Interactive, upReq.NewVersion, upReq.Sno)
 		st, ok := status.FromError(err)
 		if !ok {
 			log.Infof("err code %d msg %s", st.Code(), st.Message())
@@ -844,13 +846,13 @@ func UploadDirHandler(s *HTTPServer) http.HandlerFunc {
 
 		defer r.Body.Close()
 
-		if upReq.Parent == "" {
-			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument parent must not empty"))
+		if upReq.Parent == "" || upReq.Dest == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument parent or dest_dir must not empty"))
 			return
 		}
 
 		log.Infof("upload parent %s", upReq.Parent)
-		err := s.cm.UploadDir(upReq.Parent, upReq.Interactive, upReq.NewVersion, upReq.Sno)
+		err := s.cm.UploadDir(upReq.Parent, upReq.Dest, upReq.Interactive, upReq.NewVersion, upReq.Sno)
 		st, ok := status.FromError(err)
 		if !ok {
 			log.Infof("err code %d msg %s", st.Code(), st.Message())

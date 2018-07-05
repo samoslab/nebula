@@ -303,7 +303,7 @@ func (c *ClientManager) BestRetrieveNode(pros []*mpb.RetrieveNode) *mpb.Retrieve
 }
 
 // UploadDir upload all files in dir to provider
-func (c *ClientManager) UploadDir(parent string, interactive, newVersion bool, sno uint32) error {
+func (c *ClientManager) UploadDir(parent, dest string, interactive, newVersion bool, sno uint32) error {
 	log := c.Log
 	if !filepath.IsAbs(parent) {
 		return fmt.Errorf("path %s must absolute", parent)
@@ -314,14 +314,29 @@ func (c *ClientManager) UploadDir(parent string, interactive, newVersion bool, s
 	}
 	log.Debugf("dirs %+v", dirs)
 	log.Debugf("files %+v", files)
-	for _, dpair := range dirs {
+	// replace parent by dest, parent is D://work, dest = /cloud, D://work/abc.txt -> /cloud/abc.txt
+	newDirs := []DirPair{}
+	newFiles := []string{}
+	for _, dir := range dirs {
+		actualDir := strings.Replace(dir.Parent, parent, dest, 1)
+		newDP := DirPair{
+			Parent: actualDir,
+			Name:   dir.Name,
+		}
+		newDirs = append(newDirs, newDP)
+	}
+	for _, file := range files {
+		actualFile := strings.Replace(file, parent, dest, 1)
+		newFiles = append(newFiles, actualFile)
+	}
+	for _, dpair := range newDirs {
 		_, err := c.MkFolder(dpair.Parent, []string{dpair.Name}, interactive, sno)
 		if err != nil {
 			return err
 		}
 	}
-	for _, fname := range files {
-		err := c.UploadFile(fname, interactive, newVersion, sno)
+	for _, fname := range newFiles {
+		err := c.UploadFile(fname, dest, interactive, newVersion, sno)
 		if err != nil {
 			return nil
 		}
@@ -330,14 +345,14 @@ func (c *ClientManager) UploadDir(parent string, interactive, newVersion bool, s
 }
 
 // UploadFile upload file to provider
-func (c *ClientManager) UploadFile(filename string, interactive, newVersion bool, sno uint32) error {
+func (c *ClientManager) UploadFile(filename, dest string, interactive, newVersion bool, sno uint32) error {
 	log := c.Log
 	password, err := c.SpaceM.GetSpacePasswd(sno)
 	if err != nil {
 		log.Errorf("get encrypt key of space no %d error %v", sno, err)
 		return err
 	}
-	req, rsp, err := c.CheckFileExists(filename, interactive, newVersion, password, sno)
+	req, rsp, err := c.CheckFileExists(filename, dest, interactive, newVersion, password, sno)
 	if err != nil {
 		return common.StatusErrFromError(err)
 	}
@@ -517,7 +532,7 @@ func deleteTemporaryFile(log logrus.FieldLogger, filename string) {
 	}
 }
 
-func (c *ClientManager) CheckFileExists(filename string, interactive, newVersion bool, password []byte, sno uint32) (*mpb.CheckFileExistReq, *mpb.CheckFileExistResp, error) {
+func (c *ClientManager) CheckFileExists(filename, dest string, interactive, newVersion bool, password []byte, sno uint32) (*mpb.CheckFileExistReq, *mpb.CheckFileExistResp, error) {
 	log := c.Log
 	hash, err := util_hash.Sha1File(filename)
 	if err != nil {
@@ -528,7 +543,7 @@ func (c *ClientManager) CheckFileExists(filename string, interactive, newVersion
 		return nil, nil, err
 	}
 	fileType := filetype.FileType(filename)
-	dir, fname := filepath.Split(filename)
+	_, fname := filepath.Split(filename)
 	ctx := context.Background()
 	encryptKey, err := rsalong.EncryptLong(c.TrackerPubkey, password, 256)
 	if err != nil {
@@ -539,7 +554,7 @@ func (c *ClientManager) CheckFileExists(filename string, interactive, newVersion
 		FileSize:      uint64(fileInfo.Size()),
 		Interactive:   interactive,
 		NewVersion:    newVersion,
-		Parent:        &mpb.FilePath{OneOfPath: &mpb.FilePath_Path{dir}, SpaceNo: sno},
+		Parent:        &mpb.FilePath{OneOfPath: &mpb.FilePath_Path{dest}, SpaceNo: sno},
 		FileHash:      hash,
 		NodeId:        c.NodeId,
 		FileName:      fname,
