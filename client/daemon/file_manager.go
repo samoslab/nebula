@@ -28,6 +28,7 @@ import (
 	rsalong "github.com/samoslab/nebula/util/rsa"
 	"github.com/sirupsen/logrus"
 
+	"github.com/samoslab/nebula/client/register"
 	"google.golang.org/grpc"
 )
 
@@ -55,6 +56,7 @@ type ClientManager struct {
 	Root          string
 	SpaceM        *SpaceManager
 	TrackerPubkey *rsa.PublicKey
+	PubkeyHash    []byte
 }
 
 // NewClientManager create manager
@@ -75,6 +77,11 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 	}
 	log.Infof("tracker server %s", webcfg.TrackerServer)
 
+	rsaPubkey, pubkeyHash, err := register.GetPublicKey(webcfg.TrackerServer)
+	if err != nil {
+		return nil, err
+	}
+
 	om := order.NewOrderManager(webcfg.TrackerServer, log, cfg.Node.PriKey, cfg.Node.NodeId)
 
 	spaceM := NewSpaceManager()
@@ -83,15 +90,17 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 	}
 
 	c := &ClientManager{
-		serverConn: conn,
-		Log:        log,
-		cfg:        cfg,
-		TempDir:    os.TempDir(),
-		NodeId:     cfg.Node.NodeId,
-		PM:         common.NewProgressManager(),
-		mclient:    mpb.NewMatadataServiceClient(conn),
-		OM:         om,
-		SpaceM:     spaceM,
+		serverConn:    conn,
+		Log:           log,
+		cfg:           cfg,
+		TempDir:       os.TempDir(),
+		NodeId:        cfg.Node.NodeId,
+		PM:            common.NewProgressManager(),
+		mclient:       mpb.NewMatadataServiceClient(conn),
+		OM:            om,
+		SpaceM:        spaceM,
+		TrackerPubkey: rsaPubkey,
+		PubkeyHash:    pubkeyHash,
 	}
 
 	collectClient.NodePtr = cfg.Node
@@ -526,17 +535,18 @@ func (c *ClientManager) CheckFileExists(filename string, interactive, newVersion
 		return nil, nil, err
 	}
 	req := &mpb.CheckFileExistReq{
-		Version:     common.Version,
-		FileSize:    uint64(fileInfo.Size()),
-		Interactive: interactive,
-		NewVersion:  newVersion,
-		Parent:      &mpb.FilePath{OneOfPath: &mpb.FilePath_Path{dir}, SpaceNo: sno},
-		FileHash:    hash,
-		NodeId:      c.NodeId,
-		FileName:    fname,
-		Timestamp:   common.Now(),
-		FileType:    fileType.Value,
-		EncryptKey:  encryptKey,
+		Version:       common.Version,
+		FileSize:      uint64(fileInfo.Size()),
+		Interactive:   interactive,
+		NewVersion:    newVersion,
+		Parent:        &mpb.FilePath{OneOfPath: &mpb.FilePath_Path{dir}, SpaceNo: sno},
+		FileHash:      hash,
+		NodeId:        c.NodeId,
+		FileName:      fname,
+		Timestamp:     common.Now(),
+		FileType:      fileType.Value,
+		EncryptKey:    encryptKey,
+		PublicKeyHash: c.PubkeyHash,
 	}
 	mtime, err := GetFileModTime(filename)
 	if err != nil {
@@ -763,18 +773,19 @@ func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitio
 		return err
 	}
 	req := &mpb.UploadFileDoneReq{
-		Version:     common.Version,
-		NodeId:      c.NodeId,
-		FileHash:    reqCheck.GetFileHash(),
-		FileSize:    reqCheck.GetFileSize(),
-		FileName:    reqCheck.GetFileName(),
-		FileModTime: reqCheck.GetFileModTime(),
-		Parent:      reqCheck.GetParent(),
-		Interactive: reqCheck.GetInteractive(),
-		NewVersion:  reqCheck.GetNewVersion(),
-		Timestamp:   common.Now(),
-		Partition:   partitions,
-		EncryptKey:  encryptKey,
+		Version:       common.Version,
+		NodeId:        c.NodeId,
+		FileHash:      reqCheck.GetFileHash(),
+		FileSize:      reqCheck.GetFileSize(),
+		FileName:      reqCheck.GetFileName(),
+		FileModTime:   reqCheck.GetFileModTime(),
+		Parent:        reqCheck.GetParent(),
+		Interactive:   reqCheck.GetInteractive(),
+		NewVersion:    reqCheck.GetNewVersion(),
+		Timestamp:     common.Now(),
+		Partition:     partitions,
+		EncryptKey:    encryptKey,
+		PublicKeyHash: c.PubkeyHash,
 	}
 	err = req.SignReq(c.cfg.Node.PriKey)
 	if err != nil {

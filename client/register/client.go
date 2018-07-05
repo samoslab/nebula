@@ -2,6 +2,7 @@ package register
 
 import (
 	"context"
+	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
 	"os"
@@ -19,7 +20,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func doGetPubkey(registClient pb.ClientRegisterServiceClient) ([]byte, error) {
+func doGetPubkey(registClient pb.ClientRegisterServiceClient) ([]byte, []byte, error) {
 	ctx := context.Background()
 	getPublicKeyReq := pb.GetPublicKeyReq{
 		Version: common.Version,
@@ -28,15 +29,15 @@ func doGetPubkey(registClient pb.ClientRegisterServiceClient) ([]byte, error) {
 	pubKey, err := registClient.GetPublicKey(ctx, &getPublicKeyReq)
 	if err != nil {
 		fmt.Printf("pubkey get failed\n")
-		return nil, err
+		return nil, nil, err
 	}
-	return pubKey.GetPublicKey(), nil
+	return pubKey.GetPublicKey(), pubKey.GetPublicKeyHash(), nil
 }
 
 // DoRegister register client
 func DoRegister(registClient pb.ClientRegisterServiceClient, cfg *config.ClientConfig) (*pb.RegisterResp, error) {
 	ctx := context.Background()
-	pubkey, err := doGetPubkey(registClient)
+	pubkey, _, err := doGetPubkey(registClient)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +132,7 @@ func RegisterClient(log logrus.FieldLogger, configDir, trackerServer, emailAddre
 			Node:          no,
 			Space: []config.ReadableSpace{
 				config.ReadableSpace{SpaceNo: 0, Password: aes.RandStr(16), Home: "default", Name: "default"},
-				config.ReadableSpace{SpaceNo: 1, Password: aes.RandStr(16), Home: "private1", Name: "privacy space"},
+				config.ReadableSpace{SpaceNo: 1, Password: "", Home: "private1", Name: "privacy space"},
 			},
 		}
 		err = config.SaveClientConfig(configDir, cc)
@@ -226,4 +227,24 @@ func ResendVerifyCode(configDir string, trackerServer string) error {
 
 	fmt.Println("resendVerifyCode success, you can verify bill email.")
 	return nil
+}
+
+func GetPublicKey(trackerServer string) (*rsa.PublicKey, []byte, error) {
+	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
+	if err != nil {
+		fmt.Printf("RPC Dial failed: %s\n", err.Error())
+		return nil, nil, err
+	}
+	defer conn.Close()
+	registClient := regpb.NewClientRegisterServiceClient(conn)
+	pubkey, pubkeyHash, err := doGetPubkey(registClient)
+	if err != nil {
+		return nil, nil, err
+	}
+	rsaPubkey, err := x509.ParsePKCS1PublicKey(pubkey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return rsaPubkey, pubkeyHash, err
 }
