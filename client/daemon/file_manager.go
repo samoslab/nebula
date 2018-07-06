@@ -895,13 +895,14 @@ func (c *ClientManager) DownloadDir(path, destDir string, sno uint32) error {
 		// next page
 		page++
 		for _, fileInfo := range downFiles.Files {
-			currentFile := filepath.Join(destDir, fileInfo.FileName)
+			currentFile := filepath.Join(path, fileInfo.FileName)
+			destFile := filepath.Join(destDir, fileInfo.FileName)
 			if fileInfo.Folder {
 				log.Infof("create folder %s", currentFile)
 				if _, err := os.Stat(currentFile); os.IsNotExist(err) {
 					os.Mkdir(currentFile, 0744)
 				}
-				err = c.DownloadDir(currentFile, destDir, sno)
+				err = c.DownloadDir(currentFile, destFile, sno)
 				if err != nil {
 					log.Errorf("recursive download %s failed %v", currentFile, err)
 					return err
