@@ -609,7 +609,7 @@ func ConfigImportHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		err := s.cm.ImportConfig(req.FileName, s.cfg.ConfigDir)
+		err := s.cm.ImportConfig(req.FileName, s.cfg.ConfigFile)
 		code := 0
 		errmsg := ""
 		result := "ok"
@@ -707,10 +707,10 @@ func RegisterHandler(s *HTTPServer) http.HandlerFunc {
 
 		var err error
 		if regReq.Resend {
-			err = regclient.ResendVerifyCode(s.cfg.ConfigDir, s.cfg.TrackerServer)
+			err = regclient.ResendVerifyCode(s.cfg.ConfigFile, s.cfg.TrackerServer)
 		} else {
-			log.Infof("register email %s dir %s", regReq.Email, s.cfg.ConfigDir)
-			err = regclient.RegisterClient(log, s.cfg.ConfigDir, s.cfg.TrackerServer, regReq.Email)
+			log.Infof("register email %s dir %s", regReq.Email, s.cfg.ConfigFile)
+			err = regclient.RegisterClient(log, s.cfg.ConfigFile, s.cfg.TrackerServer, regReq.Email)
 		}
 		code := 0
 		errmsg := ""
@@ -777,7 +777,7 @@ func EmailHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		err := regclient.VerifyEmail(s.cfg.ConfigDir, s.cfg.TrackerServer, mailReq.Code)
+		err := regclient.VerifyEmail(s.cfg.ConfigFile, s.cfg.TrackerServer, mailReq.Code)
 		code := 0
 		errmsg := ""
 		result := "ok"

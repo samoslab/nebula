@@ -108,7 +108,7 @@ func resendVerifyCode(client pb.ClientRegisterServiceClient, node *node.Node) (s
 }
 
 // RegisterClient register client info to tracker
-func RegisterClient(log logrus.FieldLogger, configDir, trackerServer, emailAddress string) error {
+func RegisterClient(log logrus.FieldLogger, configFile, trackerServer, emailAddress string) error {
 	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("RPC Dial failed: %s", err.Error())
@@ -118,7 +118,7 @@ func RegisterClient(log logrus.FieldLogger, configDir, trackerServer, emailAddre
 
 	registerClient := regpb.NewClientRegisterServiceClient(conn)
 
-	cc, err := config.LoadConfig(configDir)
+	cc, err := config.LoadConfig(configFile)
 	if err != nil {
 		fmt.Printf("load config error %v\n", err)
 		fmt.Printf("generate config\n")
@@ -135,7 +135,7 @@ func RegisterClient(log logrus.FieldLogger, configDir, trackerServer, emailAddre
 				config.ReadableSpace{SpaceNo: 1, Password: "", Home: "private1", Name: "privacy space"},
 			},
 		}
-		err = config.SaveClientConfig(configDir, cc)
+		err = config.SaveClientConfig(configFile, cc)
 		if err != nil {
 			log.Infof("create config failed %v\n", err)
 			return err
@@ -157,8 +157,8 @@ func RegisterClient(log logrus.FieldLogger, configDir, trackerServer, emailAddre
 }
 
 // VerifyEmail verify email
-func VerifyEmail(configDir string, trackerServer string, verifyCode string) error {
-	cc, err := config.LoadConfig(configDir)
+func VerifyEmail(configFile string, trackerServer string, verifyCode string) error {
+	cc, err := config.LoadConfig(configFile)
 	if err != nil {
 		if err == config.ErrNoConf {
 			fmt.Printf("Config file is not ready, please run \"%s register\" to register first\n", os.Args[0])
@@ -195,8 +195,8 @@ func VerifyEmail(configDir string, trackerServer string, verifyCode string) erro
 }
 
 // ResendVerifyCode send verify code again
-func ResendVerifyCode(configDir string, trackerServer string) error {
-	cc, err := config.LoadConfig(configDir)
+func ResendVerifyCode(configFile string, trackerServer string) error {
+	cc, err := config.LoadConfig(configFile)
 	if err != nil {
 		if err == config.ErrNoConf {
 			fmt.Printf("Config file is not ready, please run \"%s register\" to register first\n", os.Args[0])

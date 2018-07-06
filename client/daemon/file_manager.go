@@ -3,9 +3,11 @@ package daemon
 import (
 	"context"
 	"crypto/rsa"
+	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -15,6 +17,7 @@ import (
 
 	collectClient "github.com/samoslab/nebula/client/collector_client"
 	"github.com/samoslab/nebula/client/util/filetype"
+	"github.com/yanzay/log"
 
 	"github.com/samoslab/nebula/client/common"
 	"github.com/samoslab/nebula/client/config"
@@ -30,6 +33,13 @@ import (
 
 	"github.com/samoslab/nebula/client/register"
 	"google.golang.org/grpc"
+)
+
+const (
+	// InfoForEncrypt info for encrypt
+	InfoForEncrypt = "this is a interesting info for encrypt msg"
+	// SysFile store password hash file
+	SysFile = ".nebula"
 )
 
 var (
@@ -57,6 +67,7 @@ type ClientManager struct {
 	SpaceM        *SpaceManager
 	TrackerPubkey *rsa.PublicKey
 	PubkeyHash    []byte
+	webcfg        config.Config
 }
 
 // NewClientManager create manager
@@ -135,14 +146,62 @@ func (c *ClientManager) SetRoot(path string) error {
 	return config.SaveClientConfig(c.cfg.SelfFileName, c.cfg)
 }
 
+func verifyPassword(sno uint32, password string, encryData []byte) bool {
+	encryInfo, err := genEncryptKey(sno, password)
+	if err != nil {
+		return false
+	}
+	return string(encryInfo) == string(encryData)
+}
+
+func genEncryptKey(sno uint32, password string) ([]byte, error) {
+	digestinfo := fmt.Sprintf("msg:%s:%d", InfoForEncrypt, sno)
+	encryptData, err := aes.Encrypt([]byte(digestinfo), []byte(password))
+	if err != nil {
+		return nil, err
+	}
+
+	h := sha256.New()
+	h.Write(encryptData)
+	shaData := h.Sum(nil)
+	return shaData, nil
+}
+
 // SetPassword set user privacy space password
 func (c *ClientManager) SetPassword(sno uint32, password string) error {
-	err := c.SpaceM.SetSpacePasswd(sno, password)
+	data, err := c.GetSpaceSysFileData(sno)
+	if err != nil {
+		return err
+	}
+	if len(data) != 0 {
+		log.Infof("space %d password has been set", sno)
+		if verifyPassword(sno, password, data) {
+			log.Infof("space %d password verified", sno)
+			return nil
+		}
+		return fmt.Errorf("password incorrect")
+	}
+
+	err = c.SpaceM.SetSpacePasswd(sno, password)
 	if err != nil {
 		return err
 	}
 	c.cfg.Space[sno].Password = password
-	return config.SaveClientConfig(c.cfg.SelfFileName, c.cfg)
+
+	encryDir := filepath.Join(c.webcfg.ConfigDir, fmt.Sprintf("space%d", sno))
+	if !util_file.Exists(encryDir) {
+		if err := os.MkdirAll(encryDir, 0700); err != nil {
+			return fmt.Errorf("mkdir space %d nebula folder %s failed:%s", sno, encryDir, err)
+		}
+	}
+
+	shaData, _ := genEncryptKey(sno, password)
+	encryFile := filepath.Join(encryDir, SysFile)
+	if err = ioutil.WriteFile(encryFile, shaData, 0600); err != nil {
+		return err
+	}
+
+	return c.UploadFile(encryFile, "/", false, false, false, sno)
 }
 
 func (c *ClientManager) getPingTime(ip string, port uint32) int {
@@ -1255,6 +1314,27 @@ func (c *ClientManager) MoveFile(source, dest string, sno uint32) error {
 	}
 	return nil
 
+}
+
+// GetSpaceSysFileData get space password data
+func (c *ClientManager) GetSpaceSysFileData(sno uint32) ([]byte, error) {
+	log := c.Log
+	req := &mpb.SpaceSysFileReq{
+		Version:   common.Version,
+		NodeId:    c.NodeId,
+		Timestamp: common.Now(),
+		SpaceNo:   sno,
+	}
+	err := req.SignReq(c.cfg.Node.PriKey)
+	if err != nil {
+		return nil, err
+	}
+	log.Infof("get space %d sys file", sno)
+	rsp, err := c.mclient.SpaceSysFile(context.Background(), req)
+	if err != nil {
+		return nil, common.StatusErrFromError(err)
+	}
+	return rsp.GetData(), nil
 }
 
 // GetProgress returns progress rate
