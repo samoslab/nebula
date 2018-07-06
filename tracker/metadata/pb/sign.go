@@ -266,3 +266,20 @@ func (self *MoveReq) SignReq(priKey *rsa.PrivateKey) (err error) {
 func (self *MoveReq) VerifySign(pubKey *rsa.PublicKey) error {
 	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, self.hash(), self.Sign)
 }
+
+func (self *SpaceSysFileReq) hash() []byte {
+	hasher := sha256.New()
+	hasher.Write(self.NodeId)
+	hasher.Write(util_bytes.FromUint64(self.Timestamp))
+	hasher.Write(util_bytes.FromUint32(self.SpaceNo))
+	return hasher.Sum(nil)
+}
+
+func (self *SpaceSysFileReq) SignReq(priKey *rsa.PrivateKey) (err error) {
+	self.Sign, err = rsa.SignPKCS1v15(rand.Reader, priKey, crypto.SHA256, self.hash())
+	return
+}
+
+func (self *SpaceSysFileReq) VerifySign(pubKey *rsa.PublicKey) error {
+	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, self.hash(), self.Sign)
+}

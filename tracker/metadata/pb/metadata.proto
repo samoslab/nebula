@@ -21,6 +21,8 @@ service MatadataService {
 
     rpc Move(MoveReq) returns (MoveResp){}
 
+    rpc SpaceSysFile(SpaceSysFileReq) returns (SpaceSysFileResp){}
+
 }
 
 message GetPublicKeyReq {
@@ -74,27 +76,17 @@ message CheckFileExistReq {
 }
 
 message CheckFileExistResp{
-    uint32 code = 1;//0:if file exists or save tiny file success; 1: please read storeType to go step 2 or step 3; 2 and more than 2 are kinds of errors
+    uint32 code = 1;//0:if file exists or save tiny file success; 1: please go step 2; 2 and more than 2 are kinds of errors
     string errMsg=2;
     FileStoreType storeType=3; // suggest store type, ErasureCode or MultiReplica
     uint32 dataPieceCount=4;  // 0 if not ErasureCode
     uint32 verifyPieceCount=5; // 0 if not ErasureCode
     uint32 replicaCount=6;  // 0 if not MultiReplica
-    repeated ReplicaProvider provider=7;// if use MultiReplica, size is more than replicaCount
 }
 
 enum FileStoreType{
     ErasureCode=0;
     MultiReplica=1;
-}
-
-message ReplicaProvider{
-    bytes nodeId=1;
-    string server=2;
-    uint32 port=3;
-    uint64 timestamp=4;// use as req timestamp argument to call provider api
-    string ticket=5;
-    bytes auth=6;
 }
 
 message UploadFilePrepareReq{
@@ -118,6 +110,17 @@ message PieceHashAndSize{
 
 message UploadFilePrepareResp{
     repeated ErasureCodePartition partition=1;
+    repeated ReplicaProvider provider=2;// if use MultiReplica, size is more than replicaCount
+    uint32 replicaCount=3;  // 0 if not MultiReplica
+}
+
+message ReplicaProvider{
+    bytes nodeId=1;
+    string server=2;
+    uint32 port=3;
+    uint64 timestamp=4;// use as req timestamp argument to call provider api
+    string ticket=5;
+    bytes auth=6;
 }
 
 message ErasureCodePartition{
@@ -277,4 +280,16 @@ message MoveReq{
 message MoveResp{
     uint32 code = 1;//0:success, 1: failed
     string errMsg=2;
+}
+
+message SpaceSysFileReq{
+    uint32 version =1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    uint32 spaceNo=4;
+    bytes sign=6;
+}
+
+message SpaceSysFileResp{
+    bytes data=1;
 }
