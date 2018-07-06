@@ -609,7 +609,7 @@ func ConfigImportHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		err := s.cm.ImportConfig(req.FileName)
+		err := s.cm.ImportConfig(req.FileName, s.cfg.ConfigDir)
 		code := 0
 		errmsg := ""
 		result := "ok"
@@ -635,20 +635,33 @@ func ConfigExportHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log := s.log
 		ctx := r.Context()
+		w.Header().Set("Accept", "application/json")
 
-		if !validMethod(ctx, w, r, []string{http.MethodGet}) {
+		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
+			return
+		}
+
+		if r.Header.Get("Content-Type") != "application/json" {
+			errorResponse(ctx, w, http.StatusUnsupportedMediaType, errors.New("Invalid content type"))
+			return
+		}
+
+		req := &ConfigExportReq{}
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&req); err != nil {
+			err = fmt.Errorf("Invalid json request body: %v", err)
+			errorResponse(ctx, w, http.StatusBadRequest, err)
 			return
 		}
 
 		defer r.Body.Close()
 
-		result, err := s.cm.ExportConfig()
-		code := 0
-		errmsg := ""
+		err := s.cm.ExportConfig(req.Filename)
+		result, code, errmsg := "ok", 0, ""
 		if err != nil {
 			code = 1
 			errmsg = err.Error()
-			result = nil
+			result = ""
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)

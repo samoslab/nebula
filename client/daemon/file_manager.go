@@ -1263,12 +1263,15 @@ func (c *ClientManager) GetProgress(files []string) (map[string]float64, error) 
 }
 
 // ImportConfig import config file
-func (c *ClientManager) ImportConfig(files string) error {
-	// todo save to config.json
-	return nil
+func (c *ClientManager) ImportConfig(fileName, clientConfigFile string) error {
+	cfg, err := config.LoadConfig(fileName)
+	if err != nil {
+		return err
+	}
+	return config.SaveClientConfig(clientConfigFile, cfg)
 }
 
 // ExportConfig export config file
-func (c *ClientManager) ExportConfig() (*config.ClientConfig, error) {
-	return c.cfg, nil
+func (c *ClientManager) ExportConfig(fileName string) error {
+	return config.SaveClientConfig(fileName, c.cfg)
 }

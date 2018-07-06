@@ -28,7 +28,9 @@ Index
 | [/api/v1/secret/decrypt](#apiv1secretdecrypt-post)                             | POST |
 | [/api/v1/service/status](#apiv1servicestatus-get)                             | GET |
 | [/api/v1/service/root](#apiv1serviceroot-post)                             | POST|
-| [/api/v1/service/password](#apiv1servicepassword-post)                             | POST|
+| [/api/v1/service/password](#apiv1servicepassword-post)                             | POST |
+| [/api/v1/config/import](#apiv1configimport-post)                             | POST |
+| [/api/v1/config/export](#apiv1configexport-get)                             | POST |
 
 统一说明 返回json object结构统一为： 成功：{"code":0, "data":object} 失败：{"code":1,"errmsg":"errmsg","data":object}  
 
@@ -668,6 +670,51 @@ Args: None
 Example 
 
 ```
+```
+
+## /api/v1/service/root [POST]
+
+set root path
+```
+URI:/api/v1/service/root
+Method: POST
+Args: 
+   root: string
+
+```
+
+## /api/v1/service/password [POST]
+
+set space no password 
+```
+URI:/api/v1/service/root
+Method: POST
+Args: 
+   password: string
+   space_no: uint32
+
+```
+
+## /api/v1/config/import [POST]
+
+import client config info
+```
+URI:/api/v1/config/import
+Method: POST
+Args: 
+   filename : string
+
+```
+
+## /api/v1/config/export [GET]
+
+export client config info
+```
+URI:/api/v1/config/export
+Method: POST
+Args: 
+   filename : string
+
 ```
 
 # specification
