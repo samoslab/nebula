@@ -303,7 +303,7 @@ func (c *ClientManager) BestRetrieveNode(pros []*mpb.RetrieveNode) *mpb.Retrieve
 }
 
 // UploadDir upload all files in dir to provider
-func (c *ClientManager) UploadDir(parent, dest string, interactive, newVersion bool, sno uint32) error {
+func (c *ClientManager) UploadDir(parent, dest string, interactive, newVersion, isEncrypt bool, sno uint32) error {
 	log := c.Log
 	if !filepath.IsAbs(parent) {
 		return fmt.Errorf("path %s must absolute", parent)
@@ -336,7 +336,7 @@ func (c *ClientManager) UploadDir(parent, dest string, interactive, newVersion b
 		}
 	}
 	for _, fname := range newFiles {
-		err := c.UploadFile(fname, dest, interactive, newVersion, sno)
+		err := c.UploadFile(fname, dest, interactive, newVersion, isEncrypt, sno)
 		if err != nil {
 			return nil
 		}
@@ -345,14 +345,21 @@ func (c *ClientManager) UploadDir(parent, dest string, interactive, newVersion b
 }
 
 // UploadFile upload file to provider
-func (c *ClientManager) UploadFile(filename, dest string, interactive, newVersion bool, sno uint32) error {
+func (c *ClientManager) UploadFile(filename, dest string, interactive, newVersion, isEncrypt bool, sno uint32) error {
 	log := c.Log
 	password, err := c.SpaceM.GetSpacePasswd(sno)
 	if err != nil {
 		log.Errorf("get encrypt key of space no %d error %v", sno, err)
 		return err
 	}
-	req, rsp, err := c.CheckFileExists(filename, dest, interactive, newVersion, password, sno)
+	var encryptKey []byte
+	if isEncrypt {
+		encryptKey, err = rsalong.EncryptLong(c.TrackerPubkey, password, 256)
+		if err != nil {
+			return err
+		}
+	}
+	req, rsp, err := c.CheckFileExists(filename, dest, interactive, newVersion, password, encryptKey, sno)
 	if err != nil {
 		return common.StatusErrFromError(err)
 	}
@@ -395,7 +402,7 @@ func (c *ClientManager) UploadFile(filename, dest string, interactive, newVersio
 		if err != nil {
 			return err
 		}
-		return c.UploadFileDone(req, partitions, password)
+		return c.UploadFileDone(req, partitions, encryptKey)
 	case mpb.FileStoreType_ErasureCode:
 		log.Infof("upload manner is erasure")
 		partFiles := []string{}
@@ -519,7 +526,7 @@ func (c *ClientManager) UploadFile(filename, dest string, interactive, newVersio
 		}
 		log.Infof("there are %d store partitions", len(partitions))
 
-		return c.UploadFileDone(req, partitions, password)
+		return c.UploadFileDone(req, partitions, encryptKey)
 
 	}
 	return nil
@@ -532,7 +539,7 @@ func deleteTemporaryFile(log logrus.FieldLogger, filename string) {
 	}
 }
 
-func (c *ClientManager) CheckFileExists(filename, dest string, interactive, newVersion bool, password []byte, sno uint32) (*mpb.CheckFileExistReq, *mpb.CheckFileExistResp, error) {
+func (c *ClientManager) CheckFileExists(filename, dest string, interactive, newVersion bool, password, encryptKey []byte, sno uint32) (*mpb.CheckFileExistReq, *mpb.CheckFileExistResp, error) {
 	log := c.Log
 	hash, err := util_hash.Sha1File(filename)
 	if err != nil {
@@ -545,10 +552,6 @@ func (c *ClientManager) CheckFileExists(filename, dest string, interactive, newV
 	fileType := filetype.FileType(filename)
 	_, fname := filepath.Split(filename)
 	ctx := context.Background()
-	encryptKey, err := rsalong.EncryptLong(c.TrackerPubkey, password, 256)
-	if err != nil {
-		return nil, nil, err
-	}
 	req := &mpb.CheckFileExistReq{
 		Version:       common.Version,
 		FileSize:      uint64(fileInfo.Size()),
@@ -574,7 +577,7 @@ func (c *ClientManager) CheckFileExists(filename, dest string, interactive, newV
 			log.Errorf("get file %s data error %v", filename, err)
 			return nil, nil, err
 		}
-		if len(password) != 0 {
+		if len(encryptKey) != 0 {
 			fileData, err = aes.Encrypt(fileData, password)
 			if err != nil {
 				log.Errorf("encrypt %s error %v", filename, err)
@@ -782,11 +785,7 @@ func (c *ClientManager) uploadFileByMultiReplica(filename string, req *mpb.Check
 	return partitions, nil
 }
 
-func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitions []*mpb.StorePartition, password []byte) error {
-	encryptKey, err := rsalong.EncryptLong(c.TrackerPubkey, password, 256)
-	if err != nil {
-		return err
-	}
+func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitions []*mpb.StorePartition, encryptKey []byte) error {
 	req := &mpb.UploadFileDoneReq{
 		Version:       common.Version,
 		NodeId:        c.NodeId,
@@ -802,7 +801,7 @@ func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitio
 		EncryptKey:    encryptKey,
 		PublicKeyHash: c.PubkeyHash,
 	}
-	err = req.SignReq(c.cfg.Node.PriKey)
+	err := req.SignReq(c.cfg.Node.PriKey)
 	if err != nil {
 		return err
 	}
@@ -1261,4 +1260,15 @@ func (c *ClientManager) MoveFile(source, dest string, sno uint32) error {
 // GetProgress returns progress rate
 func (c *ClientManager) GetProgress(files []string) (map[string]float64, error) {
 	return c.PM.GetProgress(files)
+}
+
+// ImportConfig import config file
+func (c *ClientManager) ImportConfig(files string) error {
+	// todo save to config.json
+	return nil
+}
+
+// ExportConfig export config file
+func (c *ClientManager) ExportConfig() (*config.ClientConfig, error) {
+	return c.cfg, nil
 }

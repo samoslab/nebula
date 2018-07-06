@@ -320,6 +320,8 @@ func (s *HTTPServer) setupMux() *http.ServeMux {
 	handleAPI("/api/v1/service/status", ServiceStatusHandler(s))
 	handleAPI("/api/v1/service/root", RootPathHandler(s))
 	handleAPI("/api/v1/service/password", PasswordHandler(s))
+	handleAPI("/api/v1/config/import", ConfigImportHandler(s))
+	handleAPI("/api/v1/config/export", ConfigExportHandler(s))
 
 	// Static files
 	mux.Handle("/", http.FileServer(http.Dir(s.cfg.StaticDir)))
@@ -352,6 +354,7 @@ type UploadReq struct {
 	Interactive bool   `json:"interactive"`
 	NewVersion  bool   `json:"newversion"`
 	Sno         uint32 `json:"space_no"`
+	IsEncrypt   bool   `json:"is_encypt"`
 }
 
 // UploadDirReq request struct for upload directory
@@ -361,6 +364,7 @@ type UploadDirReq struct {
 	Interactive bool   `json:"interactive"`
 	NewVersion  bool   `json:"newversion"`
 	Sno         uint32 `json:"space_no"`
+	IsEncrypt   bool   `json:"is_encypt"`
 }
 
 // DownloadDirReq request struct for download directory
@@ -442,6 +446,16 @@ type RootPath struct {
 type PasswordReq struct {
 	Password string `json:"password"`
 	SpacoNo  uint32 `json:"space_no"`
+}
+
+// ConfigImportReq import config
+type ConfigImportReq struct {
+	FileName string `json:"filename"`
+}
+
+// ConfigExportReq export config
+type ConfigExportReq struct {
+	Filename string `json:"filename"`
 }
 
 // ServiceStatusHandler returns service status
@@ -552,6 +566,89 @@ func PasswordHandler(s *HTTPServer) http.HandlerFunc {
 			code = 1
 			errmsg = err.Error()
 			result = ""
+		}
+
+		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
+		if err != nil {
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+		if err := JSONResponse(w, rsp); err != nil {
+			log.Infof("error %v\n", err)
+		}
+	}
+}
+
+// ConfigImportHandler set user root path handler
+func ConfigImportHandler(s *HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log := s.log
+		ctx := r.Context()
+		w.Header().Set("Accept", "application/json")
+
+		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
+			return
+		}
+
+		if r.Header.Get("Content-Type") != "application/json" {
+			errorResponse(ctx, w, http.StatusUnsupportedMediaType, errors.New("Invalid content type"))
+			return
+		}
+
+		req := &ConfigImportReq{}
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&req); err != nil {
+			err = fmt.Errorf("Invalid json request body: %v", err)
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+
+		defer r.Body.Close()
+		if req.FileName == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument filename must not empty"))
+			return
+		}
+
+		err := s.cm.ImportConfig(req.FileName)
+		code := 0
+		errmsg := ""
+		result := "ok"
+		if err != nil {
+			code = 1
+			errmsg = err.Error()
+			result = ""
+		}
+
+		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
+		if err != nil {
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+		if err := JSONResponse(w, rsp); err != nil {
+			log.Infof("error %v\n", err)
+		}
+	}
+}
+
+// ConfigExportHandler set user root path handler
+func ConfigExportHandler(s *HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log := s.log
+		ctx := r.Context()
+
+		if !validMethod(ctx, w, r, []string{http.MethodGet}) {
+			return
+		}
+
+		defer r.Body.Close()
+
+		result, err := s.cm.ExportConfig()
+		code := 0
+		errmsg := ""
+		if err != nil {
+			code = 1
+			errmsg = err.Error()
+			result = nil
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
@@ -776,9 +873,9 @@ func UploadHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		upReq := &UploadReq{}
+		req := &UploadReq{}
 		decoder := json.NewDecoder(r.Body)
-		if err := decoder.Decode(&upReq); err != nil {
+		if err := decoder.Decode(&req); err != nil {
 			err = fmt.Errorf("Invalid json request body: %v", err)
 			errorResponse(ctx, w, http.StatusBadRequest, err)
 			return
@@ -786,13 +883,13 @@ func UploadHandler(s *HTTPServer) http.HandlerFunc {
 
 		defer r.Body.Close()
 
-		if upReq.Filename == "" || upReq.Dest == "" {
+		if req.Filename == "" || req.Dest == "" {
 			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument filename or dest_dir must not empty"))
 			return
 		}
 
-		log.Infof("upload files %+v", upReq.Filename)
-		err := s.cm.UploadFile(upReq.Filename, upReq.Dest, upReq.Interactive, upReq.NewVersion, upReq.Sno)
+		log.Infof("upload files %+v", req.Filename)
+		err := s.cm.UploadFile(req.Filename, req.Dest, req.Interactive, req.NewVersion, req.IsEncrypt, req.Sno)
 		st, ok := status.FromError(err)
 		if !ok {
 			log.Infof("err code %d msg %s", st.Code(), st.Message())
@@ -801,7 +898,7 @@ func UploadHandler(s *HTTPServer) http.HandlerFunc {
 		errmsg := ""
 		result := "success"
 		if err != nil {
-			log.Errorf("upload %+v error %v", upReq, err)
+			log.Errorf("upload %+v error %v", req, err)
 			code = 1
 			errmsg = err.Error()
 			result = ""
@@ -838,9 +935,9 @@ func UploadDirHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		upReq := &UploadDirReq{}
+		req := &UploadDirReq{}
 		decoder := json.NewDecoder(r.Body)
-		if err := decoder.Decode(&upReq); err != nil {
+		if err := decoder.Decode(&req); err != nil {
 			err = fmt.Errorf("Invalid json request body: %v", err)
 			errorResponse(ctx, w, http.StatusBadRequest, err)
 			return
@@ -848,13 +945,13 @@ func UploadDirHandler(s *HTTPServer) http.HandlerFunc {
 
 		defer r.Body.Close()
 
-		if upReq.Parent == "" || upReq.Dest == "" {
+		if req.Parent == "" || req.Dest == "" {
 			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument parent or dest_dir must not empty"))
 			return
 		}
 
-		log.Infof("upload parent %s", upReq.Parent)
-		err := s.cm.UploadDir(upReq.Parent, upReq.Dest, upReq.Interactive, upReq.NewVersion, upReq.Sno)
+		log.Infof("upload parent %s", req.Parent)
+		err := s.cm.UploadDir(req.Parent, req.Dest, req.Interactive, req.NewVersion, req.IsEncrypt, req.Sno)
 		st, ok := status.FromError(err)
 		if !ok {
 			log.Infof("err code %d msg %s", st.Code(), st.Message())
@@ -864,7 +961,7 @@ func UploadDirHandler(s *HTTPServer) http.HandlerFunc {
 		errmsg := ""
 		result := "success"
 		if err != nil {
-			log.Errorf("upload %+v error %v", upReq, err)
+			log.Errorf("upload %+v error %v", req, err)
 			code = 1
 			errmsg = err.Error()
 			result = ""
@@ -1075,26 +1172,26 @@ func ListHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		listReq := &ListReq{}
+		req := &ListReq{}
 		decoder := json.NewDecoder(r.Body)
-		if err := decoder.Decode(&listReq); err != nil {
+		if err := decoder.Decode(&req); err != nil {
 			err = fmt.Errorf("Invalid json request body: %v", err)
 			errorResponse(ctx, w, http.StatusBadRequest, err)
 			return
 		}
 
 		defer r.Body.Close()
-		if listReq.Path == "" {
+		if req.Path == "" {
 			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument path must not empty"))
 			return
 		}
 
-		log.Infof("list %+v", listReq)
-		result, err := s.cm.ListFiles(listReq.Path, listReq.PageSize, listReq.PageNum, listReq.SortType, listReq.AscOrder, listReq.Sno)
+		log.Infof("list %+v", req)
+		result, err := s.cm.ListFiles(req.Path, req.PageSize, req.PageNum, req.SortType, req.AscOrder, req.Sno)
 		code := 0
 		errmsg := ""
 		if err != nil {
-			log.Errorf("list files %+v error %v", listReq, err)
+			log.Errorf("list files %+v error %v", req, err)
 			code = 1
 			errmsg = err.Error()
 			result = nil
