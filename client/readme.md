@@ -169,7 +169,9 @@ curl -X POST -H "Content-Type:application/json" -d '{"path":"/tmp/ok", "pagesize
 {
     "errmsg": "",
     "code": 0,
-    "Data": [
+    "Data": {
+        "total":100,
+        "files": [
         {
             "id": "f844e3f3-97a5-4da3-989e-ef354c8f4426",
             "filesize": 45382461,
@@ -185,6 +187,7 @@ curl -X POST -H "Content-Type:application/json" -d '{"path":"/tmp/ok", "pagesize
             "folder": false
         }
    ]
+   }
 }
 
 ```

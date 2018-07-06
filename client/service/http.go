@@ -366,6 +366,7 @@ type UploadDirReq struct {
 // DownloadDirReq request struct for download directory
 type DownloadDirReq struct {
 	Parent string `json:"parent"`
+	Dest   string `json:"dest_dir"`
 	Sno    uint32 `json:"space_no"`
 }
 
@@ -381,6 +382,7 @@ type DownloadReq struct {
 	FileHash string `json:"filehash"`
 	FileSize uint64 `json:"filesize"`
 	FileName string `json:"filename"`
+	Dest     string `json:"dest_dir"`
 	Sno      uint32 `json:"space_no"`
 }
 
@@ -909,13 +911,13 @@ func DownloadHandler(s *HTTPServer) http.HandlerFunc {
 
 		defer r.Body.Close()
 
-		if downReq.FileHash == "" || downReq.FileSize == 0 || downReq.FileName == "" {
-			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument filehash filesize or filename must not empty"))
+		if downReq.FileHash == "" || downReq.Dest == "" || downReq.FileSize == 0 || downReq.FileName == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument filehash, dest_dir, filesize or filename must not empty"))
 			return
 		}
 
 		log.Infof("download  %+v", downReq)
-		err := s.cm.DownloadFile(downReq.FileName, downReq.FileHash, downReq.FileSize, downReq.Sno)
+		err := s.cm.DownloadFile(downReq.FileName, downReq.Dest, downReq.FileHash, downReq.FileSize, downReq.Sno)
 		code := 0
 		errmsg := ""
 		result := "success"
@@ -967,13 +969,13 @@ func DownloadDirHandler(s *HTTPServer) http.HandlerFunc {
 
 		defer r.Body.Close()
 
-		if req.Parent == "" {
+		if req.Parent == "" || req.Dest == "" {
 			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument parent must not empty"))
 			return
 		}
 
 		log.Infof("downloaddir request %+v", req)
-		err := s.cm.DownloadDir(req.Parent, req.Sno)
+		err := s.cm.DownloadDir(req.Parent, req.Dest, req.Sno)
 		code := 0
 		errmsg := ""
 		result := "success"

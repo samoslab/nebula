@@ -876,7 +876,7 @@ func (c *ClientManager) ListFiles(path string, pageSize, pageNum uint32, sortTyp
 }
 
 // DownloadDir download dir
-func (c *ClientManager) DownloadDir(path string, sno uint32) error {
+func (c *ClientManager) DownloadDir(path, destDir string, sno uint32) error {
 	log := c.Log
 	if !filepath.IsAbs(path) {
 		return fmt.Errorf("path %s must absolute", path)
@@ -895,13 +895,13 @@ func (c *ClientManager) DownloadDir(path string, sno uint32) error {
 		// next page
 		page++
 		for _, fileInfo := range downFiles.Files {
-			currentFile := filepath.Join(path, fileInfo.FileName)
+			currentFile := filepath.Join(destDir, fileInfo.FileName)
 			if fileInfo.Folder {
 				log.Infof("create folder %s", currentFile)
 				if _, err := os.Stat(currentFile); os.IsNotExist(err) {
 					os.Mkdir(currentFile, 0744)
 				}
-				err = c.DownloadDir(currentFile, sno)
+				err = c.DownloadDir(currentFile, destDir, sno)
 				if err != nil {
 					log.Errorf("recursive download %s failed %v", currentFile, err)
 					return err
@@ -912,7 +912,7 @@ func (c *ClientManager) DownloadDir(path string, sno uint32) error {
 					log.Infof("only create %s because file size is 0", fileInfo.FileName)
 					saveFile(currentFile, []byte{})
 				} else {
-					err = c.DownloadFile(currentFile, fileInfo.FileHash, fileInfo.FileSize, sno)
+					err = c.DownloadFile(currentFile, destDir, fileInfo.FileHash, fileInfo.FileSize, sno)
 					if err != nil {
 						log.Errorf("download file %s error %v", currentFile, err)
 						errResult = append(errResult, fmt.Errorf("%s %v", currentFile, common.StatusErrFromError(err)))
@@ -932,7 +932,7 @@ func (c *ClientManager) DownloadDir(path string, sno uint32) error {
 }
 
 // DownloadFile download file
-func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileSize uint64, sno uint32) error {
+func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fileSize uint64, sno uint32) error {
 	log := c.Log
 	fileHash, err := hex.DecodeString(filehash)
 	if err != nil {
@@ -950,6 +950,8 @@ func (c *ClientManager) DownloadFile(downFileName string, filehash string, fileS
 	if err != nil {
 		return err
 	}
+	_, fileName := filepath.Split(downFileName)
+	downFileName = filepath.Join(destDir, fileName)
 	c.PM.SetProgress(downFileName, 0, req.FileSize)
 
 	ctx := context.Background()
