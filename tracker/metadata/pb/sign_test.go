@@ -13,7 +13,7 @@ import (
 func TestMkFolderReq(t *testing.T) {
 	req := MkFolderReq{NodeId: util_hash.Sha1([]byte("test-node-id")),
 		Timestamp: uint64(time.Now().Unix()),
-		Parent:    &FilePath{&FilePath_Path{"/folder1/folder2"}},
+		Parent:    &FilePath{SpaceNo: 0, OneOfPath: &FilePath_Path{"/folder1/folder2"}},
 		Folder:    []string{"f1", "f2"}}
 	priKey, err := rsa.GenerateKey(rand.Reader, 256*8)
 	if err != nil {
@@ -28,7 +28,7 @@ func TestMkFolderReq(t *testing.T) {
 	}
 	req = MkFolderReq{NodeId: util_hash.Sha1([]byte("test-node-id")),
 		Timestamp: uint64(time.Now().Unix()),
-		Parent:    &FilePath{&FilePath_Id{[]byte("parent-id")}},
+		Parent:    &FilePath{SpaceNo: 0, OneOfPath: &FilePath_Id{[]byte("parent-id")}},
 		Folder:    []string{"f1", "f2"}}
 	priKey, err = rsa.GenerateKey(rand.Reader, 256*8)
 	if err != nil {
@@ -53,7 +53,7 @@ func TestCheckFileExistReq(t *testing.T) {
 	nodeId := util_hash.Sha1(pubKeyBytes)
 	ts := uint64(time.Now().Unix())
 	pathStr := "/folder1/folder2"
-	path := &FilePath{&FilePath_Path{pathStr}}
+	path := &FilePath{SpaceNo: 0, OneOfPath: &FilePath_Path{pathStr}}
 	hash := util_hash.Sha1([]byte("test-file"))
 	size := uint64(98234)
 	name := "file.txt"
