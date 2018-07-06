@@ -78,6 +78,7 @@ URI:/api/v1/store/folder/add
 Method: POST
 Request Body: {
   "parent":"/"
+  "space_no":0,
   "":["abc","tmp"]
   "interactive":bool
 }
@@ -86,7 +87,7 @@ Request Body: {
 Example 
 
 ```
-curl -X POST -H "Content-Type:application/json" -d '{"parent":"/", "folders":["temp"], "interactive":false}' http://127.0.0.1:7788/api/v1/store/folder/add
+curl -X POST -H "Content-Type:application/json" -d '{"parent":"/", "folders":["temp"], "interactive":false, "space_no":0}' http://127.0.0.1:7788/api/v1/store/folder/add
 {
     "errmsg": "",
     "code": 0,
@@ -102,15 +103,17 @@ URI:/api/v1/store/upload
 Method: POST
 Request Body: {
   "filename":"/tmp/abc.txt"
+  "dest_dir": "/tmp"
   "interactive":true
   "newversion" :false
+  "space_no":0
   }
 ```
 
 Example 
 
 ```
-curl -X POST -H "Content-Type:application/json" -d '{"parent":"/tmp", "filename":"/tmp/ok/abc.txt", "interactive":false, "newversion":false}' http://127.0.0.1:7788/api/v1/store/upload
+curl -X POST -H "Content-Type:application/json" -d '{"space_no":0, dest_dir":"tmp", filename":"/tmp/ok/abc.txt", "interactive":false, "newversion":false}' http://127.0.0.1:7788/api/v1/store/upload
 {
     "errmsg": "",
     "code": 0,
@@ -126,13 +129,15 @@ URI:/api/v1/store/uploaddir
 Method: POST
 Request Body: {
   "parent":/tmp
+  "dest_dir": "/tmp"
+  "space_no":0
   }
 ```
 
 Example 
 
 ```
-curl -X POST -H "Content-Type:application/json" -d '{"parent":"/tmp/bak"}' http://127.0.0.1:7788/api/v1/store/uploaddir
+curl -X POST -H "Content-Type:application/json" -d '{"parent":"/tmp/bak", "dest_dir":"/tmp/bak", "space_no":0 }' http://127.0.0.1:7788/api/v1/store/uploaddir
 {
     "errmsg": "",
     "code": 0,
@@ -148,6 +153,7 @@ URI:/api/v1/store/list
 Method: get
 Request Body: {
   "path":"/tmp"
+  "space_no":0
   "pagesize":10
   "pagenum":1
   "sorttype":name|size|modtime
@@ -159,7 +165,7 @@ Request Body: {
 Example
 
 ```
-curl -X POST -H "Content-Type:application/json" -d '{"path":"/tmp/ok", "pagesize":10, "pagenum":1, "sorttype":"name", "ascorder":true}' http://127.0.0.1:7788/api/v1/store/list
+curl -X POST -H "Content-Type:application/json" -d '{"path":"/tmp/ok", "pagesize":10, "pagenum":1, "sorttype":"name", "ascorder":true,"space_no":0 }' http://127.0.0.1:7788/api/v1/store/list
 {
     "errmsg": "",
     "code": 0,
@@ -194,13 +200,15 @@ Request Body: {
   filehash:string
   filesize:uint64
   filename:string
+  space_no:uint32
+  dest_dir:string
   }
 ```
 
 Example 
 
 ```
-curl -X POST -H "Content-Type:application/json" -d '{"filehash":"732e7a7d3db77ffb6dde834c81d263dfd05922dc","filesize":68073855, "filename":"/tmp/ok/abc.txt", "folder":false}' http://127.0.0.1:7788/api/v1/store/download
+curl -X POST -H "Content-Type:application/json" -d '{"filehash":"732e7a7d3db77ffb6dde834c81d263dfd05922dc","filesize":68073855, "filename":"/tmp/ok/abc.txt", "space_no":0, "dest_dir": "/tmp/ok"}' http://127.0.0.1:7788/api/v1/store/download
 {
     "errmsg": "too few shards given",
     "code": 1,
@@ -217,13 +225,15 @@ URI:/api/v1/store/downloaddir
 Method: POST
 Request Body: {
   parent:string
+  space_no:uint32
+  dest_dir:string
   }
 ```
 
 Example 
 
 ```
-curl -X POST -H "Content-Type:application/json" -d '{"parent":"/tmp/abc"}' http://127.0.0.1:7788/api/v1/store/downloaddir
+curl -X POST -H "Content-Type:application/json" -d '{"parent":"/tmp/abc", "dest_dir":"/tmp/abc", "space_no":0}' http://127.0.0.1:7788/api/v1/store/downloaddir
 {
     "errmsg": "",
     "code": 0,
@@ -240,13 +250,14 @@ Request Body: {
    target:string
    folder:bool
    recursion:bool
+   space_no:uint32
    }
 ```
 
 Exmaple 
 
 ```
-curl -X POST -H "Content-Type:application/json" -d '{"target":"62633239633363392d373462332d343961632d396633312d363731336331376433633334", "ispath":false, "recursion":false }' http://127.0.0.1:7788/api/v1/store/remove
+curl -X POST -H "Content-Type:application/json" -d '{"target":"62633239633363392d373462332d343961632d396633312d363731336331376433633334", "ispath":false, "recursion":false, "space_no":0 }' http://127.0.0.1:7788/api/v1/store/remove
 {
     "errmsg": "",
     "code": 0,
@@ -262,13 +273,14 @@ Method: POST
 Request Body: {
    src:string
    dest:string
+   space_no:uint32
    }
 ```
 
 Exmaple 
 
 ```
-curl -X POST -H "Content-Type:application/json" -d '{"src":"62633239633363392d373462332d343961632d396633312d363731336331376433633334",  "dest":"newfile.txt"}' http://127.0.0.1:7788/api/v1/store/rename
+curl -X POST -H "Content-Type:application/json" -d '{"src":"62633239633363392d373462332d343961632d396633312d363731336331376433633334",  "dest":"newfile.txt", "space_no": 0}' http://127.0.0.1:7788/api/v1/store/rename
 {
     "errmsg": "",
     "code": 0,
