@@ -112,6 +112,7 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 		SpaceM:        spaceM,
 		TrackerPubkey: rsaPubkey,
 		PubkeyHash:    pubkeyHash,
+		webcfg:        webcfg,
 	}
 
 	collectClient.NodePtr = cfg.Node
@@ -170,32 +171,38 @@ func genEncryptKey(sno uint32, password string) ([]byte, error) {
 // SetPassword set user privacy space password
 func (c *ClientManager) SetPassword(sno uint32, password string) error {
 	data, err := c.GetSpaceSysFileData(sno)
-	if err != nil {
-		return err
-	}
-	if len(data) != 0 {
-		log.Infof("space %d password has been set", sno)
-		if verifyPassword(sno, password, data) {
-			log.Infof("space %d password verified success", sno)
-			return c.SpaceM.SetSpacePasswd(sno, password)
+	if err == nil {
+		if len(data) != 0 {
+			log.Infof("space %d password has been set", sno)
+			if verifyPassword(sno, password, data) {
+				log.Infof("space %d password verified success", sno)
+				return c.SpaceM.SetSpacePasswd(sno, password)
+			}
+			return fmt.Errorf("password incorrect")
 		}
-		return fmt.Errorf("password incorrect")
 	}
 
+	log.Infof("get sys file error msg is %v", err)
 	err = c.SpaceM.SetSpacePasswd(sno, password)
 	if err != nil {
 		return err
 	}
 
 	encryDir := filepath.Join(c.webcfg.ConfigDir, fmt.Sprintf("space%d", sno))
+	fmt.Printf("encryDir %s\n", encryDir)
 	if !util_file.Exists(encryDir) {
 		if err := os.MkdirAll(encryDir, 0700); err != nil {
 			return fmt.Errorf("mkdir space %d nebula folder %s failed:%s", sno, encryDir, err)
 		}
 	}
 
-	shaData, _ := genEncryptKey(sno, password)
+	shaData, err := genEncryptKey(sno, password)
+	if err != nil {
+		fmt.Printf("encry key %v\n", err)
+		return err
+	}
 	encryFile := filepath.Join(encryDir, SysFile)
+	fmt.Printf("encryFile %s\n", encryFile)
 	if err = ioutil.WriteFile(encryFile, shaData, 0600); err != nil {
 		return err
 	}
@@ -641,6 +648,7 @@ func (c *ClientManager) CheckFileExists(fileName, dest string, interactive, newV
 		return nil, nil, err
 	}
 	req.FileModTime = uint64(mtime)
+	fmt.Printf("password %s, encry %v\n", password, encryptKey)
 	if fileInfo.Size() < ReplicaFileSize {
 		fileData, err := util_hash.GetFileData(fileName)
 		if err != nil {

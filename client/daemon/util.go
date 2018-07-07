@@ -13,7 +13,7 @@ import (
 
 // GetConfigFile get config file
 func GetConfigFile() (string, string) {
-	defaultConfig := filepath.Join(file.UserHome(), config.DefaultConfig)
+	defaultConfig := filepath.Join(file.UserHome(), config.DefaultConfigDir, config.DefaultConfig)
 	defaultAppDir, _ := filepath.Split(defaultConfig)
 	return defaultAppDir, defaultConfig
 }

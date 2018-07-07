@@ -109,13 +109,14 @@ Request Body: {
   "interactive":true
   "newversion" :false
   "space_no":0
+  "is_encrypt":false
   }
 ```
 
 Example 
 
 ```
-curl -X POST -H "Content-Type:application/json" -d '{"space_no":0, dest_dir":"tmp", filename":"/tmp/ok/abc.txt", "interactive":false, "newversion":false}' http://127.0.0.1:7788/api/v1/store/upload
+curl -X POST -H "Content-Type:application/json" -d '{"space_no":0, "dest_dir":"/tmp", "filename":"/tmp/config-test.json", "interactive":false, "newversion":false, "is_encrypt":false}' http://127.0.0.1:7788/api/v1/store/upload
 {
     "errmsg": "",
     "code": 0,
@@ -133,13 +134,14 @@ Request Body: {
   "parent":/tmp
   "dest_dir": "/tmp"
   "space_no":0
+  "is_encrypt":false
   }
 ```
 
 Example 
 
 ```
-curl -X POST -H "Content-Type:application/json" -d '{"parent":"/tmp/bak", "dest_dir":"/tmp/bak", "space_no":0 }' http://127.0.0.1:7788/api/v1/store/uploaddir
+curl -X POST -H "Content-Type:application/json" -d '{"parent":"/tmp/bak", "dest_dir":"/tmp/bak", "space_no":0, "is_encrypt":false }' http://127.0.0.1:7788/api/v1/store/uploaddir
 {
     "errmsg": "",
     "code": 0,
@@ -670,6 +672,10 @@ Args: None
 Example 
 
 ```
+curl   http://127.0.0.1:7788/api/v1/service/status
+{
+    "status": true
+}
 ```
 
 ## /api/v1/service/root [POST]
@@ -693,6 +699,11 @@ Args:
    password: string
    space_no: uint32
 
+```
+Example 
+
+```
+curl -X POST -H "Content-Type:application/json" -d '{"password":"12345678abcdefg", "space_no":0 }' http://127.0.0.1:7788/api/v1/service/password
 ```
 
 ## /api/v1/config/import [POST]

@@ -354,7 +354,7 @@ type UploadReq struct {
 	Interactive bool   `json:"interactive"`
 	NewVersion  bool   `json:"newversion"`
 	Sno         uint32 `json:"space_no"`
-	IsEncrypt   bool   `json:"is_encypt"`
+	IsEncrypt   bool   `json:"is_encrypt"`
 }
 
 // UploadDirReq request struct for upload directory
@@ -364,7 +364,7 @@ type UploadDirReq struct {
 	Interactive bool   `json:"interactive"`
 	NewVersion  bool   `json:"newversion"`
 	Sno         uint32 `json:"space_no"`
-	IsEncrypt   bool   `json:"is_encypt"`
+	IsEncrypt   bool   `json:"is_encrypt"`
 }
 
 // DownloadDirReq request struct for download directory

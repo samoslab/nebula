@@ -13,7 +13,9 @@ import (
 
 const (
 	// DefaultConfig default store filename of config
-	DefaultConfig = ".samos-nebula-client/config.json"
+	DefaultConfig = "config.json"
+	// DefaultConfigDir config directory
+	DefaultConfigDir = ".samos-nebula-client"
 	// DefaultTracker default tracker server
 	DefaultTracker = "127.0.0.1:6677"
 	// DefaultCollect default collect server
@@ -54,10 +56,10 @@ func (cfg *Config) SetDefault() {
 		cfg.CollectServer = DefaultCollect
 	}
 	if cfg.ConfigDir == "" {
-		cfg.ConfigDir = file.UserHome()
+		cfg.ConfigDir = filepath.Join(file.UserHome(), DefaultConfigDir)
 	}
 	if cfg.ConfigFile == "" {
-		cfg.ConfigFile = filepath.Join(file.UserHome(), DefaultConfig)
+		cfg.ConfigFile = filepath.Join(file.UserHome(), DefaultConfigDir, DefaultConfig)
 	}
 	if cfg.HTTPAddr == "" {
 		cfg.HTTPAddr = DefaultServer
