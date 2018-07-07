@@ -176,8 +176,8 @@ func (c *ClientManager) SetPassword(sno uint32, password string) error {
 	if len(data) != 0 {
 		log.Infof("space %d password has been set", sno)
 		if verifyPassword(sno, password, data) {
-			log.Infof("space %d password verified", sno)
-			return nil
+			log.Infof("space %d password verified success", sno)
+			return c.SpaceM.SetSpacePasswd(sno, password)
 		}
 		return fmt.Errorf("password incorrect")
 	}
@@ -186,7 +186,6 @@ func (c *ClientManager) SetPassword(sno uint32, password string) error {
 	if err != nil {
 		return err
 	}
-	c.cfg.Space[sno].Password = password
 
 	encryDir := filepath.Join(c.webcfg.ConfigDir, fmt.Sprintf("space%d", sno))
 	if !util_file.Exists(encryDir) {
