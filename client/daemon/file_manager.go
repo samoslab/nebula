@@ -404,7 +404,7 @@ func (c *ClientManager) UploadDir(parent, dest string, interactive, newVersion, 
 }
 
 // UploadFile upload file to provider
-func (c *ClientManager) UploadFile(filename, dest string, interactive, newVersion, isEncrypt bool, sno uint32) error {
+func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersion, isEncrypt bool, sno uint32) error {
 	log := c.Log
 	password, err := c.SpaceM.GetSpacePasswd(sno)
 	if err != nil {
@@ -418,14 +418,14 @@ func (c *ClientManager) UploadFile(filename, dest string, interactive, newVersio
 			return err
 		}
 	}
-	req, rsp, err := c.CheckFileExists(filename, dest, interactive, newVersion, password, encryptKey, sno)
+	req, rsp, err := c.CheckFileExists(fileName, dest, interactive, newVersion, password, encryptKey, sno)
 	if err != nil {
 		return common.StatusErrFromError(err)
 	}
 
 	log.Infof("check file exists rsp code:%d", rsp.GetCode())
 	if rsp.GetCode() == 0 {
-		log.Infof("upload success %s %s", filename, rsp.GetErrMsg())
+		log.Infof("upload success %s %s", fileName, rsp.GetErrMsg())
 		return nil
 	}
 	// 1 can upload
@@ -433,31 +433,34 @@ func (c *ClientManager) UploadFile(filename, dest string, interactive, newVersio
 		return fmt.Errorf("%d:%s", rsp.GetCode(), rsp.GetErrMsg())
 	}
 
-	log.Infof("[upload file] %s", filename)
+	log.Infof("[upload file] %s", fileName)
 	switch rsp.GetStoreType() {
 	case mpb.FileStoreType_MultiReplica:
 		log.Infof("upload manner is multi-replication")
-		c.PM.SetProgress(filename, 0, req.FileSize)
+		c.PM.SetProgress(fileName, 0, req.FileSize)
 		// encrypt file
-		encry, err := c.SpaceM.GetSpacePasswd(sno)
-		if err != nil {
-			log.Errorf("get encrypt key of space no %d error %v", sno, err)
-			return err
-		}
-		if len(encry) != 0 {
-			_, onlyFileName := filepath.Split(filename)
-			encryptedFileName := filepath.Join(c.TempDir, onlyFileName)
-			err := aes.EncryptFile(filename, encry, encryptedFileName)
+		if isEncrypt {
+			encry, err := c.SpaceM.GetSpacePasswd(sno)
 			if err != nil {
-				log.Errorf("encrypt %s error %v", filename, err)
+				log.Errorf("get encrypt key of space no %d error %v", sno, err)
 				return err
 			}
-			filename = encryptedFileName
-			defer func() {
-				deleteTemporaryFile(log, encryptedFileName)
-			}()
+			if len(encry) != 0 {
+				_, onlyFileName := filepath.Split(fileName)
+				encryptedFileName := filepath.Join(c.TempDir, onlyFileName)
+				err := aes.EncryptFile(fileName, encry, encryptedFileName)
+				if err != nil {
+					log.Errorf("encrypt %s error %v", fileName, err)
+					return err
+				}
+				// change fileName to temp file avoid origin file modified
+				fileName = encryptedFileName
+				defer func() {
+					deleteTemporaryFile(log, encryptedFileName)
+				}()
+			}
 		}
-		partitions, err := c.uploadFileByMultiReplica(filename, req, rsp)
+		partitions, err := c.uploadFileByMultiReplica(fileName, req, rsp)
 		if err != nil {
 			return err
 		}
@@ -469,12 +472,12 @@ func (c *ClientManager) UploadFile(filename, dest string, interactive, newVersio
 		fileSize := int64(req.GetFileSize())
 		if fileSize > PartitionMaxSize {
 			chunkSize, chunkNum := GetChunkSizeAndNum(fileSize, PartitionMaxSize)
-			partFiles, err = FileSplit(c.TempDir, filename, fileSize, chunkSize, int64(chunkNum))
+			partFiles, err = FileSplit(c.TempDir, fileName, fileSize, chunkSize, int64(chunkNum))
 			if err != nil {
 				return err
 			}
 		} else {
-			partFiles = append(partFiles, filename)
+			partFiles = append(partFiles, fileName)
 		}
 
 		log.Infof("file %s need split to %d partitions", req.GetFileName(), len(partFiles))
@@ -488,7 +491,7 @@ func (c *ClientManager) UploadFile(filename, dest string, interactive, newVersio
 
 		realSizeAfterRS := int64(0)
 		for _, fname := range partFiles {
-			fileSlices, err := c.onlyFileSplit(fname, dataShards, verifyShards, sno)
+			fileSlices, err := c.onlyFileSplit(fname, dataShards, verifyShards, isEncrypt, sno)
 			if err != nil {
 				return err
 			}
@@ -502,13 +505,13 @@ func (c *ClientManager) UploadFile(filename, dest string, interactive, newVersio
 			log.Infof("file %s need split to %d blocks", fname, len(fileSlices))
 			for _, fs := range fileSlices {
 				log.Debugf("erasure block files %s index %d", fs.FileName, fs.SliceIndex)
-				c.PM.SetPartitionMap(fs.FileName, filename)
+				c.PM.SetPartitionMap(fs.FileName, fileName)
 				realSizeAfterRS += fs.FileSize
 			}
-			c.PM.SetPartitionMap(fname, filename)
+			c.PM.SetPartitionMap(fname, fileName)
 		}
 
-		c.PM.SetProgress(filename, 0, uint64(realSizeAfterRS))
+		c.PM.SetProgress(fileName, 0, uint64(realSizeAfterRS))
 
 		// delete temporary file
 		defer func() {
@@ -522,31 +525,7 @@ func (c *ClientManager) UploadFile(filename, dest string, interactive, newVersio
 			}
 		}()
 
-		ufpr := &mpb.UploadFilePrepareReq{
-			Version:   common.Version,
-			NodeId:    req.NodeId,
-			FileHash:  req.FileHash,
-			FileSize:  req.FileSize,
-			Timestamp: common.Now(),
-			Partition: make([]*mpb.SplitPartition, len(partFiles)),
-		}
-		block := 0
-		for i, partInfo := range fileInfos {
-			phslist := []*mpb.PieceHashAndSize{}
-			for j, slice := range partInfo.Pieces {
-				phs := &mpb.PieceHashAndSize{
-					Hash: slice.FileHash,
-					Size: uint32(slice.FileSize),
-				}
-				phslist = append(phslist, phs)
-				log.Debugf("%s %dth piece", slice.FileName, j)
-				block++
-			}
-			ufpr.Partition[i] = &mpb.SplitPartition{phslist}
-			log.Debugf("%s is %dth partitions", partInfo.FileName, i)
-		}
-		log.Infof("upload request has %d partitions, %d pieces", len(ufpr.Partition), block)
-		err = ufpr.SignReq(c.cfg.Node.PriKey)
+		ufpr, err := c.createUploadPrepareRequest(req, len(partFiles), fileInfos)
 		if err != nil {
 			return err
 		}
@@ -591,25 +570,58 @@ func (c *ClientManager) UploadFile(filename, dest string, interactive, newVersio
 	return nil
 }
 
-func deleteTemporaryFile(log logrus.FieldLogger, filename string) {
-	log.Debugf("delete file %s", filename)
-	if err := os.Remove(filename); err != nil {
-		log.Errorf("delete %s failed, error %v", filename, err)
+func (c *ClientManager) createUploadPrepareRequest(req *mpb.CheckFileExistReq, partFileCount int, fileInfos []common.PartitionFile) (*mpb.UploadFilePrepareReq, error) {
+	log := c.Log
+	ufpr := &mpb.UploadFilePrepareReq{
+		Version:   common.Version,
+		NodeId:    req.NodeId,
+		FileHash:  req.FileHash,
+		FileSize:  req.FileSize,
+		Timestamp: common.Now(),
+		Partition: make([]*mpb.SplitPartition, partFileCount),
+	}
+	block := 0
+	for i, partInfo := range fileInfos {
+		phslist := []*mpb.PieceHashAndSize{}
+		for j, slice := range partInfo.Pieces {
+			phs := &mpb.PieceHashAndSize{
+				Hash: slice.FileHash,
+				Size: uint32(slice.FileSize),
+			}
+			phslist = append(phslist, phs)
+			log.Debugf("%s %dth piece", slice.FileName, j)
+			block++
+		}
+		ufpr.Partition[i] = &mpb.SplitPartition{phslist}
+		log.Debugf("%s is %dth partitions", partInfo.FileName, i)
+	}
+	log.Infof("upload request has %d partitions, %d pieces", len(ufpr.Partition), block)
+	if err := ufpr.SignReq(c.cfg.Node.PriKey); err != nil {
+		return nil, err
+	}
+
+	return ufpr, nil
+}
+
+func deleteTemporaryFile(log logrus.FieldLogger, fileName string) {
+	log.Debugf("delete file %s", fileName)
+	if err := os.Remove(fileName); err != nil {
+		log.Errorf("delete %s failed, error %v", fileName, err)
 	}
 }
 
-func (c *ClientManager) CheckFileExists(filename, dest string, interactive, newVersion bool, password, encryptKey []byte, sno uint32) (*mpb.CheckFileExistReq, *mpb.CheckFileExistResp, error) {
+func (c *ClientManager) CheckFileExists(fileName, dest string, interactive, newVersion bool, password, encryptKey []byte, sno uint32) (*mpb.CheckFileExistReq, *mpb.CheckFileExistResp, error) {
 	log := c.Log
-	hash, err := util_hash.Sha1File(filename)
+	hash, err := util_hash.Sha1File(fileName)
 	if err != nil {
 		return nil, nil, err
 	}
-	fileInfo, err := os.Stat(filename)
+	fileInfo, err := os.Stat(fileName)
 	if err != nil {
 		return nil, nil, err
 	}
-	fileType := filetype.FileType(filename)
-	_, fname := filepath.Split(filename)
+	fileType := filetype.FileType(fileName)
+	_, fname := filepath.Split(fileName)
 	ctx := context.Background()
 	req := &mpb.CheckFileExistReq{
 		Version:       common.Version,
@@ -625,21 +637,21 @@ func (c *ClientManager) CheckFileExists(filename, dest string, interactive, newV
 		EncryptKey:    encryptKey,
 		PublicKeyHash: c.PubkeyHash,
 	}
-	mtime, err := GetFileModTime(filename)
+	mtime, err := GetFileModTime(fileName)
 	if err != nil {
 		return nil, nil, err
 	}
 	req.FileModTime = uint64(mtime)
 	if fileInfo.Size() < ReplicaFileSize {
-		fileData, err := util_hash.GetFileData(filename)
+		fileData, err := util_hash.GetFileData(fileName)
 		if err != nil {
-			log.Errorf("get file %s data error %v", filename, err)
+			log.Errorf("get file %s data error %v", fileName, err)
 			return nil, nil, err
 		}
 		if len(encryptKey) != 0 {
 			fileData, err = aes.Encrypt(fileData, password)
 			if err != nil {
-				log.Errorf("encrypt %s error %v", filename, err)
+				log.Errorf("encrypt %s error %v", fileName, err)
 				return nil, nil, err
 			}
 		}
@@ -686,28 +698,35 @@ func (c *ClientManager) MkFolder(filepath string, folders []string, interactive 
 	return true, nil
 }
 
-func (c *ClientManager) onlyFileSplit(filename string, dataNum, verifyNum int, sno uint32) ([]common.HashFile, error) {
+func (c *ClientManager) onlyFileSplit(fileName string, dataNum, verifyNum int, isEncrypt bool, sno uint32) ([]common.HashFile, error) {
 	log := c.Log
-	fileSlices, err := RsEncoder(c.Log, c.TempDir, filename, dataNum, verifyNum)
+	fileSlices, err := RsEncoder(c.Log, c.TempDir, fileName, dataNum, verifyNum)
 	if err != nil {
 		log.Errorf("reedsolomon encoder error %v", err)
 		return nil, err
 	}
-	encry, err := c.SpaceM.GetSpacePasswd(sno)
-	if err != nil {
-		log.Errorf("get encrypt key of space no %d error %v", sno, err)
-		return nil, err
-	}
-	if len(encry) != 0 {
-		for _, ff := range fileSlices {
-			err := aes.EncryptFile(ff.FileName, encry, ff.FileName)
-			if err != nil {
-				log.Errorf("encrypt %s error %v", filename, err)
-				return nil, err
+	if isEncrypt {
+		encry, err := c.SpaceM.GetSpacePasswd(sno)
+		if err != nil {
+			log.Errorf("get encrypt key of space no %d error %v", sno, err)
+			return nil, err
+		}
+		if len(encry) != 0 {
+			for i := range fileSlices {
+				err := aes.EncryptFile(fileSlices[i].FileName, encry, fileSlices[i].FileName)
+				if err != nil {
+					log.Errorf("encrypt %s error %v", fileName, err)
+					return nil, err
+				}
+				hash, err := util_hash.Sha1File(fileSlices[i].FileName)
+				if err != nil {
+					return nil, err
+				}
+				fileSlices[i].FileHash = hash
 			}
-
 		}
 	}
+
 	return fileSlices, nil
 
 }
@@ -808,29 +827,58 @@ func (c *ClientManager) uploadFileToReplicaProvider(pro *mpb.ReplicaProvider, up
 	return pro.GetNodeId(), nil
 }
 
-func (c *ClientManager) uploadFileByMultiReplica(filename string, req *mpb.CheckFileExistReq, rsp *mpb.CheckFileExistResp) ([]*mpb.StorePartition, error) {
+func (c *ClientManager) uploadFileByMultiReplica(fileName string, req *mpb.CheckFileExistReq, rsp *mpb.CheckFileExistResp) ([]*mpb.StorePartition, error) {
 
-	fileInfo := common.HashFile{
-		FileName:   filename,
-		FileSize:   int64(req.FileSize),
-		FileHash:   req.FileHash,
-		SliceIndex: 0,
+	log := c.Log
+	hash, err := util_hash.Sha1File(fileName)
+	if err != nil {
+		return nil, err
 	}
+	fileSlices := []common.HashFile{
+		common.HashFile{
+			FileSize:   int64(req.FileSize),
+			FileName:   fileName,
+			FileHash:   hash,
+			SliceIndex: 0,
+		},
+	}
+	fileInfos := []common.PartitionFile{
+		common.PartitionFile{FileName: fileName,
+			Pieces:         fileSlices,
+			OriginFileName: req.FileName,
+			OriginFileHash: req.FileHash,
+			OriginFileSize: req.FileSize,
+		}}
+
+	ufpr, err := c.createUploadPrepareRequest(req, 1, fileInfos)
+	if err != nil {
+		return nil, err
+	}
+
+	ctx := context.Background()
+	log.Infof("send prepare request for %s", req.GetFileName())
+	ufprsp, err := c.mclient.UploadFilePrepare(ctx, ufpr)
+	if err != nil {
+		log.Errorf("UploadFilePrepare error %v", err)
+		return nil, common.StatusErrFromError(err)
+	}
+	///
+
 	uploadPara := &common.UploadParameter{
 		OriginFileHash: req.FileHash,
 		OriginFileSize: req.FileSize,
-		HF:             fileInfo,
+		HF:             fileSlices[0],
 	}
 
 	block := &mpb.StoreBlock{
-		Hash:        fileInfo.FileHash,
-		Size:        uint64(fileInfo.FileSize),
-		BlockSeq:    uint32(fileInfo.SliceIndex),
+		Hash:        fileSlices[0].FileHash,
+		Size:        uint64(fileSlices[0].FileSize),
+		BlockSeq:    uint32(fileSlices[0].SliceIndex),
 		Checksum:    false,
 		StoreNodeId: [][]byte{},
 	}
-	c.PM.SetPartitionMap(filename, filename)
-	for _, pro := range rsp.GetProvider() {
+	c.PM.SetPartitionMap(fileName, fileName)
+	for _, pro := range ufprsp.GetProvider() {
 		proID, err := c.uploadFileToReplicaProvider(pro, uploadPara)
 		if err != nil {
 			return nil, err
@@ -1177,7 +1225,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 	return nil
 }
 
-func (c *ClientManager) saveFileByPartition(filename string, partition *mpb.RetrievePartition, tm uint64, fileHash []byte, fileSize uint64, multiReplica bool) (int, int, int, []string, error) {
+func (c *ClientManager) saveFileByPartition(fileName string, partition *mpb.RetrievePartition, tm uint64, fileHash []byte, fileSize uint64, multiReplica bool) (int, int, int, []string, error) {
 	log := c.Log
 	log.Infof("there is %d blocks", len(partition.GetBlock()))
 	dataShards := 0
@@ -1193,9 +1241,9 @@ func (c *ClientManager) saveFileByPartition(filename string, partition *mpb.Retr
 		}
 		node := c.BestRetrieveNode(block.GetStoreNode())
 		server := fmt.Sprintf("%s:%d", node.GetServer(), node.GetPort())
-		tempFileName := filename
+		tempFileName := fileName
 		if !multiReplica {
-			_, onlyFileName := filepath.Split(filename)
+			_, onlyFileName := filepath.Split(fileName)
 			tempFileName = filepath.Join(c.TempDir, fmt.Sprintf("%s.%d", onlyFileName, block.GetBlockSeq()))
 		}
 		log.Infof("[part file] %s, hash %x retrieve from %s", tempFileName, block.GetHash(), server)
