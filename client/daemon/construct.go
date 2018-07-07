@@ -9,6 +9,12 @@ type DownFile struct {
 	Folder   bool   `json:"folder"`
 }
 
+// FilePages list file
+type FilePages struct {
+	Total uint32      `json:"total"`
+	Files []*DownFile `json:"files"`
+}
+
 // DirPair dir and its parent is a pair
 type DirPair struct {
 	Name   string

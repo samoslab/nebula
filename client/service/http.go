@@ -19,6 +19,7 @@ import (
 	"github.com/samoslab/nebula/client/config"
 	"github.com/samoslab/nebula/client/daemon"
 	regclient "github.com/samoslab/nebula/client/register"
+	"github.com/samoslab/nebula/util/aes"
 	"github.com/sirupsen/logrus"
 	"github.com/unrolled/secure"
 	"golang.org/x/crypto/acme/autocert"
@@ -67,7 +68,7 @@ func InitClientManager(log logrus.FieldLogger, webcfg config.Config) (*daemon.Cl
 	}
 	cm, err := daemon.NewClientManager(log, webcfg, clientConfig)
 	if err != nil {
-		fmt.Printf("new client manager failed %v\n", err)
+		log.Infof("new client manager failed %v\n", err)
 		return cm, err
 	}
 	return cm, nil
@@ -317,6 +318,10 @@ func (s *HTTPServer) setupMux() *http.ServeMux {
 	handleAPI("/api/v1/secret/decrypt", DecryFileHandler(s))
 
 	handleAPI("/api/v1/service/status", ServiceStatusHandler(s))
+	handleAPI("/api/v1/service/root", RootPathHandler(s))
+	handleAPI("/api/v1/service/password", PasswordHandler(s))
+	handleAPI("/api/v1/config/import", ConfigImportHandler(s))
+	handleAPI("/api/v1/config/export", ConfigExportHandler(s))
 
 	// Static files
 	mux.Handle("/", http.FileServer(http.Dir(s.cfg.StaticDir)))
@@ -339,31 +344,41 @@ type MkfolderReq struct {
 	Folders     []string `json:"folders"`
 	Parent      string   `json:"parent"`
 	Interactive bool     `json:"interactive"`
+	Sno         uint32   `json:"space_no"`
 }
 
 // UploadReq request struct for upload file
 type UploadReq struct {
 	Filename    string `json:"filename"`
+	Dest        string `json:"dest_dir"`
 	Interactive bool   `json:"interactive"`
 	NewVersion  bool   `json:"newversion"`
+	Sno         uint32 `json:"space_no"`
+	IsEncrypt   bool   `json:"is_encypt"`
 }
 
 // UploadDirReq request struct for upload directory
 type UploadDirReq struct {
 	Parent      string `json:"parent"`
+	Dest        string `json:"dest_dir"`
 	Interactive bool   `json:"interactive"`
 	NewVersion  bool   `json:"newversion"`
+	Sno         uint32 `json:"space_no"`
+	IsEncrypt   bool   `json:"is_encypt"`
 }
 
 // DownloadDirReq request struct for download directory
 type DownloadDirReq struct {
 	Parent string `json:"parent"`
+	Dest   string `json:"dest_dir"`
+	Sno    uint32 `json:"space_no"`
 }
 
 // RenameReq request struct for move file, src is source file id which get by list
 type RenameReq struct {
 	Source string `json:"src"`
 	Dest   string `json:"dest"`
+	Sno    uint32 `json:"space_no"`
 }
 
 // DownloadReq request struct for download file
@@ -371,6 +386,8 @@ type DownloadReq struct {
 	FileHash string `json:"filehash"`
 	FileSize uint64 `json:"filesize"`
 	FileName string `json:"filename"`
+	Dest     string `json:"dest_dir"`
+	Sno      uint32 `json:"space_no"`
 }
 
 // ListReq request struct for list files
@@ -380,6 +397,7 @@ type ListReq struct {
 	PageNum  uint32 `json:"pagenum"`
 	SortType string `json:"sorttype"`
 	AscOrder bool   `json:"ascorder"`
+	Sno      uint32 `json:"space_no"`
 }
 
 // RemoveReq request struct for remove file
@@ -387,6 +405,7 @@ type RemoveReq struct {
 	Target    string `json:"target"`
 	Recursion bool   `json:"recursion"`
 	IsPath    bool   `json:"ispath"`
+	Sno       uint32 `json:"space_no"`
 }
 
 // ProgressReq request struct for progress bar
@@ -418,10 +437,32 @@ type ServiceStatus struct {
 	Status bool `json:"status"`
 }
 
+// RootPath root path
+type RootPath struct {
+	Root string `json:"root"`
+}
+
+// PasswordReq set password for privacy space
+type PasswordReq struct {
+	Password string `json:"password"`
+	SpacoNo  uint32 `json:"space_no"`
+}
+
+// ConfigImportReq import config
+type ConfigImportReq struct {
+	FileName string `json:"filename"`
+}
+
+// ConfigExportReq export config
+type ConfigExportReq struct {
+	Filename string `json:"filename"`
+}
+
 // ServiceStatusHandler returns service status
 func ServiceStatusHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+		log := s.log
 		if !validMethod(ctx, w, r, []string{http.MethodGet}) {
 			return
 		}
@@ -431,7 +472,205 @@ func ServiceStatusHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		if err := JSONResponse(w, ss); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
+		}
+	}
+}
+
+// RootPathHandler set user root path handler
+func RootPathHandler(s *HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log := s.log
+		ctx := r.Context()
+		w.Header().Set("Accept", "application/json")
+
+		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
+			return
+		}
+
+		if r.Header.Get("Content-Type") != "application/json" {
+			errorResponse(ctx, w, http.StatusUnsupportedMediaType, errors.New("Invalid content type"))
+			return
+		}
+
+		req := &RootPath{}
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&req); err != nil {
+			err = fmt.Errorf("Invalid json request body: %v", err)
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+
+		defer r.Body.Close()
+		if req.Root == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument root must not empty"))
+			return
+		}
+
+		err := s.cm.SetRoot(req.Root)
+		code := 0
+		errmsg := ""
+		result := "ok"
+		if err != nil {
+			code = 1
+			errmsg = err.Error()
+			result = ""
+		}
+
+		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
+		if err != nil {
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+		if err := JSONResponse(w, rsp); err != nil {
+			log.Infof("error %v\n", err)
+		}
+	}
+}
+
+// PasswordHandler set user root path handler
+func PasswordHandler(s *HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log := s.log
+		ctx := r.Context()
+		w.Header().Set("Accept", "application/json")
+
+		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
+			return
+		}
+
+		if r.Header.Get("Content-Type") != "application/json" {
+			errorResponse(ctx, w, http.StatusUnsupportedMediaType, errors.New("Invalid content type"))
+			return
+		}
+
+		req := &PasswordReq{}
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&req); err != nil {
+			err = fmt.Errorf("Invalid json request body: %v", err)
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+
+		defer r.Body.Close()
+		if req.Password == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument password must not empty"))
+			return
+		}
+
+		err := s.cm.SetPassword(req.SpacoNo, req.Password)
+		code := 0
+		errmsg := ""
+		result := "ok"
+		if err != nil {
+			code = 1
+			errmsg = err.Error()
+			result = ""
+		}
+
+		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
+		if err != nil {
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+		if err := JSONResponse(w, rsp); err != nil {
+			log.Infof("error %v\n", err)
+		}
+	}
+}
+
+// ConfigImportHandler set user root path handler
+func ConfigImportHandler(s *HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log := s.log
+		ctx := r.Context()
+		w.Header().Set("Accept", "application/json")
+
+		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
+			return
+		}
+
+		if r.Header.Get("Content-Type") != "application/json" {
+			errorResponse(ctx, w, http.StatusUnsupportedMediaType, errors.New("Invalid content type"))
+			return
+		}
+
+		req := &ConfigImportReq{}
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&req); err != nil {
+			err = fmt.Errorf("Invalid json request body: %v", err)
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+
+		defer r.Body.Close()
+		if req.FileName == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument filename must not empty"))
+			return
+		}
+
+		err := s.cm.ImportConfig(req.FileName, s.cfg.ConfigFile)
+		code := 0
+		errmsg := ""
+		result := "ok"
+		if err != nil {
+			code = 1
+			errmsg = err.Error()
+			result = ""
+		}
+
+		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
+		if err != nil {
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+		if err := JSONResponse(w, rsp); err != nil {
+			log.Infof("error %v\n", err)
+		}
+	}
+}
+
+// ConfigExportHandler set user root path handler
+func ConfigExportHandler(s *HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log := s.log
+		ctx := r.Context()
+		w.Header().Set("Accept", "application/json")
+
+		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
+			return
+		}
+
+		if r.Header.Get("Content-Type") != "application/json" {
+			errorResponse(ctx, w, http.StatusUnsupportedMediaType, errors.New("Invalid content type"))
+			return
+		}
+
+		req := &ConfigExportReq{}
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&req); err != nil {
+			err = fmt.Errorf("Invalid json request body: %v", err)
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+
+		defer r.Body.Close()
+
+		err := s.cm.ExportConfig(req.Filename)
+		result, code, errmsg := "ok", 0, ""
+		if err != nil {
+			code = 1
+			errmsg = err.Error()
+			result = ""
+		}
+
+		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
+		if err != nil {
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+		if err := JSONResponse(w, rsp); err != nil {
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -468,10 +707,10 @@ func RegisterHandler(s *HTTPServer) http.HandlerFunc {
 
 		var err error
 		if regReq.Resend {
-			err = regclient.ResendVerifyCode(s.cfg.ConfigDir, s.cfg.TrackerServer)
+			err = regclient.ResendVerifyCode(s.cfg.ConfigFile, s.cfg.TrackerServer)
 		} else {
-			log.Infof("register email %s dir %s", regReq.Email, s.cfg.ConfigDir)
-			err = regclient.RegisterClient(log, s.cfg.ConfigDir, s.cfg.TrackerServer, regReq.Email)
+			log.Infof("register email %s dir %s", regReq.Email, s.cfg.ConfigFile)
+			err = regclient.RegisterClient(log, s.cfg.ConfigFile, s.cfg.TrackerServer, regReq.Email)
 		}
 		code := 0
 		errmsg := ""
@@ -498,7 +737,7 @@ func RegisterHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -538,7 +777,7 @@ func EmailHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		err := regclient.VerifyEmail(s.cfg.ConfigDir, s.cfg.TrackerServer, mailReq.Code)
+		err := regclient.VerifyEmail(s.cfg.ConfigFile, s.cfg.TrackerServer, mailReq.Code)
 		code := 0
 		errmsg := ""
 		result := "ok"
@@ -555,7 +794,7 @@ func EmailHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -604,7 +843,7 @@ func MkfolderHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		log.Infof("mkfolder parent %s folders %+v", mkReq.Parent, mkReq.Folders)
-		result, err := s.cm.MkFolder(mkReq.Parent, mkReq.Folders, mkReq.Interactive)
+		result, err := s.cm.MkFolder(mkReq.Parent, mkReq.Folders, mkReq.Interactive, mkReq.Sno)
 		if err != nil {
 			log.Errorf("create folder %+v error %v", mkReq.Parent, mkReq.Folders, err)
 		}
@@ -622,7 +861,7 @@ func MkfolderHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -647,9 +886,9 @@ func UploadHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		upReq := &UploadReq{}
+		req := &UploadReq{}
 		decoder := json.NewDecoder(r.Body)
-		if err := decoder.Decode(&upReq); err != nil {
+		if err := decoder.Decode(&req); err != nil {
 			err = fmt.Errorf("Invalid json request body: %v", err)
 			errorResponse(ctx, w, http.StatusBadRequest, err)
 			return
@@ -657,13 +896,13 @@ func UploadHandler(s *HTTPServer) http.HandlerFunc {
 
 		defer r.Body.Close()
 
-		if upReq.Filename == "" {
-			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument filename must not empty"))
+		if req.Filename == "" || req.Dest == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument filename or dest_dir must not empty"))
 			return
 		}
 
-		log.Infof("upload files %+v", upReq.Filename)
-		err := s.cm.UploadFile(upReq.Filename, upReq.Interactive, upReq.NewVersion)
+		log.Infof("upload files %+v", req.Filename)
+		err := s.cm.UploadFile(req.Filename, req.Dest, req.Interactive, req.NewVersion, req.IsEncrypt, req.Sno)
 		st, ok := status.FromError(err)
 		if !ok {
 			log.Infof("err code %d msg %s", st.Code(), st.Message())
@@ -672,7 +911,7 @@ func UploadHandler(s *HTTPServer) http.HandlerFunc {
 		errmsg := ""
 		result := "success"
 		if err != nil {
-			log.Errorf("upload %+v error %v", upReq, err)
+			log.Errorf("upload %+v error %v", req, err)
 			code = 1
 			errmsg = err.Error()
 			result = ""
@@ -684,7 +923,7 @@ func UploadHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -709,9 +948,9 @@ func UploadDirHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		upReq := &UploadDirReq{}
+		req := &UploadDirReq{}
 		decoder := json.NewDecoder(r.Body)
-		if err := decoder.Decode(&upReq); err != nil {
+		if err := decoder.Decode(&req); err != nil {
 			err = fmt.Errorf("Invalid json request body: %v", err)
 			errorResponse(ctx, w, http.StatusBadRequest, err)
 			return
@@ -719,13 +958,13 @@ func UploadDirHandler(s *HTTPServer) http.HandlerFunc {
 
 		defer r.Body.Close()
 
-		if upReq.Parent == "" {
-			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument parent must not empty"))
+		if req.Parent == "" || req.Dest == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument parent or dest_dir must not empty"))
 			return
 		}
 
-		log.Infof("upload parent %s", upReq.Parent)
-		err := s.cm.UploadDir(upReq.Parent, upReq.Interactive, upReq.NewVersion)
+		log.Infof("upload parent %s", req.Parent)
+		err := s.cm.UploadDir(req.Parent, req.Dest, req.Interactive, req.NewVersion, req.IsEncrypt, req.Sno)
 		st, ok := status.FromError(err)
 		if !ok {
 			log.Infof("err code %d msg %s", st.Code(), st.Message())
@@ -735,7 +974,7 @@ func UploadDirHandler(s *HTTPServer) http.HandlerFunc {
 		errmsg := ""
 		result := "success"
 		if err != nil {
-			log.Errorf("upload %+v error %v", upReq, err)
+			log.Errorf("upload %+v error %v", req, err)
 			code = 1
 			errmsg = err.Error()
 			result = ""
@@ -747,7 +986,7 @@ func UploadDirHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -782,13 +1021,13 @@ func DownloadHandler(s *HTTPServer) http.HandlerFunc {
 
 		defer r.Body.Close()
 
-		if downReq.FileHash == "" || downReq.FileSize == 0 || downReq.FileName == "" {
-			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument filehash filesize or filename must not empty"))
+		if downReq.FileHash == "" || downReq.Dest == "" || downReq.FileSize == 0 || downReq.FileName == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument filehash, dest_dir, filesize or filename must not empty"))
 			return
 		}
 
 		log.Infof("download  %+v", downReq)
-		err := s.cm.DownloadFile(downReq.FileName, downReq.FileHash, downReq.FileSize)
+		err := s.cm.DownloadFile(downReq.FileName, downReq.Dest, downReq.FileHash, downReq.FileSize, downReq.Sno)
 		code := 0
 		errmsg := ""
 		result := "success"
@@ -805,7 +1044,7 @@ func DownloadHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -840,13 +1079,13 @@ func DownloadDirHandler(s *HTTPServer) http.HandlerFunc {
 
 		defer r.Body.Close()
 
-		if req.Parent == "" {
+		if req.Parent == "" || req.Dest == "" {
 			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument parent must not empty"))
 			return
 		}
 
 		log.Infof("downloaddir request %+v", req)
-		err := s.cm.DownloadDir(req.Parent)
+		err := s.cm.DownloadDir(req.Parent, req.Dest, req.Sno)
 		code := 0
 		errmsg := ""
 		result := "success"
@@ -863,7 +1102,7 @@ func DownloadDirHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -904,7 +1143,7 @@ func RenameHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		log.Infof("rename request %+v", req)
-		err := s.cm.MoveFile(req.Source, req.Dest)
+		err := s.cm.MoveFile(req.Source, req.Dest, req.Sno)
 		code := 0
 		errmsg := ""
 		result := "success"
@@ -921,7 +1160,7 @@ func RenameHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -946,26 +1185,26 @@ func ListHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		listReq := &ListReq{}
+		req := &ListReq{}
 		decoder := json.NewDecoder(r.Body)
-		if err := decoder.Decode(&listReq); err != nil {
+		if err := decoder.Decode(&req); err != nil {
 			err = fmt.Errorf("Invalid json request body: %v", err)
 			errorResponse(ctx, w, http.StatusBadRequest, err)
 			return
 		}
 
 		defer r.Body.Close()
-		if listReq.Path == "" {
+		if req.Path == "" {
 			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument path must not empty"))
 			return
 		}
 
-		log.Infof("list %+v", listReq)
-		result, err := s.cm.ListFiles(listReq.Path, listReq.PageSize, listReq.PageNum, listReq.SortType, listReq.AscOrder)
+		log.Infof("list %+v", req)
+		result, err := s.cm.ListFiles(req.Path, req.PageSize, req.PageNum, req.SortType, req.AscOrder, req.Sno)
 		code := 0
 		errmsg := ""
 		if err != nil {
-			log.Errorf("list files %+v error %v", listReq, err)
+			log.Errorf("list files %+v error %v", req, err)
 			code = 1
 			errmsg = err.Error()
 			result = nil
@@ -977,7 +1216,7 @@ func ListHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -1017,7 +1256,7 @@ func RemoveHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		log.Infof("remove %+v", rmReq)
-		err := s.cm.RemoveFile(rmReq.Target, rmReq.Recursion, false)
+		err := s.cm.RemoveFile(rmReq.Target, rmReq.Recursion, false, rmReq.Sno)
 		code := 0
 		errmsg := ""
 		result := true
@@ -1034,7 +1273,7 @@ func RemoveHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -1084,7 +1323,7 @@ func ProgressHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -1135,7 +1374,7 @@ func EncryFileHandler(s *HTTPServer) http.HandlerFunc {
 		if req.OutputFile == "" {
 			req.OutputFile = req.FileName
 		}
-		err := common.EncryptFile(req.FileName, []byte(req.Password), req.OutputFile)
+		err := aes.EncryptFile(req.FileName, []byte(req.Password), req.OutputFile)
 		code := 0
 		errmsg := ""
 		result := true
@@ -1152,7 +1391,7 @@ func EncryFileHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -1203,7 +1442,7 @@ func DecryFileHandler(s *HTTPServer) http.HandlerFunc {
 		if req.OutputFile == "" {
 			req.OutputFile = req.FileName
 		}
-		err := common.DecryptFile(req.FileName, []byte(req.Password), req.OutputFile)
+		err := aes.DecryptFile(req.FileName, []byte(req.Password), req.OutputFile)
 		code := 0
 		errmsg := ""
 		result := true
@@ -1220,7 +1459,7 @@ func DecryFileHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			fmt.Printf("error %v\n", err)
+			log.Infof("error %v\n", err)
 		}
 	}
 }
@@ -1249,8 +1488,9 @@ func errorResponse(ctx context.Context, w http.ResponseWriter, code int, err err
 
 // Shutdown stops the HTTPServer
 func (s *HTTPServer) Shutdown() {
-	s.log.Info("Shutting down HTTP server(s)")
-	defer s.log.Info("Shutdown HTTP server(s)")
+	log := s.log
+	log.Info("Shutting down HTTP server(s)")
+	defer log.Info("Shutdown HTTP server(s)")
 	close(s.quit)
 
 	var wg sync.WaitGroup
@@ -1261,7 +1501,7 @@ func (s *HTTPServer) Shutdown() {
 		if ln == nil {
 			return
 		}
-		log := s.log.WithFields(logrus.Fields{
+		log := log.WithFields(logrus.Fields{
 			"proto":   proto,
 			"timeout": shutdownTimeout,
 		})

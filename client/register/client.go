@@ -2,6 +2,7 @@ package register
 
 import (
 	"context"
+	"crypto/rsa"
 	"crypto/x509"
 	"fmt"
 	"os"
@@ -14,11 +15,12 @@ import (
 	"github.com/samoslab/nebula/provider/node"
 	pb "github.com/samoslab/nebula/tracker/register/client/pb"
 	regpb "github.com/samoslab/nebula/tracker/register/client/pb"
+	"github.com/samoslab/nebula/util/aes"
 	rsalong "github.com/samoslab/nebula/util/rsa"
 	"github.com/sirupsen/logrus"
 )
 
-func doGetPubkey(registClient pb.ClientRegisterServiceClient) ([]byte, error) {
+func doGetPubkey(registClient pb.ClientRegisterServiceClient) ([]byte, []byte, error) {
 	ctx := context.Background()
 	getPublicKeyReq := pb.GetPublicKeyReq{
 		Version: common.Version,
@@ -27,15 +29,15 @@ func doGetPubkey(registClient pb.ClientRegisterServiceClient) ([]byte, error) {
 	pubKey, err := registClient.GetPublicKey(ctx, &getPublicKeyReq)
 	if err != nil {
 		fmt.Printf("pubkey get failed\n")
-		return nil, err
+		return nil, nil, err
 	}
-	return pubKey.GetPublicKey(), nil
+	return pubKey.GetPublicKey(), pubKey.GetPublicKeyHash(), nil
 }
 
 // DoRegister register client
 func DoRegister(registClient pb.ClientRegisterServiceClient, cfg *config.ClientConfig) (*pb.RegisterResp, error) {
 	ctx := context.Background()
-	pubkey, err := doGetPubkey(registClient)
+	pubkey, _, err := doGetPubkey(registClient)
 	if err != nil {
 		return nil, err
 	}
@@ -106,7 +108,7 @@ func resendVerifyCode(client pb.ClientRegisterServiceClient, node *node.Node) (s
 }
 
 // RegisterClient register client info to tracker
-func RegisterClient(log logrus.FieldLogger, configDir, trackerServer, emailAddress string) error {
+func RegisterClient(log logrus.FieldLogger, configFile, trackerServer, emailAddress string) error {
 	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("RPC Dial failed: %s", err.Error())
@@ -116,7 +118,7 @@ func RegisterClient(log logrus.FieldLogger, configDir, trackerServer, emailAddre
 
 	registerClient := regpb.NewClientRegisterServiceClient(conn)
 
-	cc, err := config.LoadConfig(configDir)
+	cc, err := config.LoadConfig(configFile)
 	if err != nil {
 		fmt.Printf("load config error %v\n", err)
 		fmt.Printf("generate config\n")
@@ -128,8 +130,12 @@ func RegisterClient(log logrus.FieldLogger, configDir, trackerServer, emailAddre
 			Email:         emailAddress,
 			TrackerServer: trackerServer,
 			Node:          no,
+			Space: []config.ReadableSpace{
+				config.ReadableSpace{SpaceNo: 0, Password: aes.RandStr(16), Home: "default", Name: "default"},
+				config.ReadableSpace{SpaceNo: 1, Password: "", Home: "private1", Name: "privacy space"},
+			},
 		}
-		err = config.SaveClientConfig(configDir, cc)
+		err = config.SaveClientConfig(configFile, cc)
 		if err != nil {
 			log.Infof("create config failed %v\n", err)
 			return err
@@ -151,8 +157,8 @@ func RegisterClient(log logrus.FieldLogger, configDir, trackerServer, emailAddre
 }
 
 // VerifyEmail verify email
-func VerifyEmail(configDir string, trackerServer string, verifyCode string) error {
-	cc, err := config.LoadConfig(configDir)
+func VerifyEmail(configFile string, trackerServer string, verifyCode string) error {
+	cc, err := config.LoadConfig(configFile)
 	if err != nil {
 		if err == config.ErrNoConf {
 			fmt.Printf("Config file is not ready, please run \"%s register\" to register first\n", os.Args[0])
@@ -189,8 +195,8 @@ func VerifyEmail(configDir string, trackerServer string, verifyCode string) erro
 }
 
 // ResendVerifyCode send verify code again
-func ResendVerifyCode(configDir string, trackerServer string) error {
-	cc, err := config.LoadConfig(configDir)
+func ResendVerifyCode(configFile string, trackerServer string) error {
+	cc, err := config.LoadConfig(configFile)
 	if err != nil {
 		if err == config.ErrNoConf {
 			fmt.Printf("Config file is not ready, please run \"%s register\" to register first\n", os.Args[0])
@@ -221,4 +227,24 @@ func ResendVerifyCode(configDir string, trackerServer string) error {
 
 	fmt.Println("resendVerifyCode success, you can verify bill email.")
 	return nil
+}
+
+func GetPublicKey(trackerServer string) (*rsa.PublicKey, []byte, error) {
+	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
+	if err != nil {
+		fmt.Printf("RPC Dial failed: %s\n", err.Error())
+		return nil, nil, err
+	}
+	defer conn.Close()
+	registClient := regpb.NewClientRegisterServiceClient(conn)
+	pubkey, pubkeyHash, err := doGetPubkey(registClient)
+	if err != nil {
+		return nil, nil, err
+	}
+	rsaPubkey, err := x509.ParsePKCS1PublicKey(pubkey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return rsaPubkey, pubkeyHash, err
 }

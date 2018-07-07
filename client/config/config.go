@@ -25,15 +25,26 @@ var (
 	ErrConfVerify = errors.New("verify config file failed")
 )
 
+// ReadableSpace user space
+type ReadableSpace struct {
+	SpaceNo  uint32 `json:"no"`
+	Password string `json:"password"`
+	Home     string `json:"home"`
+	Name     string `json:"name"`
+}
+
 // ClientConfig client role config struct json format
 type ClientConfig struct {
-	TempDir       string     `json:"temp_dir"`
-	TrackerServer string     `json:"tracker_server"`
-	NodeId        string     `json:"node_id"`
-	PublicKey     string     `json:"public_key"`
-	PrivateKey    string     `json:"private_key"`
-	Email         string     `json:"email"`
-	Node          *node.Node `json:"-"`
+	TempDir       string          `json:"temp_dir"`
+	TrackerServer string          `json:"tracker_server"`
+	NodeId        string          `json:"node_id"`
+	PublicKey     string          `json:"public_key"`
+	PrivateKey    string          `json:"private_key"`
+	Email         string          `json:"email"`
+	Node          *node.Node      `json:"-"`
+	Root          string          `json:"root"`
+	Space         []ReadableSpace `json:"space"`
+	SelfFileName  string          `json:"self_filename"`
 }
 
 // LoadConfig load config from config file
@@ -117,6 +128,7 @@ func readConfig(configFilePath string) (*ClientConfig, error) {
 }
 
 func saveClientConfig(configPath string, cc *ClientConfig) error {
+	cc.SelfFileName = configPath
 	b, err := json.Marshal(cc)
 	if err != nil {
 		return err

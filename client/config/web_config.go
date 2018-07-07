@@ -31,6 +31,7 @@ type Config struct {
 	TrackerServer    string        `json:"tracker_server"`
 	CollectServer    string        `json:"collect_server"`
 	ConfigDir        string        `json:"config_dir"`
+	ConfigFile       string        `json:"config_file"`
 	HTTPAddr         string        `json:"http_addr"`
 	HTTPPort         uint32        `json:"http_port"`
 	HTTPSAddr        string        `json:"https_addr"`
@@ -53,7 +54,10 @@ func (cfg *Config) SetDefault() {
 		cfg.CollectServer = DefaultCollect
 	}
 	if cfg.ConfigDir == "" {
-		cfg.ConfigDir = filepath.Join(file.UserHome(), DefaultConfig)
+		cfg.ConfigDir = file.UserHome()
+	}
+	if cfg.ConfigFile == "" {
+		cfg.ConfigFile = filepath.Join(file.UserHome(), DefaultConfig)
 	}
 	if cfg.HTTPAddr == "" {
 		cfg.HTTPAddr = DefaultServer
