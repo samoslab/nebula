@@ -394,6 +394,15 @@ func (c *ClientManager) UploadDir(parent, dest string, interactive, newVersion, 
 	if err != nil {
 		return err
 	}
+	if isEncrypt {
+		password, err := c.getSpacePassword(sno)
+		if err != nil {
+			return err
+		}
+		if len(password) == 0 {
+			return fmt.Errorf("Password not set")
+		}
+	}
 	log.Debugf("Upload dirs %+v", dirs)
 	newDirs := dirAdjust(dirs, parent, dest)
 	log.Debugf("New upload dirs %+v", newDirs)
@@ -430,16 +439,22 @@ func (c *ClientManager) getSpacePassword(sno uint32) ([]byte, error) {
 
 // UploadFile upload file to provider
 func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersion, isEncrypt bool, sno uint32) error {
-	log := c.Log
-	password, err := c.getSpacePassword(sno)
-	if err != nil {
-		log.WithError(err).Infof("Upload %s", fileName)
-		return err
-	}
-	var encryptKey []byte
+	var err error
+	var password, encryptKey []byte
+	log := c.Log.WithField("upload file", fileName)
 	if isEncrypt {
+		password, err = c.getSpacePassword(sno)
+		if err != nil {
+			log.WithError(err).Info("Get space password")
+			return err
+		}
+		if len(password) == 0 {
+			log.Info("Space password not set")
+			return fmt.Errorf("Password not set")
+		}
 		encryptKey, err = rsalong.EncryptLong(c.TrackerPubkey, password, 256)
 		if err != nil {
+			log.WithError(err).Info("Encrypt password")
 			return err
 		}
 	}
@@ -458,7 +473,6 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 		return fmt.Errorf("%d:%s", rsp.GetCode(), rsp.GetErrMsg())
 	}
 
-	log = log.WithField("filename", fileName)
 	switch rsp.GetStoreType() {
 	case mpb.FileStoreType_MultiReplica:
 		log.Infof("Upload manner is multi-replication")
@@ -993,7 +1007,7 @@ func (c *ClientManager) ListFiles(path string, pageSize, pageNum uint32, sortTyp
 		return nil, err
 	}
 	ctx := context.Background()
-	log.Info("list path request")
+	log.Info("List path request")
 	rsp, err := c.mclient.ListFiles(ctx, req)
 
 	if err != nil {
