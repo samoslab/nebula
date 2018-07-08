@@ -119,21 +119,20 @@ func FileJoin(filename string, partfiles []string) error {
 }
 
 // GetDirsAndFiles returns dirs and files in path root
-func GetDirsAndFiles(root string) ([]DirPair, []string, error) {
+func GetDirsAndFiles(root string) ([]DirPair, error) {
 	dirs := []DirPair{}
-	files := []string{}
 	err := filepath.Walk(root, func(path string, f os.FileInfo, err error) error {
+		parent, _ := filepath.Split(path)
 		if f.IsDir() {
-			parent, _ := filepath.Split(path)
-			dirs = append(dirs, DirPair{Name: f.Name(), Parent: parent})
+			dirs = append(dirs, DirPair{Name: f.Name(), Parent: parent, Folder: true})
 		} else {
-			files = append(files, path)
+			dirs = append(dirs, DirPair{Name: path, Parent: parent, Folder: false})
 		}
 		return nil
 	},
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return dirs, files, nil
+	return dirs, nil
 }

@@ -28,7 +28,7 @@ var (
 // ReadableSpace user space
 type ReadableSpace struct {
 	SpaceNo  uint32 `json:"no"`
-	Password string `json:"password"`
+	Password string `json:"-"`
 	Home     string `json:"home"`
 	Name     string `json:"name"`
 }

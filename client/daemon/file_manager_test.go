@@ -16,3 +16,25 @@ func TestProviderBackupMap(t *testing.T) {
 	}
 
 }
+
+func TestFolderUpload(t *testing.T) {
+	parent := "/tmp/upload/"
+	dest := "/tmp/music"
+	dirs := []DirPair{
+		DirPair{Parent: "/tmp/", Name: "upload", Folder: true},
+		DirPair{Parent: "/tmp/upload/", Name: "/tmp/upload/abc.txt", Folder: false},
+		DirPair{Parent: "/tmp/upload", Name: "localmusic", Folder: true},
+		DirPair{Parent: "/tmp/upload/localmusic", Name: "/tmp/upload/localmusic/sea.music", Folder: false},
+	}
+
+	newDirs := dirAdjust(dirs, parent, dest)
+
+	expectDirs := []DirPair{
+		DirPair{Parent: "/tmp/music", Name: "upload", Folder: true},
+		DirPair{Parent: "/tmp/music/upload", Name: "/tmp/upload/abc.txt", Folder: false},
+		DirPair{Parent: "/tmp/music/upload", Name: "localmusic", Folder: true},
+		DirPair{Parent: "/tmp/music/upload/localmusic", Name: "/tmp/upload/localmusic/sea.music", Folder: false},
+	}
+	assert.Equal(t, newDirs, expectDirs)
+
+}

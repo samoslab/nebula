@@ -20,7 +20,7 @@ func main() {
 	collectAddr := pflag.StringP("collect", "", "", "collect server format is ip:port")
 	trackerAddr := pflag.StringP("tracker", "", "", "tracker server format is ip:port")
 	webDir := pflag.StringP("webdir", "d", "./web/build", "web static directory")
-	launchBrowser := pflag.BoolP("launch-browser", "l", true, "launch system default webbrowser at client startup")
+	launchBrowser := pflag.BoolP("launch-browser", "l", false, "launch system default webbrowser at client startup")
 	pflag.Parse()
 	defaultAppDir, _ := daemon.GetConfigFile()
 	if _, err := os.Stat(defaultAppDir); os.IsNotExist(err) {

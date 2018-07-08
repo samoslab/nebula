@@ -19,4 +19,5 @@ type FilePages struct {
 type DirPair struct {
 	Name   string
 	Parent string
+	Folder bool
 }

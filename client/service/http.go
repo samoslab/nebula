@@ -68,7 +68,7 @@ func InitClientManager(log logrus.FieldLogger, webcfg config.Config) (*daemon.Cl
 	}
 	cm, err := daemon.NewClientManager(log, webcfg, clientConfig)
 	if err != nil {
-		log.Infof("new client manager failed %v\n", err)
+		log.Infof("New client manager failed %v\n", err)
 		return cm, err
 	}
 	return cm, nil
@@ -78,7 +78,7 @@ func InitClientManager(log logrus.FieldLogger, webcfg config.Config) (*daemon.Cl
 func NewHTTPServer(log logrus.FieldLogger, cfg config.Config) *HTTPServer {
 	cm, err := InitClientManager(log, cfg)
 	if err != nil {
-		log.Errorf("init client manager failed, error %v", err)
+		log.Errorf("Init client manager failed, error %v", err)
 	}
 	return &HTTPServer{
 		cfg:  cfg,
@@ -99,8 +99,8 @@ func (s *HTTPServer) CanBeWork() bool {
 // Run runs the HTTPServer
 func (s *HTTPServer) Run() error {
 	log := s.log
-	log.Info("HTTP service start")
-	defer log.Info("HTTP service closed")
+	log.Info("Http service start")
+	defer log.Info("Http service closed")
 	defer close(s.done)
 
 	var mux http.Handler = s.setupMux()
@@ -128,8 +128,6 @@ func (s *HTTPServer) Run() error {
 	}
 
 	log = log.WithField("sslHost", sslHost)
-
-	log.Info("Configured")
 
 	secureMiddleware := configureSecureMiddleware(sslHost, allowedHosts)
 	mux = secureMiddleware.Handler(mux)
@@ -472,7 +470,7 @@ func ServiceStatusHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		if err := JSONResponse(w, ss); err != nil {
-			log.Infof("error %v\n", err)
+			log.Infof("Error %v\n", err)
 		}
 	}
 }
@@ -523,7 +521,7 @@ func RootPathHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			log.Infof("error %v\n", err)
+			log.Infof("Error %v\n", err)
 		}
 	}
 }
@@ -574,7 +572,7 @@ func PasswordHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			log.Infof("error %v\n", err)
+			log.Infof("Error %v\n", err)
 		}
 	}
 }
@@ -625,7 +623,7 @@ func ConfigImportHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			log.Infof("error %v\n", err)
+			log.Infof("Error %v\n", err)
 		}
 	}
 }
@@ -709,14 +707,12 @@ func RegisterHandler(s *HTTPServer) http.HandlerFunc {
 		if regReq.Resend {
 			err = regclient.ResendVerifyCode(s.cfg.ConfigFile, s.cfg.TrackerServer)
 		} else {
-			log.Infof("register email %s dir %s", regReq.Email, s.cfg.ConfigFile)
+			log.Infof("Register email %s dir %s", regReq.Email, s.cfg.ConfigFile)
 			err = regclient.RegisterClient(log, s.cfg.ConfigFile, s.cfg.TrackerServer, regReq.Email)
 		}
-		code := 0
-		errmsg := ""
-		result := "ok"
+		result, code, errmsg := "ok", 0, ""
 		if err != nil {
-			log.Errorf("send email %+v error %v", regReq, err)
+			log.Errorf("Send email %+v error %v", regReq, err)
 			code = 1
 			errmsg = err.Error()
 			result = ""
@@ -737,7 +733,7 @@ func RegisterHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			log.Infof("error %v\n", err)
+			log.Infof("Error %v\n", err)
 		}
 	}
 }
@@ -778,14 +774,10 @@ func EmailHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		err := regclient.VerifyEmail(s.cfg.ConfigFile, s.cfg.TrackerServer, mailReq.Code)
-		code := 0
-		errmsg := ""
-		result := "ok"
+		result, code, errmsg := "ok", 0, ""
 		if err != nil {
-			log.Errorf("verify email %+v error %v", mailReq, err)
-			code = 1
-			errmsg = err.Error()
-			result = ""
+			log.Errorf("Verify email %+v error %v", mailReq, err)
+			result, code, errmsg = "", 1, err.Error()
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
@@ -794,7 +786,7 @@ func EmailHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			log.Infof("error %v\n", err)
+			log.Infof("Error %v\n", err)
 		}
 	}
 }
@@ -842,17 +834,15 @@ func MkfolderHandler(s *HTTPServer) http.HandlerFunc {
 			}
 		}
 
-		log.Infof("mkfolder parent %s folders %+v", mkReq.Parent, mkReq.Folders)
+		log.Infof("Mkfolder parent %s folders %+v", mkReq.Parent, mkReq.Folders)
 		result, err := s.cm.MkFolder(mkReq.Parent, mkReq.Folders, mkReq.Interactive, mkReq.Sno)
 		if err != nil {
-			log.Errorf("create folder %+v error %v", mkReq.Parent, mkReq.Folders, err)
+			log.Errorf("Create folder %+v error %v", mkReq.Parent, mkReq.Folders, err)
 		}
 
-		code := 0
-		errmsg := ""
+		code, errmsg := 0, ""
 		if !result {
-			code = 1
-			errmsg = err.Error()
+			code, errmsg = 1, err.Error()
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
@@ -861,7 +851,7 @@ func MkfolderHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			log.Infof("error %v\n", err)
+			log.Infof("Error %v\n", err)
 		}
 	}
 }
@@ -901,20 +891,12 @@ func UploadHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		log.Infof("upload files %+v", req.Filename)
+		log.Infof("Upload files %+v", req.Filename)
 		err := s.cm.UploadFile(req.Filename, req.Dest, req.Interactive, req.NewVersion, req.IsEncrypt, req.Sno)
-		st, ok := status.FromError(err)
-		if !ok {
-			log.Infof("err code %d msg %s", st.Code(), st.Message())
-		}
-		code := 0
-		errmsg := ""
-		result := "success"
+		result, code, errmsg := "ok", 0, ""
 		if err != nil {
-			log.Errorf("upload %+v error %v", req, err)
-			code = 1
-			errmsg = err.Error()
-			result = ""
+			log.Errorf("Upload %+v error %v", req, err)
+			result, code, errmsg = "", 1, err.Error()
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
@@ -923,7 +905,7 @@ func UploadHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			log.Infof("error %v\n", err)
+			log.Infof("Error %v\n", err)
 		}
 	}
 }
@@ -963,21 +945,17 @@ func UploadDirHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		log.Infof("upload parent %s", req.Parent)
+		log.Infof("Upload parent %s", req.Parent)
 		err := s.cm.UploadDir(req.Parent, req.Dest, req.Interactive, req.NewVersion, req.IsEncrypt, req.Sno)
 		st, ok := status.FromError(err)
 		if !ok {
-			log.Infof("err code %d msg %s", st.Code(), st.Message())
+			log.Infof("Err code %d msg %s", st.Code(), st.Message())
 		}
 
-		code := 0
-		errmsg := ""
-		result := "success"
+		result, code, errmsg := "ok", 0, ""
 		if err != nil {
 			log.Errorf("upload %+v error %v", req, err)
-			code = 1
-			errmsg = err.Error()
-			result = ""
+			result, code, errmsg = "", 1, err.Error()
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
@@ -986,7 +964,7 @@ func UploadDirHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			log.Infof("error %v\n", err)
+			log.Infof("Error %v\n", err)
 		}
 	}
 }
@@ -1026,16 +1004,12 @@ func DownloadHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		log.Infof("download  %+v", downReq)
+		log.Infof("Download  %+v", downReq)
 		err := s.cm.DownloadFile(downReq.FileName, downReq.Dest, downReq.FileHash, downReq.FileSize, downReq.Sno)
-		code := 0
-		errmsg := ""
-		result := "success"
+		result, code, errmsg := "ok", 0, ""
 		if err != nil {
-			log.Errorf("download files %+v error %v", downReq, err)
-			code = 1
-			errmsg = err.Error()
-			result = ""
+			log.Errorf("Download files %+v error %v", downReq, err)
+			result, code, errmsg = "", 1, err.Error()
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
@@ -1044,7 +1018,7 @@ func DownloadHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			log.Infof("error %v\n", err)
+			log.Infof("Error %v\n", err)
 		}
 	}
 }
@@ -1086,14 +1060,10 @@ func DownloadDirHandler(s *HTTPServer) http.HandlerFunc {
 
 		log.Infof("downloaddir request %+v", req)
 		err := s.cm.DownloadDir(req.Parent, req.Dest, req.Sno)
-		code := 0
-		errmsg := ""
-		result := "success"
+		result, code, errmsg := "ok", 0, ""
 		if err != nil {
-			log.Errorf("download dirs %+v error %v", req, err)
-			code = 1
-			errmsg = err.Error()
-			result = ""
+			log.Errorf("Download dir %+v error %v", req, err)
+			result, code, errmsg = "", 1, err.Error()
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
@@ -1102,7 +1072,7 @@ func DownloadDirHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			log.Infof("error %v\n", err)
+			log.Infof("Error %v\n", err)
 		}
 	}
 }
@@ -1142,16 +1112,12 @@ func RenameHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		log.Infof("rename request %+v", req)
+		log.Infof("Move request %+v", req)
 		err := s.cm.MoveFile(req.Source, req.Dest, req.Sno)
-		code := 0
-		errmsg := ""
-		result := "success"
+		result, code, errmsg := "ok", 0, ""
 		if err != nil {
-			log.Errorf("move file %+v error %v", req, err)
-			code = 1
-			errmsg = err.Error()
-			result = ""
+			log.Errorf("Move file %+v error %v", req, err)
+			result, code, errmsg = "", 1, err.Error()
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
@@ -1160,7 +1126,7 @@ func RenameHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			log.Infof("error %v\n", err)
+			log.Infof("Error %v\n", err)
 		}
 	}
 }
@@ -1199,15 +1165,12 @@ func ListHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		log.Infof("list %+v", req)
+		log.Infof("List %+v", req)
 		result, err := s.cm.ListFiles(req.Path, req.PageSize, req.PageNum, req.SortType, req.AscOrder, req.Sno)
-		code := 0
-		errmsg := ""
+		code, errmsg := 0, ""
 		if err != nil {
-			log.Errorf("list files %+v error %v", req, err)
-			code = 1
-			errmsg = err.Error()
-			result = nil
+			log.Errorf("List file %+v error %v", req, err)
+			code, errmsg = 1, err.Error()
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
@@ -1216,7 +1179,7 @@ func ListHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			log.Infof("error %v\n", err)
+			log.Infof("Error %v\n", err)
 		}
 	}
 }
@@ -1255,16 +1218,12 @@ func RemoveHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		log.Infof("remove %+v", rmReq)
+		log.Infof("Remove %+v", rmReq)
 		err := s.cm.RemoveFile(rmReq.Target, rmReq.Recursion, false, rmReq.Sno)
-		code := 0
-		errmsg := ""
-		result := true
+		result, code, errmsg := "ok", 0, ""
 		if err != nil {
-			log.Errorf("remove files %+v error %v", rmReq, err)
-			code = 1
-			errmsg = err.Error()
-			result = false
+			log.Errorf("Remove files %+v error %v", rmReq, err)
+			result, code, errmsg = "", 1, err.Error()
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
@@ -1273,7 +1232,7 @@ func RemoveHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			log.Infof("error %v\n", err)
+			log.Infof("Error %v\n", err)
 		}
 	}
 }
@@ -1307,12 +1266,12 @@ func ProgressHandler(s *HTTPServer) http.HandlerFunc {
 
 		defer r.Body.Close()
 
-		log.Infof("progress %+v", progressReq)
+		log.Infof("Progress %+v", progressReq)
 		progressRsp, err := s.cm.GetProgress(progressReq.Files)
 		code := 0
 		errmsg := ""
 		if err != nil {
-			log.Errorf("remove files %+v error %v", progressReq, err)
+			log.Errorf("Progress files %+v error %v", progressReq, err)
 			code = 1
 			errmsg = err.Error()
 		}
@@ -1323,7 +1282,7 @@ func ProgressHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			log.Infof("error %v\n", err)
+			log.Infof("Error %v\n", err)
 		}
 	}
 }
@@ -1370,7 +1329,7 @@ func EncryFileHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		log.Infof("encrypt file %+v\n", req.FileName)
+		log.Infof("Encrypt file %+v\n", req.FileName)
 		if req.OutputFile == "" {
 			req.OutputFile = req.FileName
 		}

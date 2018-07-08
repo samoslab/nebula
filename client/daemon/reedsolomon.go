@@ -19,7 +19,7 @@ func RsEncoder(log logrus.FieldLogger, outDir, fName string, dataShards, parShar
 		return nil, err
 	}
 
-	log.Debugf("[reedsolomon] Opening %s", fName)
+	log.Debugf("[Reedsolomon] Opening %s", fName)
 	f, err := os.Open(fName)
 	if err != nil {
 		return nil, err
@@ -41,7 +41,7 @@ func RsEncoder(log logrus.FieldLogger, outDir, fName string, dataShards, parShar
 	}
 	for i := range out {
 		outfn := fmt.Sprintf("%s.%d", file, i)
-		log.Debugf("[reedsolomon] Creating %s", outfn)
+		log.Debugf("[Reedsolomon] Creating %s", outfn)
 		out[i], err = os.Create(filepath.Join(dir, outfn))
 		if err != nil {
 			return nil, err
@@ -122,7 +122,7 @@ func RsDecoder(log logrus.FieldLogger, fName, outFname string, filesize int64, d
 	if ok {
 		log.Info("No reconstruction needed")
 	} else {
-		log.Info("Verification failed. Reconstructing data")
+		log.Info("Verification failed. reconstructing data")
 		shards, _, err = openInput(log, dataShards, parShards, fName)
 		if err != nil {
 			return err
@@ -132,7 +132,7 @@ func RsDecoder(log logrus.FieldLogger, fName, outFname string, filesize int64, d
 		for i := range out {
 			if shards[i] == nil {
 				outfn := fmt.Sprintf("%s.%d", fName, i)
-				log.Debugf("[reedsolomon] Creating %s", outfn)
+				log.Debugf("[Reedsolomon] Creating %s", outfn)
 				out[i], err = os.Create(outfn)
 				if err != nil {
 					return err
@@ -141,7 +141,7 @@ func RsDecoder(log logrus.FieldLogger, fName, outFname string, filesize int64, d
 		}
 		err = enc.Reconstruct(shards, out)
 		if err != nil {
-			log.Info("Reconstruct failed %v", err)
+			log.Infof("Reconstruct failed %v", err)
 			return err
 		}
 		// Close output.
@@ -149,7 +149,7 @@ func RsDecoder(log logrus.FieldLogger, fName, outFname string, filesize int64, d
 			if out[i] != nil {
 				err := out[i].(*os.File).Close()
 				if err != nil {
-					log.Info("close file error %v", err)
+					log.Errorf("Close file error %v", err)
 					return err
 				}
 			}
@@ -157,7 +157,7 @@ func RsDecoder(log logrus.FieldLogger, fName, outFname string, filesize int64, d
 		shards, _, err = openInput(log, dataShards, parShards, fName)
 		ok, err = enc.Verify(shards)
 		if !ok {
-			log.Info("Verification failed after reconstruction, data likely corrupted:", err)
+			log.Infof("Verification failed after reconstruction, data likely corrupted", err)
 		}
 		if err != nil {
 			return err
@@ -170,7 +170,7 @@ func RsDecoder(log logrus.FieldLogger, fName, outFname string, filesize int64, d
 		outfn = fName
 	}
 
-	log.Info("Writing data to ", outfn)
+	log.Infof("Writing data to %s", outfn)
 	f, err := os.Create(outfn)
 	if err != nil {
 		return err
@@ -197,10 +197,10 @@ func openInput(log logrus.FieldLogger, dataShards, parShards int, fName string) 
 	shards := make([]io.Reader, dataShards+parShards)
 	for i := range shards {
 		infn := fmt.Sprintf("%s.%d", fName, i)
-		log.Debugf("[reedsolomon] Opening %s", infn)
+		log.Debugf("[Reedsolomon] Opening %s", infn)
 		f, err := os.Open(infn)
 		if err != nil {
-			log.Info("Error reading file", err)
+			log.Infof("Error reading file %v", err)
 			shards[i] = nil
 			continue
 		} else {

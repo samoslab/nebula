@@ -83,10 +83,10 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 	}
 	conn, err := grpc.Dial(webcfg.TrackerServer, grpc.WithInsecure())
 	if err != nil {
-		log.Errorf("RPC Dial failed: %s", err.Error())
+		log.Errorf("Rpc dial failed: %s", err.Error())
 		return nil, err
 	}
-	log.Infof("tracker server %s", webcfg.TrackerServer)
+	log.Infof("Tracker server %s", webcfg.TrackerServer)
 
 	rsaPubkey, pubkeyHash, err := register.GetPublicKey(webcfg.TrackerServer)
 	if err != nil {
@@ -117,7 +117,7 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 
 	collectClient.NodePtr = cfg.Node
 
-	log.Infof("temp dir %s", c.TempDir)
+	log.Infof("Temp dir is %s", c.TempDir)
 	if _, err := os.Stat(c.TempDir); os.IsNotExist(err) {
 		//create the dir.
 		if err := os.MkdirAll(c.TempDir, 0744); err != nil {
@@ -173,23 +173,22 @@ func (c *ClientManager) SetPassword(sno uint32, password string) error {
 	data, err := c.GetSpaceSysFileData(sno)
 	if err == nil {
 		if len(data) != 0 {
-			log.Infof("space %d password has been set", sno)
+			log.Infof("Space %d password has been set", sno)
 			if verifyPassword(sno, password, data) {
-				log.Infof("space %d password verified success", sno)
+				log.Infof("Space %d password verified success", sno)
 				return c.SpaceM.SetSpacePasswd(sno, password)
 			}
-			return fmt.Errorf("password incorrect")
+			return fmt.Errorf("Password incorrect")
 		}
 	}
 
-	log.Infof("get sys file error msg is %v", err)
+	log.Infof("Get space %d sys file error %v", sno, err)
 	err = c.SpaceM.SetSpacePasswd(sno, password)
 	if err != nil {
 		return err
 	}
 
 	encryDir := filepath.Join(c.webcfg.ConfigDir, fmt.Sprintf("space%d", sno))
-	fmt.Printf("encryDir %s\n", encryDir)
 	if !util_file.Exists(encryDir) {
 		if err := os.MkdirAll(encryDir, 0700); err != nil {
 			return fmt.Errorf("mkdir space %d nebula folder %s failed:%s", sno, encryDir, err)
@@ -198,11 +197,9 @@ func (c *ClientManager) SetPassword(sno uint32, password string) error {
 
 	shaData, err := genEncryptKey(sno, password)
 	if err != nil {
-		fmt.Printf("encry key %v\n", err)
 		return err
 	}
 	encryFile := filepath.Join(encryDir, SysFile)
-	fmt.Printf("encryFile %s\n", encryFile)
 	if err = ioutil.WriteFile(encryFile, shaData, 0600); err != nil {
 		return err
 	}
@@ -215,7 +212,7 @@ func (c *ClientManager) getPingTime(ip string, port uint32) int {
 	timeStart := time.Now().Unix()
 	conn, err := grpc.Dial(server, grpc.WithInsecure())
 	if err != nil {
-		c.Log.Errorf("RPC Dial failed: %s", err.Error())
+		c.Log.Errorf("Rpc dial failed: %s", err.Error())
 		return 99999
 	}
 	defer conn.Close()
@@ -288,14 +285,14 @@ func (c *ClientManager) UsingBestProvider(pros []*mpb.BlockProviderAuth, needNum
 	for _, proInfo := range workPros {
 		if proInfo.Delay == 99999 {
 			// provider cannot connect , choose one from backup
-			log.Errorf("provider %v cannot connected")
+			log.Errorf("Provider %v cannot connected")
 			if backupNum == 0 {
-				log.Errorf("no backup provider")
+				log.Errorf("No backup provider for provider %d", proInfo.OriginIndex)
 				return nil, fmt.Errorf("one of provider cannot connected and no backup provider")
 			}
 			choosed := chooseBackupProvicer(proInfo.OriginIndex, backupMap)
 			if choosed == -1 {
-				log.Errorf("no availbe provider")
+				log.Errorf("No availbe provider for provider %d", proInfo.OriginIndex)
 				return nil, fmt.Errorf("no more backup provider can be choosed")
 			}
 			availablePros = append(availablePros, backupPros[choosed].Pro)
@@ -304,8 +301,8 @@ func (c *ClientManager) UsingBestProvider(pros []*mpb.BlockProviderAuth, needNum
 		}
 	}
 
-	return availablePros[0:needNum], nil
-	//return pros, nil
+	//return availablePros[0:needNum], nil
+	return pros, nil
 }
 
 type IndexStatus struct {
@@ -367,54 +364,76 @@ func (c *ClientManager) BestRetrieveNode(pros []*mpb.RetrieveNode) *mpb.Retrieve
 	return availablePros[0]
 }
 
+func dirAdjust(dirs []DirPair, parent, dest string) []DirPair {
+	parent = strings.TrimSuffix(parent, "/")
+	dest = strings.TrimSuffix(dest, "/")
+	// replace parent by dest, parent is D://work, dest = /cloud, D://work/abc.txt -> /cloud/abc.txt
+	newDirs := []DirPair{}
+	lastFolder := filepath.Base(parent)
+	parentParent := strings.TrimSuffix(parent, "/"+lastFolder)
+	for _, dir := range dirs {
+		actualDir := strings.Replace(strings.TrimSuffix(dir.Parent, "/"), parentParent, dest, 1)
+		newDP := DirPair{
+			Parent: actualDir,
+			Name:   dir.Name,
+			Folder: dir.Folder,
+		}
+		newDirs = append(newDirs, newDP)
+	}
+
+	return newDirs
+}
+
 // UploadDir upload all files in dir to provider
 func (c *ClientManager) UploadDir(parent, dest string, interactive, newVersion, isEncrypt bool, sno uint32) error {
 	log := c.Log
 	if !filepath.IsAbs(parent) {
 		return fmt.Errorf("path %s must absolute", parent)
 	}
-	dirs, files, err := GetDirsAndFiles(parent)
+	dirs, err := GetDirsAndFiles(parent)
 	if err != nil {
 		return err
 	}
-	log.Debugf("dirs %+v", dirs)
-	log.Debugf("files %+v", files)
-	// replace parent by dest, parent is D://work, dest = /cloud, D://work/abc.txt -> /cloud/abc.txt
-	newDirs := []DirPair{}
-	newFiles := []string{}
-	for _, dir := range dirs {
-		actualDir := strings.Replace(dir.Parent, parent, dest, 1)
-		newDP := DirPair{
-			Parent: actualDir,
-			Name:   dir.Name,
-		}
-		newDirs = append(newDirs, newDP)
-	}
-	for _, file := range files {
-		actualFile := strings.Replace(file, parent, dest, 1)
-		newFiles = append(newFiles, actualFile)
-	}
+	log.Debugf("Upload dirs %+v", dirs)
+	newDirs := dirAdjust(dirs, parent, dest)
+	log.Debugf("New upload dirs %+v", newDirs)
 	for _, dpair := range newDirs {
-		_, err := c.MkFolder(dpair.Parent, []string{dpair.Name}, interactive, sno)
-		if err != nil {
-			return err
-		}
-	}
-	for _, fname := range newFiles {
-		err := c.UploadFile(fname, dest, interactive, newVersion, isEncrypt, sno)
-		if err != nil {
-			return nil
+		if dpair.Folder {
+			log.Debugf("Mkfolder %+v", dpair)
+			_, err := c.MkFolder(dpair.Parent, []string{dpair.Name}, interactive, sno)
+			if err != nil {
+				return err
+			}
+		} else {
+			log.Debugf("Upload file %+v", dpair)
+			err := c.UploadFile(dpair.Name, dpair.Parent, interactive, newVersion, isEncrypt, sno)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
 }
 
+func (c *ClientManager) getSpacePassword(sno uint32) ([]byte, error) {
+	password, err := c.SpaceM.GetSpacePasswd(sno)
+	if err != nil {
+		log.Errorf("Get password of space no %d error %v", sno, err)
+		return nil, err
+	}
+	if len(password) == 0 {
+		log.Errorf("Please set space %d password first", sno)
+		return nil, fmt.Errorf("please set space %d password first", sno)
+	}
+	return password, nil
+}
+
 // UploadFile upload file to provider
 func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersion, isEncrypt bool, sno uint32) error {
 	log := c.Log
-	password, err := c.SpaceM.GetSpacePasswd(sno)
+	password, err := c.getSpacePassword(sno)
 	if err != nil {
-		log.Errorf("get encrypt key of space no %d error %v", sno, err)
+		log.WithError(err).Infof("Upload %s", fileName)
 		return err
 	}
 	var encryptKey []byte
@@ -429,9 +448,9 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 		return common.StatusErrFromError(err)
 	}
 
-	log.Infof("check file exists rsp code:%d", rsp.GetCode())
+	log.Infof("Check file %s exists resp code:%d", fileName, rsp.GetCode())
 	if rsp.GetCode() == 0 {
-		log.Infof("upload success %s %s", fileName, rsp.GetErrMsg())
+		log.Infof("Upload %s success", fileName)
 		return nil
 	}
 	// 1 can upload
@@ -439,16 +458,16 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 		return fmt.Errorf("%d:%s", rsp.GetCode(), rsp.GetErrMsg())
 	}
 
-	log.Infof("[upload file] %s", fileName)
+	log = log.WithField("filename", fileName)
 	switch rsp.GetStoreType() {
 	case mpb.FileStoreType_MultiReplica:
-		log.Infof("upload manner is multi-replication")
+		log.Infof("Upload manner is multi-replication")
 		c.PM.SetProgress(fileName, 0, req.FileSize)
 		// encrypt file
 		if isEncrypt {
 			encry, err := c.SpaceM.GetSpacePasswd(sno)
 			if err != nil {
-				log.Errorf("get encrypt key of space no %d error %v", sno, err)
+				log.Errorf("Get encrypt key of space no %d error %v", sno, err)
 				return err
 			}
 			if len(encry) != 0 {
@@ -456,9 +475,11 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 				encryptedFileName := filepath.Join(c.TempDir, onlyFileName)
 				err := aes.EncryptFile(fileName, encry, encryptedFileName)
 				if err != nil {
-					log.Errorf("encrypt %s error %v", fileName, err)
+					log.Errorf("Encrypt %s error %v", fileName, err)
 					return err
 				}
+				// todo set file size as encrypted file size
+				c.PM.SetPartitionMap(encryptedFileName, fileName)
 				// change fileName to temp file avoid origin file modified
 				fileName = encryptedFileName
 				defer func() {
@@ -472,7 +493,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 		}
 		return c.UploadFileDone(req, partitions, encryptKey)
 	case mpb.FileStoreType_ErasureCode:
-		log.Infof("upload manner is erasure")
+		log.Infof("Upload manner is erasure")
 		partFiles := []string{}
 		var err error
 		fileSize := int64(req.GetFileSize())
@@ -486,12 +507,12 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 			partFiles = append(partFiles, fileName)
 		}
 
-		log.Infof("file %s need split to %d partitions", req.GetFileName(), len(partFiles))
+		log.Infof("File %s need split to %d partitions", req.GetFileName(), len(partFiles))
 
 		dataShards := int(rsp.GetDataPieceCount())
 		verifyShards := int(rsp.GetVerifyPieceCount())
 
-		log.Infof("prepare response gave %d dataShards, %d verifyShards", dataShards, verifyShards)
+		log.Infof("Prepare response gave %d dataShards, %d verifyShards", dataShards, verifyShards)
 
 		fileInfos := []common.PartitionFile{}
 
@@ -508,9 +529,9 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 				OriginFileHash: req.FileHash,
 				OriginFileSize: req.FileSize,
 			})
-			log.Infof("file %s need split to %d blocks", fname, len(fileSlices))
+			log.Infof("File %s need split to %d blocks", fname, len(fileSlices))
 			for _, fs := range fileSlices {
-				log.Debugf("erasure block files %s index %d", fs.FileName, fs.SliceIndex)
+				log.Debugf("Erasure block files %s index %d", fs.FileName, fs.SliceIndex)
 				c.PM.SetPartitionMap(fs.FileName, fileName)
 				realSizeAfterRS += fs.FileSize
 			}
@@ -537,7 +558,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 		}
 
 		ctx := context.Background()
-		log.Infof("send prepare request for %s", req.GetFileName())
+		log.Info("Send prepare reques")
 		ufprsp, err := c.mclient.UploadFilePrepare(ctx, ufpr)
 		if err != nil {
 			log.Errorf("UploadFilePrepare error %v", err)
@@ -545,7 +566,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 		}
 
 		rspPartitions := ufprsp.GetPartition()
-		log.Infof("upload prepare response partitions count:%d", len(rspPartitions))
+		log.Infof("Upload prepare response partitions count:%d", len(rspPartitions))
 
 		if len(rspPartitions) == 0 {
 			return fmt.Errorf("only 0 partitions, not correct")
@@ -554,7 +575,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 		for i, part := range rspPartitions {
 			auth := part.GetProviderAuth()
 			for _, pa := range auth {
-				log.Debugf("partition %d, server %s, port %d hashauth %d", i, pa.GetServer(), pa.GetPort(), len(pa.GetHashAuth()))
+				log.Debugf("Partition %d, server %s, port %d hashauth %d", i, pa.GetServer(), pa.GetPort(), len(pa.GetHashAuth()))
 			}
 		}
 
@@ -565,10 +586,10 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 			if err != nil {
 				return err
 			}
-			log.Debugf("partition %d has %d store blocks", i, len(partition.GetBlock()))
+			log.Debugf("Partition %d has %d store blocks", i, len(partition.GetBlock()))
 			partitions = append(partitions, partition)
 		}
-		log.Infof("there are %d store partitions", len(partitions))
+		log.Infof("There are %d store partitions", len(partitions))
 
 		return c.UploadFileDone(req, partitions, encryptKey)
 
@@ -618,11 +639,12 @@ func deleteTemporaryFile(log logrus.FieldLogger, fileName string) {
 
 func (c *ClientManager) CheckFileExists(fileName, dest string, interactive, newVersion bool, password, encryptKey []byte, sno uint32) (*mpb.CheckFileExistReq, *mpb.CheckFileExistResp, error) {
 	log := c.Log
+	log = log.WithField("filename", fileName)
 	hash, err := util_hash.Sha1File(fileName)
 	if err != nil {
 		return nil, nil, err
 	}
-	fileInfo, err := os.Stat(fileName)
+	fileSize, err := GetFileSize(fileName)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -631,7 +653,7 @@ func (c *ClientManager) CheckFileExists(fileName, dest string, interactive, newV
 	ctx := context.Background()
 	req := &mpb.CheckFileExistReq{
 		Version:       common.Version,
-		FileSize:      uint64(fileInfo.Size()),
+		FileSize:      uint64(fileSize),
 		Interactive:   interactive,
 		NewVersion:    newVersion,
 		Parent:        &mpb.FilePath{OneOfPath: &mpb.FilePath_Path{dest}, SpaceNo: sno},
@@ -648,27 +670,27 @@ func (c *ClientManager) CheckFileExists(fileName, dest string, interactive, newV
 		return nil, nil, err
 	}
 	req.FileModTime = uint64(mtime)
-	fmt.Printf("password %s, encry %v\n", password, encryptKey)
-	if fileInfo.Size() < ReplicaFileSize {
+	if fileSize < ReplicaFileSize {
 		fileData, err := util_hash.GetFileData(fileName)
 		if err != nil {
-			log.Errorf("get file %s data error %v", fileName, err)
+			log.Errorf("Read file data error %v", err)
 			return nil, nil, err
 		}
 		if len(encryptKey) != 0 {
 			fileData, err = aes.Encrypt(fileData, password)
 			if err != nil {
-				log.Errorf("encrypt %s error %v", fileName, err)
+				log.Errorf("Encrypt file error %v", err)
 				return nil, nil, err
 			}
 		}
 		req.FileData = fileData
+		fmt.Printf("Origin filesize %d, encrypted size %d\n", req.FileSize, len(req.FileData))
 	}
 	err = req.SignReq(c.cfg.Node.PriKey)
 	if err != nil {
 		return nil, nil, err
 	}
-	log.Infof("check file exist req:%s", req.GetFileName())
+	log.Info("Check file exist request")
 	rsp, err := c.mclient.CheckFileExist(ctx, req)
 	return req, rsp, err
 }
@@ -676,6 +698,7 @@ func (c *ClientManager) CheckFileExists(fileName, dest string, interactive, newV
 // MkFolder create folder
 func (c *ClientManager) MkFolder(filepath string, folders []string, interactive bool, sno uint32) (bool, error) {
 	log := c.Log
+	log = log.WithField("folder parent", filepath)
 	ctx := context.Background()
 	req := &mpb.MkFolderReq{
 		Version:     common.Version,
@@ -689,40 +712,40 @@ func (c *ClientManager) MkFolder(filepath string, folders []string, interactive 
 	if err != nil {
 		return false, err
 	}
-	log.Infof("make folder :%+v, parent:%s", req.GetFolder(), filepath)
+	log.Infof("Make folder %+v", req.GetFolder())
 	rsp, err := c.mclient.MkFolder(ctx, req)
 	if err != nil {
 		return false, common.StatusErrFromError(err)
 	}
 	if rsp.GetCode() != 0 {
 		if strings.Contains(rsp.GetErrMsg(), "System error: pq: duplicate key value") {
-			log.Warning("folder exists %s", rsp.GetErrMsg())
+			log.Warning("Folder exists %s", rsp.GetErrMsg())
 			return true, nil
 		}
 		return false, fmt.Errorf("%s", rsp.GetErrMsg())
 	}
-	log.Infof("make folder response code:%d", rsp.GetCode())
+	log.Infof("Make folder response code %d", rsp.GetCode())
 	return true, nil
 }
 
 func (c *ClientManager) onlyFileSplit(fileName string, dataNum, verifyNum int, isEncrypt bool, sno uint32) ([]common.HashFile, error) {
-	log := c.Log
+	log := c.Log.WithField("filesplit", fileName)
 	fileSlices, err := RsEncoder(c.Log, c.TempDir, fileName, dataNum, verifyNum)
 	if err != nil {
-		log.Errorf("reedsolomon encoder error %v", err)
+		log.Errorf("Reedsolomon encoder error %v", err)
 		return nil, err
 	}
 	if isEncrypt {
 		encry, err := c.SpaceM.GetSpacePasswd(sno)
 		if err != nil {
-			log.Errorf("get encrypt key of space no %d error %v", sno, err)
+			log.Errorf("Get encrypt key of space no %d error %v", sno, err)
 			return nil, err
 		}
 		if len(encry) != 0 {
 			for i := range fileSlices {
 				err := aes.EncryptFile(fileSlices[i].FileName, encry, fileSlices[i].FileName)
 				if err != nil {
-					log.Errorf("encrypt %s error %v", fileName, err)
+					log.Errorf("Encrypt error %v", err)
 					return nil, err
 				}
 				hash, err := util_hash.Sha1File(fileSlices[i].FileName)
@@ -730,6 +753,11 @@ func (c *ClientManager) onlyFileSplit(fileName string, dataNum, verifyNum int, i
 					return nil, err
 				}
 				fileSlices[i].FileHash = hash
+				fileSize, err := GetFileSize(fileSlices[i].FileName)
+				if err != nil {
+					return nil, err
+				}
+				fileSlices[i].FileSize = fileSize
 			}
 		}
 	}
@@ -767,12 +795,12 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 			mutex.Lock()
 			defer mutex.Unlock()
 			if err != nil {
-				log.Errorf("upload file %s error %v", uploadPara.HF.FileName, err)
+				log.Errorf("Upload file %s error %v", uploadPara.HF.FileName, err)
 				errResult = append(errResult, err)
 				return
 			}
 			partition.Block = append(partition.Block, block)
-			log.Debugf("%s upload to privider %s success", uploadParas.HF.FileName, server)
+			log.Debugf("Upload %s to privider %s success", uploadParas.HF.FileName, server)
 		}(pro, rspPartition.GetTimestamp(), uploadParas)
 	}
 	wg.Wait()
@@ -787,7 +815,7 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 	server := fmt.Sprintf("%s:%d", pro.GetServer(), pro.GetPort())
 	conn, err := grpc.Dial(server, grpc.WithInsecure())
 	if err != nil {
-		log.Errorf("RPC Dial failed: %s", err.Error())
+		log.Errorf("Rpc dial failed: %s", err.Error())
 		return nil, err
 	}
 	defer conn.Close()
@@ -811,25 +839,25 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 }
 
 func (c *ClientManager) uploadFileToReplicaProvider(pro *mpb.ReplicaProvider, uploadPara *common.UploadParameter) ([]byte, error) {
-	log := c.Log
 	fileInfo := uploadPara.HF
+	log := c.Log.WithField("filename", fileInfo.FileName)
 	server := fmt.Sprintf("%s:%d", pro.GetServer(), pro.GetPort())
 	conn, err := grpc.Dial(server, grpc.WithInsecure())
 	if err != nil {
-		log.Errorf("RPC Dail failed: %v", err)
+		log.Errorf("Rpc dail failed: %v", err)
 		return nil, err
 	}
 	defer conn.Close()
 	pclient := pb.NewProviderServiceClient(conn)
-	log.Debugf("upload file %s hash %x size %d to %s", fileInfo.FileName, fileInfo.FileHash, fileInfo.FileSize, server)
+	log.Debugf("Upload file hash %x size %d to %s", fileInfo.FileHash, fileInfo.FileSize, server)
 
 	err = client.StorePiece(log, pclient, uploadPara, pro.GetAuth(), pro.GetTicket(), pro.GetTimestamp(), c.PM)
 	if err != nil {
-		log.Errorf("upload error %v", err)
+		log.Errorf("Upload error %v", err)
 		return nil, err
 	}
 
-	log.Infof("upload file %s success", fileInfo.FileName)
+	log.Info("Upload file success")
 
 	return pro.GetNodeId(), nil
 }
@@ -841,9 +869,13 @@ func (c *ClientManager) uploadFileByMultiReplica(fileName string, req *mpb.Check
 	if err != nil {
 		return nil, err
 	}
+	fileSize, err := GetFileSize(fileName)
+	if err != nil {
+		return nil, err
+	}
 	fileSlices := []common.HashFile{
 		common.HashFile{
-			FileSize:   int64(req.FileSize),
+			FileSize:   fileSize,
 			FileName:   fileName,
 			FileHash:   hash,
 			SliceIndex: 0,
@@ -863,7 +895,7 @@ func (c *ClientManager) uploadFileByMultiReplica(fileName string, req *mpb.Check
 	}
 
 	ctx := context.Background()
-	log.Infof("send prepare request for %s", req.GetFileName())
+	log.Infof("Send prepare request for %s", req.GetFileName())
 	ufprsp, err := c.mclient.UploadFilePrepare(ctx, ufpr)
 	if err != nil {
 		log.Errorf("UploadFilePrepare error %v", err)
@@ -920,12 +952,13 @@ func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitio
 		return err
 	}
 	ctx := context.Background()
-	c.Log.Infof("upload file %s done request", req.GetFileName())
+	log := c.Log.WithField("filename", req.GetFileName())
+	log.Info("Upload file done request")
 	ufdrsp, err := c.mclient.UploadFileDone(ctx, req)
 	if err != nil {
 		return common.StatusErrFromError(err)
 	}
-	c.Log.Infof("upload done code: %d", ufdrsp.GetCode())
+	log.Infof("Upload done code %d", ufdrsp.GetCode())
 	if ufdrsp.GetCode() != 0 {
 		return fmt.Errorf("%s", ufdrsp.GetErrMsg())
 	}
@@ -934,7 +967,8 @@ func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitio
 
 // ListFiles list files on dir
 func (c *ClientManager) ListFiles(path string, pageSize, pageNum uint32, sortType string, ascOrder bool, sno uint32) (*FilePages, error) {
-	c.Log.Infof("path %s, size %d, num %d, sortype %s, asc %v", path, pageSize, pageNum, sortType, ascOrder)
+	log := c.Log.WithField("list path", path)
+	log.Infof("Parameter size %d, num %d, sortype %s, asc %v", pageSize, pageNum, sortType, ascOrder)
 	req := &mpb.ListFilesReq{
 		Version:   common.Version,
 		Timestamp: common.Now(),
@@ -959,7 +993,7 @@ func (c *ClientManager) ListFiles(path string, pageSize, pageNum uint32, sortTyp
 		return nil, err
 	}
 	ctx := context.Background()
-	c.Log.Infof("list request path %s", req.Parent)
+	log.Info("list path request")
 	rsp, err := c.mclient.ListFiles(ctx, req)
 
 	if err != nil {
@@ -990,7 +1024,7 @@ func (c *ClientManager) ListFiles(path string, pageSize, pageNum uint32, sortTyp
 
 // DownloadDir download dir
 func (c *ClientManager) DownloadDir(path, destDir string, sno uint32) error {
-	log := c.Log
+	log := c.Log.WithField("download dir", path)
 	if !filepath.IsAbs(path) {
 		return fmt.Errorf("path %s must absolute", path)
 	}
@@ -1002,33 +1036,34 @@ func (c *ClientManager) DownloadDir(path, destDir string, sno uint32) error {
 		if err != nil {
 			return err
 		}
-		if downFiles.Total == 0 {
+		if len(downFiles.Files) == 0 {
 			break
 		}
+		log.Infof("Page %d has %d files", page, len(downFiles.Files))
 		// next page
 		page++
 		for _, fileInfo := range downFiles.Files {
 			currentFile := filepath.Join(path, fileInfo.FileName)
 			destFile := filepath.Join(destDir, fileInfo.FileName)
 			if fileInfo.Folder {
-				log.Infof("create folder %s", currentFile)
+				log.Infof("Create folder %s", currentFile)
 				if _, err := os.Stat(currentFile); os.IsNotExist(err) {
 					os.Mkdir(currentFile, 0744)
 				}
 				err = c.DownloadDir(currentFile, destFile, sno)
 				if err != nil {
-					log.Errorf("recursive download %s failed %v", currentFile, err)
+					log.Errorf("Recursive download %s failed %v", currentFile, err)
 					return err
 				}
 			} else {
-				log.Infof("start download %s", currentFile)
+				log.Infof("Start download %s", currentFile)
 				if fileInfo.FileSize == 0 {
-					log.Infof("only create %s because file size is 0", fileInfo.FileName)
+					log.Infof("Only create %s because file size is 0", fileInfo.FileName)
 					saveFile(currentFile, []byte{})
 				} else {
 					err = c.DownloadFile(currentFile, destDir, fileInfo.FileHash, fileInfo.FileSize, sno)
 					if err != nil {
-						log.Errorf("download file %s error %v", currentFile, err)
+						log.Errorf("Download file %s error %v", currentFile, err)
 						errResult = append(errResult, fmt.Errorf("%s %v", currentFile, common.StatusErrFromError(err)))
 						//return err
 					}
@@ -1038,7 +1073,7 @@ func (c *ClientManager) DownloadDir(path, destDir string, sno uint32) error {
 	}
 	if len(errResult) > 0 {
 		for _, err := range errResult {
-			log.Errorf("download error: %v", err)
+			log.Errorf("Download dir error: %v", err)
 		}
 		return errResult[0]
 	}
@@ -1047,7 +1082,7 @@ func (c *ClientManager) DownloadDir(path, destDir string, sno uint32) error {
 
 // DownloadFile download file
 func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fileSize uint64, sno uint32) error {
-	log := c.Log
+	log := c.Log.WithField("download file", downFileName)
 	fileHash, err := hex.DecodeString(filehash)
 	if err != nil {
 		return err
@@ -1069,7 +1104,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 	c.PM.SetProgress(downFileName, 0, req.FileSize)
 
 	ctx := context.Background()
-	log.Infof("download file request hash:%x, size %d", fileHash, fileSize)
+	log.Infof("Download request file hash %x, size %d", fileHash, fileSize)
 	rsp, err := c.mclient.RetrieveFile(ctx, req)
 	if err != nil {
 		return common.StatusErrFromError(err)
@@ -1078,33 +1113,36 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 		return fmt.Errorf("%s", rsp.GetErrMsg())
 	}
 
+	password := []byte{}
 	encryptKey := rsp.GetEncryptKey()
-	password, err := rsalong.DecryptLong(c.cfg.Node.PriKey, encryptKey, 256)
-	if err != nil {
-		return err
+	if len(encryptKey) > 0 {
+		password, err = rsalong.DecryptLong(c.cfg.Node.PriKey, encryptKey, 256)
+		if err != nil {
+			return err
+		}
 	}
 	// tiny file
 	if filedata := rsp.GetFileData(); filedata != nil {
 		if len(password) != 0 {
 			filedata, err = aes.Decrypt(filedata, password)
 			if err != nil {
-				log.Errorf("decrypted %s error %v", downFileName, err)
+				log.Errorf("Decrypted error %v", err)
 				return err
 			}
 		}
 		saveFile(downFileName, filedata)
 		c.PM.SetProgress(downFileName, req.FileSize, req.FileSize)
-		log.Infof("download tiny file %s", downFileName)
+		log.Info("Download tiny file")
 		return nil
 	}
 
 	partitions := rsp.GetPartition()
-	log.Infof("there is %d partitions", len(partitions))
+	log.Infof("There is %d partitions", len(partitions))
 	partitionCount := len(partitions)
 	if partitionCount == 1 {
 		blockCount := len(partitions[0].GetBlock())
 		if blockCount == 1 { // 1 partition 1 block is multiReplica
-			log.Infof("file %s is multi replication files", downFileName)
+			log.Info("File store as multi-replication")
 			// for progress stats
 			for _, block := range partitions[0].GetBlock() {
 				c.PM.SetPartitionMap(hex.EncodeToString(block.GetHash()), downFileName)
@@ -1122,13 +1160,14 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 
 	// erasure files handle by below codes
 
+	log.Info("This is erasure file")
 	// for progress stats
 	realSizeAfterRS := uint64(0)
 	for i, partition := range partitions {
 		for j, block := range partition.GetBlock() {
 			c.PM.SetPartitionMap(hex.EncodeToString(block.GetHash()), downFileName)
 			realSizeAfterRS += block.GetSize()
-			log.Infof("partition %d block %d hash %x size %d checksum %v seq %d\n", i, j, block.Hash, block.Size, block.Checksum, block.BlockSeq)
+			log.Infof("Partition %d block %d hash %x size %d checksum %v seq %d\n", i, j, block.Hash, block.Size, block.Checksum, block.BlockSeq)
 		}
 	}
 	c.PM.SetProgress(downFileName, 0, realSizeAfterRS)
@@ -1137,11 +1176,11 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 		partition := partitions[0]
 		datas, paritys, failedCount, middleFiles, err := c.saveFileByPartition(downFileName, partition, rsp.GetTimestamp(), req.FileHash, req.FileSize, false)
 		if failedCount > paritys {
-			log.Errorf("file %s cannot be recoved!!!", downFileName)
+			log.Error("File cannot be recoved!!!")
 			return err
 		}
 		if err != nil {
-			log.Errorf("save file by partition error: %v, but file still can be recoverd", err)
+			log.Errorf("Save file by partition error %v, but file still can be recoverd", err)
 		}
 
 		if len(password) != 0 {
@@ -1159,7 +1198,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 			}
 		}()
 
-		log.Infof("dataShards %d, parityShards %d, failedCount %d", datas, paritys, failedCount)
+		log.Infof("DataShards %d, parityShards %d, failedCount %d", datas, paritys, failedCount)
 
 		_, onlyFileName := filepath.Split(downFileName)
 		tempDownFileName := filepath.Join(c.TempDir, onlyFileName)
@@ -1186,11 +1225,11 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 		partFileName := fmt.Sprintf("%s.%s.%d", downFileName, TEMP_NAMESPACE, i)
 		datas, paritys, failedCount, middleFiles, err := c.saveFileByPartition(partFileName, partition, rsp.GetTimestamp(), req.FileHash, req.FileSize, false)
 		if failedCount > paritys {
-			log.Errorf("middle file %s cannot be recoved!!!", partFileName)
+			log.Errorf("Middle file %s cannot be recoved!!!", partFileName)
 			return err
 		}
 		if err != nil {
-			log.Errorf("save file by partition error %v, but file still can be recoverd", err)
+			log.Errorf("Save file by partition error %v, but file still can be recoverd", err)
 		}
 		if len(password) != 0 {
 			for _, file := range middleFiles {
@@ -1199,12 +1238,12 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 				}
 			}
 		}
-		log.Infof("dataShards %d, parityShards %d, failedCount %d", datas, paritys, failedCount)
+		log.Infof("DataShards %d, parityShards %d, failedCount %d", datas, paritys, failedCount)
 		_, onlyFileName := filepath.Split(partFileName)
 		tempDownFileName := filepath.Join(c.TempDir, onlyFileName)
 		// file real size can be calcauted by filesize and partition number
 		partitionFileSize := ReverseCalcuatePartFileSize(int64(req.FileSize), len(partitions), i)
-		log.Infof("partition %d, size %d", i, partitionFileSize)
+		log.Infof("Partition %d, size %d", i, partitionFileSize)
 		err = RsDecoder(log, tempDownFileName, "", int64(partitionFileSize), datas, paritys)
 		if err != nil {
 			return err
@@ -1224,17 +1263,16 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 		}
 	}()
 
-	log.Infof("file %s is erasure files", downFileName)
 	if err := FileJoin(downFileName, partFiles); err != nil {
-		log.Errorf("file %s join failed, part files %+v", downFileName, partFiles)
+		log.Errorf("File %s join failed, part files %+v", downFileName, partFiles)
 		return err
 	}
 	return nil
 }
 
 func (c *ClientManager) saveFileByPartition(fileName string, partition *mpb.RetrievePartition, tm uint64, fileHash []byte, fileSize uint64, multiReplica bool) (int, int, int, []string, error) {
-	log := c.Log
-	log.Infof("there is %d blocks", len(partition.GetBlock()))
+	log := c.Log.WithField("filename", fileName)
+	log.Infof("There is %d blocks", len(partition.GetBlock()))
 	dataShards := 0
 	parityShards := 0
 	failedCount := 0
@@ -1253,11 +1291,12 @@ func (c *ClientManager) saveFileByPartition(fileName string, partition *mpb.Retr
 			_, onlyFileName := filepath.Split(fileName)
 			tempFileName = filepath.Join(c.TempDir, fmt.Sprintf("%s.%d", onlyFileName, block.GetBlockSeq()))
 		}
-		log.Infof("[part file] %s, hash %x retrieve from %s", tempFileName, block.GetHash(), server)
+		log = log.WithField("part file", tempFileName)
+		log.Infof("Hash %x retrieve from %s", block.GetHash(), server)
 		conn, err := grpc.Dial(server, grpc.WithInsecure(), grpc.WithTimeout(3*time.Second), grpc.WithBlock())
 		if err != nil {
-			log.Errorf("RPC Dial %s failed, : %s", server, err.Error())
-			log.Errorf("[part file] %s  retrieve failed", tempFileName)
+			log.Errorf("Rpc dial %s failed, error %v", server, err)
+			log.Error("Retrieve failed")
 			errArray = append(errArray, err.Error())
 			middleFiles = append(middleFiles, tempFileName)
 			failedCount++
@@ -1270,11 +1309,11 @@ func (c *ClientManager) saveFileByPartition(fileName string, partition *mpb.Retr
 			failedCount++
 			errArray = append(errArray, err.Error())
 			conn.Close()
-			log.Errorf("[part file] %s  retrieve failed", tempFileName)
+			log.Error("Retrieve failed")
 			middleFiles = append(middleFiles, tempFileName)
 			continue
 		}
-		log.Infof("[part file] %s  retrieve success", tempFileName)
+		log.Info("Retrieve success")
 		middleFiles = append(middleFiles, tempFileName)
 		conn.Close()
 	}
@@ -1301,7 +1340,7 @@ func saveFile(fileName string, content []byte) error {
 
 // RemoveFile remove file
 func (c *ClientManager) RemoveFile(target string, recursive bool, isPath bool, sno uint32) error {
-	log := c.Log
+	log := c.Log.WithField("target", target)
 	req := &mpb.RemoveReq{
 		Version:   common.Version,
 		NodeId:    c.NodeId,
@@ -1315,7 +1354,7 @@ func (c *ClientManager) RemoveFile(target string, recursive bool, isPath bool, s
 		if err != nil {
 			return err
 		}
-		log.Infof("delete file by id %s, binary id %s", target, id)
+		log.Infof("Delete file binary id %s", id)
 		req.Target = &mpb.FilePath{OneOfPath: &mpb.FilePath_Id{id}, SpaceNo: sno}
 	}
 
@@ -1324,12 +1363,12 @@ func (c *ClientManager) RemoveFile(target string, recursive bool, isPath bool, s
 		return err
 	}
 
-	log.Infof("remove file :%+v, recursion %v", req.Target, req.GetRecursive())
+	log.Infof("Remove file request")
 	rsp, err := c.mclient.Remove(context.Background(), req)
 	if err != nil {
 		return common.StatusErrFromError(err)
 	}
-	log.Infof("remove file rsp code :%d msg: %s", rsp.GetCode(), rsp.GetErrMsg())
+	log.Infof("Remove file resp code %d msg %s", rsp.GetCode(), rsp.GetErrMsg())
 	if rsp.GetCode() != 0 {
 		return fmt.Errorf("%s", rsp.GetErrMsg())
 	}
@@ -1339,7 +1378,7 @@ func (c *ClientManager) RemoveFile(target string, recursive bool, isPath bool, s
 
 // MoveFile move file
 func (c *ClientManager) MoveFile(source, dest string, sno uint32) error {
-	log := c.Log
+	log := c.Log.WithField("move source", source)
 	req := &mpb.MoveReq{
 		Version:   common.Version,
 		NodeId:    c.NodeId,
@@ -1349,7 +1388,7 @@ func (c *ClientManager) MoveFile(source, dest string, sno uint32) error {
 	if err != nil {
 		return err
 	}
-	log.Infof("rename file by id %s, binary id %s", source, id)
+	log.Infof("Move file binary id %s", id)
 	req.Source = &mpb.FilePath{OneOfPath: &mpb.FilePath_Id{id}, SpaceNo: sno}
 	req.Dest = dest
 
@@ -1358,12 +1397,12 @@ func (c *ClientManager) MoveFile(source, dest string, sno uint32) error {
 		return err
 	}
 
-	log.Infof("move file from %+v, to %v", source, dest)
+	log.Infof("Move file to %s", dest)
 	rsp, err := c.mclient.Move(context.Background(), req)
 	if err != nil {
 		return common.StatusErrFromError(err)
 	}
-	log.Infof("move file rsp code :%d msg: %s", rsp.GetCode(), rsp.GetErrMsg())
+	log.Infof("Move file resp code %d msg %s", rsp.GetCode(), rsp.GetErrMsg())
 	if rsp.GetCode() != 0 {
 		return fmt.Errorf("%s", rsp.GetErrMsg())
 	}
@@ -1384,7 +1423,7 @@ func (c *ClientManager) GetSpaceSysFileData(sno uint32) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Infof("get space %d sys file", sno)
+	log.Infof("Get space %d sys file", sno)
 	rsp, err := c.mclient.SpaceSysFile(context.Background(), req)
 	if err != nil {
 		return nil, common.StatusErrFromError(err)
