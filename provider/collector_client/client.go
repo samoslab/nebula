@@ -36,10 +36,10 @@ var conn *grpc.ClientConn
 func sendLockOff() {
 	sendLock <- false
 }
-func Start() {
+func Start(collectorServer string) {
 	sendLockOff()
 	var err error
-	conn, err = grpc.Dial("collector.store.samos.io:6688", grpc.WithInsecure())
+	conn, err = grpc.Dial(collectorServer, grpc.WithInsecure())
 	if err != nil {
 		log.Fatalf("dial collector failed: %s", err)
 	}
@@ -108,6 +108,5 @@ func buildReq(size int) *pb.CollectReq {
 		log.Errorf("buildReq marshal proto error: %s", err)
 		return nil
 	}
-	fmt.Println(len(data))
 	return &pb.CollectReq{Data: data}
 }

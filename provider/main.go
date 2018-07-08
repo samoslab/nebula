@@ -46,6 +46,7 @@ func main() {
 	daemonCommand := flag.NewFlagSet("daemon", flag.ExitOnError)
 	daemonConfigDirFlag := daemonCommand.String("configDir", usr.HomeDir+string(os.PathSeparator)+home_config_folder, "config director")
 	daemonTrackerServerFlag := daemonCommand.String("trackerServer", "tracker.store.samos.io:6677", "tracker server address, eg: tracker.store.samos.io:6677")
+	daemonCollectorServerFlag := daemonCommand.String("collectorServer", "collector.store.samos.io:6688", "collector server address, eg: collector.store.samos.io:6688")
 	listenFlag := daemonCommand.String("listen", ":6666", "listen address and port, eg: 111.111.111.111:6666 or :6666")
 	disableAutoRefreshIpFlag := daemonCommand.Bool("disableAutoRefreshIp", false, "disable auto refresh provider ip or enable auto refresh provider ip")
 
@@ -82,7 +83,7 @@ func main() {
 	if len(os.Args) == 1 {
 		fmt.Printf("usage: %s <command> [<args>]\n", os.Args[0])
 		fmt.Println("The most commonly used commands are: ")
-		fmt.Println(" register [-configDir config-dir] [-trackerServer tracker-server-and-port] [-listen listen-address-and-port] [-host outer-host] [-dynamicDomain dynamic-domain] [-port outer-port] -walletAddress wallet-address -billEmail bill-email -downBandwidth down-bandwidth -upBandwidth up-bandwidth -availability availability-percentage -mainStoragePath storage-path -mainStorageVolume storage-volume -extraStorage extra-storage-string")
+		fmt.Println(" register [-configDir config-dir] [-trackerServer tracker-server-and-port] [-collectorServer collector-server-and-port] [-listen listen-address-and-port] [-host outer-host] [-dynamicDomain dynamic-domain] [-port outer-port] -walletAddress wallet-address -billEmail bill-email -downBandwidth down-bandwidth -upBandwidth up-bandwidth -availability availability-percentage -mainStoragePath storage-path -mainStorageVolume storage-volume -extraStorage extra-storage-string")
 		registerCommand.PrintDefaults()
 		fmt.Println(" verifyEmail [-configDir config-dir] [-trackerServer tracker-server-and-port] -verifyCode verify-code")
 		verifyEmailCommand.PrintDefaults()
@@ -98,7 +99,7 @@ func main() {
 	switch os.Args[1] {
 	case "daemon":
 		daemonCommand.Parse(os.Args[2:])
-		daemon(*daemonConfigDirFlag, *daemonTrackerServerFlag, *listenFlag, *disableAutoRefreshIpFlag)
+		daemon(*daemonConfigDirFlag, *daemonTrackerServerFlag, *daemonCollectorServerFlag, *listenFlag, *disableAutoRefreshIpFlag)
 	case "register":
 		registerCommand.Parse(os.Args[2:])
 		register(*registerConfigDirFlag, *registerTrackerServerFlag, *registerListenFlag, *walletAddressFlag, *billEmailFlag, *availabilityFlag,
@@ -185,7 +186,7 @@ func resendVerifyCode(configDir string, trackerServer string) {
 	fmt.Println("resendVerifyCode success, you can verify bill email.")
 }
 
-func daemon(configDir string, trackerServer string, listen string, disableAutoRefreshIpFlag bool) {
+func daemon(configDir string, trackerServer string, collectorServer string, listen string, disableAutoRefreshIpFlag bool) {
 	err := config.LoadConfig(configDir)
 	if err != nil {
 		if err == config.NoConfErr {
@@ -200,7 +201,7 @@ func daemon(configDir string, trackerServer string, listen string, disableAutoRe
 	}
 	config.StartAutoCheck()
 	defer config.StopAutoCheck()
-	collector.Start()
+	collector.Start(collectorServer)
 	defer collector.Stop()
 	port, err := strconv.Atoi(strings.Split(listen, ":")[1])
 	if err != nil {
