@@ -9,17 +9,17 @@ import (
 	pb "github.com/samoslab/nebula/tracker/register/provider/pb"
 )
 
-func GetPublicKey(client pb.ProviderRegisterServiceClient) (pubKey []byte, ip string, err error) {
+func GetPublicKey(client pb.ProviderRegisterServiceClient) (pubKey []byte, publicKeyHash []byte, ip string, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	resp, err := client.GetPublicKey(ctx, &pb.GetPublicKeyReq{})
 	if err != nil {
-		return nil, "", err
+		return nil, nil, "", err
 	}
-	return resp.PublicKey, resp.Ip, nil
+	return resp.PublicKey, resp.PublicKeyHash, resp.Ip, nil
 }
 
-func Register(client pb.ProviderRegisterServiceClient, nodeIdEnc []byte, publicKeyEnc []byte,
+func Register(client pb.ProviderRegisterServiceClient, publicKeyHash []byte, nodeIdEnc []byte, publicKeyEnc []byte,
 	encryptKeyEnc []byte, walletAddressEnc []byte, billEmailEnc []byte, mainStorageVolume uint64,
 	upBandwidth uint64, downBandwidth uint64, testUpBandwidth uint64, testDownBandwidth uint64,
 	availability float64, port uint32, hostEnc []byte, dynamicDomainEnc []byte,
@@ -27,6 +27,7 @@ func Register(client pb.ProviderRegisterServiceClient, nodeIdEnc []byte, publicK
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	req := &pb.RegisterReq{Timestamp: uint64(time.Now().Unix()),
+		PublicKeyHash:      publicKeyHash,
 		NodeIdEnc:          nodeIdEnc,
 		PublicKeyEnc:       publicKeyEnc,
 		EncryptKeyEnc:      encryptKeyEnc,

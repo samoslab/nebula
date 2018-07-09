@@ -434,7 +434,7 @@ func doRegister(configDir string, trackerServer string, listen string, walletAdd
 	}
 	defer conn.Close()
 	prsc := trp_pb.NewProviderRegisterServiceClient(conn)
-	pubKeyBytes, clientIp, err := client.GetPublicKey(prsc)
+	pubKeyBytes, publicKeyHash, clientIp, err := client.GetPublicKey(prsc)
 	if err != nil {
 		fmt.Printf("GetPublicKey failed: %s\n", err.Error())
 		os.Exit(53)
@@ -448,7 +448,7 @@ func doRegister(configDir string, trackerServer string, listen string, walletAdd
 		fmt.Printf("Parse PublicKey failed: %s\n", err.Error())
 		os.Exit(54)
 	}
-	code, errMsg, err := client.Register(prsc, encrypt(pubKey, no.NodeId),
+	code, errMsg, err := client.Register(prsc, publicKeyHash, encrypt(pubKey, no.NodeId),
 		encrypt(pubKey, no.PubKeyBytes), encrypt(pubKey, no.EncryptKey["0"]), encrypt(pubKey, []byte(pc.WalletAddress)),
 		encrypt(pubKey, []byte(pc.BillEmail)), mainStorageVolume, upBandwidth, downBandwidth,
 		testUpBandwidth, testDownBandwidth, availability, port, encrypt(pubKey, []byte(host)), encrypt(pubKey, []byte(dynamicDomain)), extraStorageSlice, no.PriKey)

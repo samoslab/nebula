@@ -30,6 +30,7 @@ func (self *RegisterReq) hash() []byte {
 	for _, val := range self.ExtraStorageVolume {
 		hasher.Write(util_bytes.FromUint64(val))
 	}
+	hasher.Write(self.PublicKeyHash)
 	return hasher.Sum(nil)
 }
 
