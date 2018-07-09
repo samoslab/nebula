@@ -29,7 +29,7 @@ func GetAllPackageHandler(s *HTTPServer) http.HandlerFunc {
 		code := 0
 		errmsg := ""
 		if err != nil {
-			log.Errorf("get all packages error %v", err)
+			log.Errorf("Get all packages error %v", err)
 			code = 1
 			errmsg = err.Error()
 			result = nil
@@ -41,7 +41,7 @@ func GetAllPackageHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			log.Infof("error %v\n", err)
+			log.Infof("Error %v\n", err)
 		}
 	}
 }
@@ -70,7 +70,7 @@ func GetPackageInfoHandler(s *HTTPServer) http.HandlerFunc {
 		code := 0
 		errmsg := ""
 		if err != nil {
-			log.Errorf("get all packages error %v", err)
+			log.Errorf("Get package error %v", err)
 			code = 1
 			errmsg = err.Error()
 			result = nil
@@ -82,7 +82,7 @@ func GetPackageInfoHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			log.Infof("error %v\n", err)
+			log.Infof("Error %v\n", err)
 		}
 	}
 }
@@ -132,7 +132,7 @@ func BuyPackageHandler(s *HTTPServer) http.HandlerFunc {
 		code := 0
 		errmsg := ""
 		if err != nil {
-			log.Errorf("get all packages error %v", err)
+			log.Errorf("Buy package error %v", err)
 			code = 1
 			errmsg = err.Error()
 			result = nil
@@ -144,7 +144,7 @@ func BuyPackageHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			log.Infof("error %v\n", err)
+			log.Infof("Error %v\n", err)
 		}
 	}
 }
@@ -176,13 +176,13 @@ func DiscountPackageHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		log.Infof("package %s\n", id)
+		log.Infof("Package %s\n", id)
 
 		result, err := s.cm.OM.DiscountPackage(id)
 		code := 0
 		errmsg := ""
 		if err != nil {
-			log.Errorf("discount package error %v", err)
+			log.Errorf("Discount package error %v", err)
 			code = 1
 			errmsg = err.Error()
 			result = nil
@@ -194,7 +194,7 @@ func DiscountPackageHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			log.Infof("error %v\n", err)
+			log.Infof("Error %v\n", err)
 		}
 	}
 }
@@ -228,7 +228,7 @@ func MyAllOrderHandler(s *HTTPServer) http.HandlerFunc {
 		code := 0
 		errmsg := ""
 		if err != nil {
-			log.Errorf("get all packages error %v", err)
+			log.Errorf("Get all my orders error %v", err)
 			code = 1
 			errmsg = err.Error()
 			result = nil
@@ -240,7 +240,7 @@ func MyAllOrderHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			log.Infof("error %v\n", err)
+			log.Infof("Error %v\n", err)
 		}
 	}
 }
@@ -269,7 +269,7 @@ func GetOrderInfoHandler(s *HTTPServer) http.HandlerFunc {
 		code := 0
 		errmsg := ""
 		if err != nil {
-			log.Errorf("get all packages error %v", err)
+			log.Errorf("Get order info error %v", err)
 			code = 1
 			errmsg = err.Error()
 			result = nil
@@ -281,7 +281,7 @@ func GetOrderInfoHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			log.Infof("error %v\n", err)
+			log.Infof("Error %v\n", err)
 		}
 	}
 }
@@ -329,7 +329,7 @@ func PayOrderHandler(s *HTTPServer) http.HandlerFunc {
 		code := 0
 		errmsg := ""
 		if err != nil {
-			log.Errorf("get all packages error %v", err)
+			log.Errorf("Pay order error %v", err)
 			code = 1
 			errmsg = err.Error()
 			result = nil
@@ -341,7 +341,7 @@ func PayOrderHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			log.Infof("error %v\n", err)
+			log.Infof("Error %v\n", err)
 		}
 	}
 }
@@ -365,7 +365,7 @@ func RechargeAddressHandler(s *HTTPServer) http.HandlerFunc {
 		code := 0
 		errmsg := ""
 		if err != nil {
-			log.Errorf("get usage amount error %v", err)
+			log.Errorf("Get recharge address error %v", err)
 			code = 1
 			errmsg = err.Error()
 			result = nil
@@ -377,7 +377,7 @@ func RechargeAddressHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			log.Infof("error %v\n", err)
+			log.Infof("Error %v\n", err)
 		}
 	}
 }
@@ -401,7 +401,7 @@ func UsageAmountHandler(s *HTTPServer) http.HandlerFunc {
 		code := 0
 		errmsg := ""
 		if err != nil {
-			log.Errorf("get usage amount error %v", err)
+			log.Errorf("Get usage amount error %v", err)
 			code = 1
 			errmsg = err.Error()
 			result = nil
@@ -413,7 +413,7 @@ func UsageAmountHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			log.Infof("error %v\n", err)
+			log.Infof("Error %v\n", err)
 		}
 	}
 }

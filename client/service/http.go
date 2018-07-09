@@ -668,7 +668,7 @@ func ConfigExportHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			log.Infof("error %v\n", err)
+			log.Infof("Error %v\n", err)
 		}
 	}
 }
@@ -954,7 +954,7 @@ func UploadDirHandler(s *HTTPServer) http.HandlerFunc {
 
 		result, code, errmsg := "ok", 0, ""
 		if err != nil {
-			log.Errorf("upload %+v error %v", req, err)
+			log.Errorf("Upload %+v error %v", req, err)
 			result, code, errmsg = "", 1, err.Error()
 		}
 
@@ -1338,7 +1338,7 @@ func EncryFileHandler(s *HTTPServer) http.HandlerFunc {
 		errmsg := ""
 		result := true
 		if err != nil {
-			log.Errorf("encrypt file %+v error %v", req.FileName, err)
+			log.Errorf("Encrypt file %+v error %v", req.FileName, err)
 			code = 1
 			errmsg = err.Error()
 			result = false
@@ -1350,7 +1350,7 @@ func EncryFileHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			log.Infof("error %v\n", err)
+			log.Infof("Error %v\n", err)
 		}
 	}
 }
@@ -1406,7 +1406,7 @@ func DecryFileHandler(s *HTTPServer) http.HandlerFunc {
 		errmsg := ""
 		result := true
 		if err != nil {
-			log.Errorf("decrypt file %+v error %v", req.FileName, err)
+			log.Errorf("Decrypt file %+v error %v", req.FileName, err)
 			code = 1
 			errmsg = err.Error()
 			result = false
@@ -1418,7 +1418,7 @@ func DecryFileHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
-			log.Infof("error %v\n", err)
+			log.Infof("Error %v\n", err)
 		}
 	}
 }
@@ -1441,7 +1441,7 @@ func errorResponse(ctx context.Context, w http.ResponseWriter, code int, err err
 		return
 	}
 	if err := JSONResponse(w, unifiedres); err != nil {
-		fmt.Printf("error response failed")
+		fmt.Printf("Error response failed")
 	}
 }
 
