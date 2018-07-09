@@ -392,26 +392,6 @@ func (c *ClientManager) BestRetrieveNode(pros []*mpb.RetrieveNode) *mpb.Retrieve
 	return availablePros[0]
 }
 
-func dirAdjust(dirs []DirPair, parent, dest string) []DirPair {
-	parent = strings.TrimSuffix(parent, "/")
-	dest = strings.TrimSuffix(dest, "/")
-	// replace parent by dest, parent is D://work, dest = /cloud, D://work/abc.txt -> /cloud/abc.txt
-	newDirs := []DirPair{}
-	lastFolder := filepath.Base(parent)
-	parentParent := strings.TrimSuffix(parent, "/"+lastFolder)
-	for _, dir := range dirs {
-		actualDir := strings.Replace(strings.TrimSuffix(dir.Parent, "/"), parentParent, dest, 1)
-		newDP := DirPair{
-			Parent: actualDir,
-			Name:   dir.Name,
-			Folder: dir.Folder,
-		}
-		newDirs = append(newDirs, newDP)
-	}
-
-	return newDirs
-}
-
 // UploadDir upload all files in dir to provider
 func (c *ClientManager) UploadDir(parent, dest string, interactive, newVersion, isEncrypt bool, sno uint32) error {
 	log := c.Log

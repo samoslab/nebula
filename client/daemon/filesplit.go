@@ -5,7 +5,9 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
+	"strings"
 )
 
 const chunkSize int64 = 1024 * 1024
@@ -135,4 +137,35 @@ func GetDirsAndFiles(root string) ([]DirPair, error) {
 		return nil, err
 	}
 	return dirs, nil
+}
+
+func dirAdjust(dirs []DirPair, parent, dest string) []DirPair {
+	seperator := "/"
+	if runtime.GOOS == "windows" {
+		seperator = "\\"
+	}
+	parent = strings.TrimSuffix(parent, seperator)
+	dest = strings.TrimSuffix(dest, seperator)
+	// replace parent by dest, parent is D://work, dest = /cloud, D://work/abc.txt -> /cloud/abc.txt
+	newDirs := []DirPair{}
+	lastFolder := filepath.Base(parent)
+	if seperator == "\\" {
+		lastFolders := strings.Split(parent, "\\")
+		lastFolder = lastFolders[len(lastFolders)-1]
+	}
+	parentParent := strings.TrimSuffix(parent, seperator+lastFolder)
+	for _, dir := range dirs {
+		actualDir := strings.Replace(strings.TrimSuffix(dir.Parent, seperator), parentParent, dest, 1)
+		if seperator == "\\" {
+			actualDir = strings.Replace(actualDir, "\\", "/", -1)
+		}
+		newDP := DirPair{
+			Parent: actualDir,
+			Name:   dir.Name,
+			Folder: dir.Folder,
+		}
+		newDirs = append(newDirs, newDP)
+	}
+
+	return newDirs
 }
