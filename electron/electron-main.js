@@ -66,7 +66,7 @@ function startSamos() {
   case 'win32':
     // Use only the relative path on windows due to short path length
     // limits
-    return './resources/app/nebula-client.exe';
+    return '../client/nebula-client.exe';
   case 'linux':
     return path.join(path.dirname(appPath), '../../../../client/nebula-client');
   default:
