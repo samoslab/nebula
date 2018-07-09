@@ -27,7 +27,7 @@ func TestFolderUpload(t *testing.T) {
 		DirPair{Parent: "/tmp/upload/localmusic", Name: "/tmp/upload/localmusic/sea.music", Folder: false},
 	}
 
-	newDirs := dirAdjust(dirs, parent, dest)
+	newDirs := dirAdjust(dirs, parent, dest, "linux")
 
 	expectDirs := []DirPair{
 		DirPair{Parent: "/tmp/music", Name: "upload", Folder: true},
@@ -49,7 +49,7 @@ func TestWinFolderUpload(t *testing.T) {
 		DirPair{Parent: "C:\\windows\\system32\\localmusic", Name: "C:\\windows\\system32\\localmusic\\sea.music", Folder: false},
 	}
 
-	newDirs := dirAdjust(dirs, parent, dest)
+	newDirs := dirAdjust(dirs, parent, dest, "windows")
 
 	expectDirs := []DirPair{
 		DirPair{Parent: "/tmp/music", Name: "system32", Folder: true},

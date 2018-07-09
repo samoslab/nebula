@@ -5,7 +5,6 @@ import (
 	"math"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 )
@@ -139,9 +138,9 @@ func GetDirsAndFiles(root string) ([]DirPair, error) {
 	return dirs, nil
 }
 
-func dirAdjust(dirs []DirPair, parent, dest string) []DirPair {
+func dirAdjust(dirs []DirPair, parent, dest string, os string) []DirPair {
 	seperator := "/"
-	if runtime.GOOS == "windows" {
+	if os == "windows" {
 		seperator = "\\"
 	}
 	parent = strings.TrimSuffix(parent, seperator)

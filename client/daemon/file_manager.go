@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -412,7 +413,7 @@ func (c *ClientManager) UploadDir(parent, dest string, interactive, newVersion, 
 		}
 	}
 	log.Debugf("Upload dirs %+v", dirs)
-	newDirs := dirAdjust(dirs, parent, dest)
+	newDirs := dirAdjust(dirs, parent, dest, runtime.GOOS)
 	log.Debugf("New upload dirs %+v", newDirs)
 	for _, dpair := range newDirs {
 		if dpair.Folder {
