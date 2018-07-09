@@ -29,3 +29,4 @@ _testmain.go
 *.log
 *.swp
 *.out
+electron/node_modules/
