@@ -44,6 +44,12 @@
   revision = "2e65f85255dbc3072edf28d6b5b8efc472979f5a"
 
 [[projects]]
+  name = "github.com/h2non/filetype"
+  packages = ["."]
+  revision = "cc14fdc9ca0e4c2bafad7458f6ff79fd3947cfbb"
+  version = "v1.0.5"
+
+[[projects]]
   name = "github.com/klauspost/cpuid"
   packages = ["."]
   revision = "ae7887de9fa5d2db4eaa8174a7eff2c1ac00f2da"
@@ -256,6 +262,15 @@
   version = "v1.13.0"
 
 [[projects]]
+  name = "gopkg.in/h2non/filetype.v1"
+  packages = [
+    "matchers",
+    "types"
+  ]
+  revision = "cc14fdc9ca0e4c2bafad7458f6ff79fd3947cfbb"
+  version = "v1.0.5"
+
+[[projects]]
   name = "gopkg.in/yaml.v2"
   packages = ["."]
   revision = "5420a8b6744d3b0345ab293f6fcba19c978f1183"
@@ -264,6 +279,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "4d787ec0409d0d60b616e4fec0147859a89ae52179bfc648fa4f5dbc047361a6"
+  inputs-digest = "4a9c4636bed71b93021c802a987410ea3a13bc0a47b70f365180a3bef4049c4b"
   solver-name = "gps-cdcl"
   solver-version = 1
