@@ -207,6 +207,34 @@ func (c *ClientManager) SetPassword(sno uint32, password string) error {
 	return c.UploadFile(encryFile, "/", false, false, false, sno)
 }
 
+// SetPassword set user privacy space password
+func (c *ClientManager) VerifyPassword(sno uint32, password string) error {
+	data, err := c.GetSpaceSysFileData(sno)
+	if err == nil {
+		if len(data) != 0 {
+			if verifyPassword(sno, password, data) {
+				log.Infof("Space %d password verified success", sno)
+				return nil
+			}
+			return fmt.Errorf("Password incorrect")
+		}
+	}
+	return fmt.Errorf("space %d password not set", sno)
+}
+
+// CheckSpaceStatus check space status
+func (c *ClientManager) CheckSpaceStatus(sno uint32) error {
+	password, err := c.SpaceM.GetSpacePasswd(sno)
+	if err != nil {
+		return err
+	}
+	if len(password) == 0 {
+		return fmt.Errorf("password not set")
+	}
+
+	return nil
+}
+
 func (c *ClientManager) getPingTime(ip string, port uint32) int {
 	server := fmt.Sprintf("%s:%d", ip, port)
 	timeStart := time.Now().Unix()

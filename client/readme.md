@@ -28,9 +28,11 @@ Index
 | [/api/v1/secret/decrypt](#apiv1secretdecrypt-post)                             | POST |
 | [/api/v1/service/status](#apiv1servicestatus-get)                             | GET |
 | [/api/v1/service/root](#apiv1serviceroot-post)                             | POST|
-| [/api/v1/service/password](#apiv1servicepassword-post)                             | POST |
 | [/api/v1/config/import](#apiv1configimport-post)                             | POST |
 | [/api/v1/config/export](#apiv1configexport-get)                             | POST |
+| [/api/v1/space/password](#apiv1spacepassword-post)                             | POST |
+| [/api/v1/space/verify](#apiv1spaceverify-post)                             | POST |
+| [/api/v1/space/status](#apiv1spacestatus-post)                             | POST |
 
 统一说明 返回json object结构统一为： 成功：{"code":0, "data":object} 失败：{"code":1,"errmsg":"errmsg","data":object}  
 
@@ -689,11 +691,11 @@ Args:
 
 ```
 
-## /api/v1/service/password [POST]
+## /api/v1/space/password [POST]
 
-set space no password 
+set space password 
 ```
-URI:/api/v1/service/root
+URI:/api/v1/space/password
 Method: POST
 Args: 
    password: string
@@ -704,6 +706,29 @@ Example
 
 ```
 curl -X POST -H "Content-Type:application/json" -d '{"password":"12345678abcdefg", "space_no":0 }' http://127.0.0.1:7788/api/v1/service/password
+```
+
+## /api/v1/space/verify [POST]
+
+check space password correctness
+```
+URI:/api/v1/space/verify
+Method: POST
+Args: 
+   password: string
+   space_no: uint32
+
+```
+
+## /api/v1/space/status [POST]
+
+check space psssword set or not 
+```
+URI:/api/v1/space/status
+Method: POST
+Args: 
+   space_no: uint32
+
 ```
 
 ## /api/v1/config/import [POST]

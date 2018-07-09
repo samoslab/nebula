@@ -317,9 +317,12 @@ func (s *HTTPServer) setupMux() *http.ServeMux {
 
 	handleAPI("/api/v1/service/status", ServiceStatusHandler(s))
 	handleAPI("/api/v1/service/root", RootPathHandler(s))
-	handleAPI("/api/v1/service/password", PasswordHandler(s))
 	handleAPI("/api/v1/config/import", ConfigImportHandler(s))
 	handleAPI("/api/v1/config/export", ConfigExportHandler(s))
+
+	handleAPI("/api/v1/space/verify", SpaceVerifyHandler(s))
+	handleAPI("/api/v1/space/password", PasswordHandler(s))
+	handleAPI("/api/v1/space/status", SpaceStatusHandler(s))
 
 	// Static files
 	mux.Handle("/", http.FileServer(http.Dir(s.cfg.StaticDir)))
@@ -446,6 +449,11 @@ type PasswordReq struct {
 	SpacoNo  uint32 `json:"space_no"`
 }
 
+// SpaceStatusReq space status
+type SpaceStatusReq struct {
+	SpacoNo uint32 `json:"space_no"`
+}
+
 // ConfigImportReq import config
 type ConfigImportReq struct {
 	FileName string `json:"filename"`
@@ -506,13 +514,9 @@ func RootPathHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		err := s.cm.SetRoot(req.Root)
-		code := 0
-		errmsg := ""
-		result := "ok"
+		result, code, errmsg := "ok", 0, ""
 		if err != nil {
-			code = 1
-			errmsg = err.Error()
-			result = ""
+			result, code, errmsg = "", 1, err.Error()
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
@@ -557,13 +561,99 @@ func PasswordHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		err := s.cm.SetPassword(req.SpacoNo, req.Password)
-		code := 0
-		errmsg := ""
-		result := "ok"
+		result, code, errmsg := "ok", 0, ""
 		if err != nil {
-			code = 1
-			errmsg = err.Error()
-			result = ""
+			result, code, errmsg = "", 1, err.Error()
+		}
+
+		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
+		if err != nil {
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+		if err := JSONResponse(w, rsp); err != nil {
+			log.Infof("Error %v\n", err)
+		}
+	}
+}
+
+// SpaceVerifyHandler check password correctness
+func SpaceVerifyHandler(s *HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log := s.log
+		ctx := r.Context()
+		w.Header().Set("Accept", "application/json")
+
+		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
+			return
+		}
+
+		if r.Header.Get("Content-Type") != "application/json" {
+			errorResponse(ctx, w, http.StatusUnsupportedMediaType, errors.New("Invalid content type"))
+			return
+		}
+
+		req := &PasswordReq{}
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&req); err != nil {
+			err = fmt.Errorf("Invalid json request body: %v", err)
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+
+		defer r.Body.Close()
+		if req.Password == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument password must not empty"))
+			return
+		}
+
+		err := s.cm.VerifyPassword(req.SpacoNo, req.Password)
+		result, code, errmsg := "ok", 0, ""
+		if err != nil {
+			result, code, errmsg = "", 1, err.Error()
+		}
+
+		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
+		if err != nil {
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+		if err := JSONResponse(w, rsp); err != nil {
+			log.Infof("Error %v\n", err)
+		}
+	}
+}
+
+// SpaceStatusHandler check password correctness
+func SpaceStatusHandler(s *HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log := s.log
+		ctx := r.Context()
+		w.Header().Set("Accept", "application/json")
+
+		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
+			return
+		}
+
+		if r.Header.Get("Content-Type") != "application/json" {
+			errorResponse(ctx, w, http.StatusUnsupportedMediaType, errors.New("Invalid content type"))
+			return
+		}
+
+		req := &SpaceStatusReq{}
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&req); err != nil {
+			err = fmt.Errorf("Invalid json request body: %v", err)
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+
+		defer r.Body.Close()
+
+		err := s.cm.CheckSpaceStatus(req.SpacoNo)
+		result, code, errmsg := "ok", 0, ""
+		if err != nil {
+			result, code, errmsg = "", 1, err.Error()
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
