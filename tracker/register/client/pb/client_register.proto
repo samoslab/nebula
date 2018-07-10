@@ -90,6 +90,8 @@ service OrderService {
 
     rpc OrderInfo(OrderInfoReq)returns(OrderInfoResp){}
 
+    rpc RemoveOrder(RemoveOrderReq)returns(RemoveOrderResp){}
+
     rpc RechargeAddress(RechargeAddressReq)returns(RechargeAddressResp){}
  
     rpc PayOrder(PayOrderReq)returns(PayOrderResp){}
@@ -198,6 +200,19 @@ message OrderInfoResp{
     uint32 code = 1;//0:success, other value: failed
     string errMsg=2;
     Order order=3;
+}
+
+message RemoveOrderReq{
+    uint32 version=1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    bytes orderId=4;
+    bytes sign = 5;
+}
+
+message RemoveOrderResp{
+    uint32 code = 1;//0:success, other value: failed
+    string errMsg=2;
 }
 
 message RechargeAddressReq{
