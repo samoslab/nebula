@@ -448,23 +448,39 @@ func doRegister(configDir string, trackerServer string, listen string, walletAdd
 		fmt.Printf("Parse PublicKey failed: %s\n", err.Error())
 		os.Exit(54)
 	}
-	code, errMsg, err := client.Register(prsc, publicKeyHash, encrypt(pubKey, no.NodeId),
-		encrypt(pubKey, no.PubKeyBytes), encrypt(pubKey, no.EncryptKey["0"]), encrypt(pubKey, []byte(pc.WalletAddress)),
-		encrypt(pubKey, []byte(pc.BillEmail)), mainStorageVolume, upBandwidth, downBandwidth,
-		testUpBandwidth, testDownBandwidth, availability, port, encrypt(pubKey, []byte(host)), encrypt(pubKey, []byte(dynamicDomain)), extraStorageSlice, no.PriKey)
-	if err != nil {
-		fmt.Println("Register failed: " + err.Error())
-		os.Exit(55)
+	for times := 0; times < 5; times++ {
+		code, errMsg, err := client.Register(prsc, publicKeyHash, encrypt(pubKey, no.NodeId),
+			encrypt(pubKey, no.PubKeyBytes), encrypt(pubKey, no.EncryptKey["0"]), encrypt(pubKey, []byte(pc.WalletAddress)),
+			encrypt(pubKey, []byte(pc.BillEmail)), mainStorageVolume, upBandwidth, downBandwidth,
+			testUpBandwidth, testDownBandwidth, availability, port, encrypt(pubKey, []byte(host)), encrypt(pubKey, []byte(dynamicDomain)), extraStorageSlice, no.PriKey)
+		if err != nil {
+			fmt.Println("Register failed: " + err.Error())
+			os.Exit(55)
+		}
+		if code != 0 {
+			if code == 500 {
+				pubKeyBytes, publicKeyHash, _, err = client.GetPublicKey(prsc)
+				if err != nil {
+					fmt.Printf("GetPublicKey failed: %s\n", err.Error())
+					os.Exit(53)
+				}
+				pubKey, err = x509.ParsePKCS1PublicKey(pubKeyBytes)
+				if err != nil {
+					fmt.Printf("Parse PublicKey failed: %s\n", err.Error())
+					os.Exit(54)
+				}
+				continue
+			}
+			fmt.Println(errMsg)
+			os.Exit(56)
+		}
+		if len(host) == 0 && len(dynamicDomain) > 0 {
+			pc.Ddns = true
+		}
+		path := config.CreateProviderConfig(configDir, pc)
+		fmt.Println("Register success, please recieve verify code email to verify bill email and backup your config file: " + path)
+		return
 	}
-	if code != 0 {
-		fmt.Println(errMsg)
-		os.Exit(56)
-	}
-	if len(host) == 0 && len(dynamicDomain) > 0 {
-		pc.Ddns = true
-	}
-	path := config.CreateProviderConfig(configDir, pc)
-	fmt.Println("Register success, please recieve verify code email to verify bill email and backup your config file: " + path)
 }
 
 func startPingServer(listen string, grpcServer *grpc.Server) {

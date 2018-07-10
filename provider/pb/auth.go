@@ -11,6 +11,8 @@ import (
 )
 
 const timestamp_expired = 900
+const timestamp_ahead = -150
+
 const method_store = "Store"
 const method_retrieve = "Retrieve"
 const method_get_fragment = "GetFragment"
@@ -35,7 +37,8 @@ func genAuth(publicKeyBytes []byte, method string, fileKey []byte, fileSize uint
 }
 
 func checkAuth(publicKeyBytes []byte, method string, fileKey []byte, fileSize uint64, blockKey []byte, blockSize uint64, timestamp uint64, ticket string, auth []byte) error {
-	if uint64(time.Now().Unix())-timestamp > timestamp_expired {
+	interval := time.Now().Unix() - int64(timestamp)
+	if interval > timestamp_expired || interval < timestamp_ahead {
 		return errors.New("auth expired")
 	}
 	if len(blockKey) == 0 {
@@ -103,7 +106,8 @@ func (self *CheckAvailableReq) GenAuth(publicKeyBytes []byte) {
 }
 
 func (self *CheckAvailableReq) CheckAuth(publicKeyBytes []byte) error {
-	if uint64(time.Now().Unix())-self.Timestamp > timestamp_expired {
+	interval := time.Now().Unix() - int64(self.Timestamp)
+	if interval > timestamp_expired || interval < timestamp_ahead {
 		return errors.New("auth expired")
 	}
 	if len(self.Auth) > 0 && bytes.Equal(self.Auth, self.genAuth(publicKeyBytes)) {
