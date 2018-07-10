@@ -37,7 +37,7 @@ func doGetPubkey(registClient pb.ClientRegisterServiceClient) ([]byte, []byte, e
 // DoRegister register client
 func DoRegister(registClient pb.ClientRegisterServiceClient, cfg *config.ClientConfig) (*pb.RegisterResp, error) {
 	ctx := context.Background()
-	pubkey, _, err := doGetPubkey(registClient)
+	pubkey, publicKeyHash, err := doGetPubkey(registClient)
 	if err != nil {
 		return nil, err
 	}
@@ -58,6 +58,7 @@ func DoRegister(registClient pb.ClientRegisterServiceClient, cfg *config.ClientC
 		NodeId:          cfg.Node.NodeId,
 		PublicKeyEnc:    pubkeyEnc,
 		ContactEmailEnc: contactEmailEnc,
+		PublicKeyHash: 		publicKeyHash,
 	}
 
 	rsp, err := registClient.Register(ctx, &registerReq)
