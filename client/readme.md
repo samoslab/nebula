@@ -618,6 +618,10 @@ curl http://127.0.0.1:7788/api/v1/usage/amount
         "netflow": 6144,
         "upNetflow": 3072,
         "downNetflow": 3072,
+        "usageVolume": 1,
+        "usageNetflow": 6,
+        "usageUpNetflow": 12,
+        "usageDownNetflow": 32,
         "endTime": 1531819508
     }
 }

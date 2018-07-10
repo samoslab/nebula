@@ -58,7 +58,7 @@ func DoRegister(registClient pb.ClientRegisterServiceClient, cfg *config.ClientC
 		NodeId:          cfg.Node.NodeId,
 		PublicKeyEnc:    pubkeyEnc,
 		ContactEmailEnc: contactEmailEnc,
-		PublicKeyHash: 		publicKeyHash,
+		PublicKeyHash:   publicKeyHash,
 	}
 
 	rsp, err := registClient.Register(ctx, &registerReq)
@@ -136,11 +136,6 @@ func RegisterClient(log logrus.FieldLogger, configFile, trackerServer, emailAddr
 				config.ReadableSpace{SpaceNo: 1, Password: "", Home: "private1", Name: "privacy space"},
 			},
 		}
-		err = config.SaveClientConfig(configFile, cc)
-		if err != nil {
-			log.Infof("create config failed %v\n", err)
-			return err
-		}
 	}
 
 	rsp, err := DoRegister(registerClient, cc)
@@ -151,6 +146,12 @@ func RegisterClient(log logrus.FieldLogger, configFile, trackerServer, emailAddr
 
 	if rsp.GetCode() != 0 {
 		log.Infof("register failed: %+v\n", rsp.GetErrMsg())
+	}
+
+	err = config.SaveClientConfig(configFile, cc)
+	if err != nil {
+		log.Infof("create config failed %v\n", err)
+		return err
 	}
 
 	log.Infof("register success")
