@@ -35,16 +35,14 @@ type ReadableSpace struct {
 
 // ClientConfig client role config struct json format
 type ClientConfig struct {
-	TempDir       string          `json:"temp_dir"`
-	TrackerServer string          `json:"tracker_server"`
-	NodeId        string          `json:"node_id"`
-	PublicKey     string          `json:"public_key"`
-	PrivateKey    string          `json:"private_key"`
-	Email         string          `json:"email"`
-	Node          *node.Node      `json:"-"`
-	Root          string          `json:"root"`
-	Space         []ReadableSpace `json:"space"`
-	SelfFileName  string          `json:"self_filename"`
+	NodeId       string          `json:"node_id"`
+	PublicKey    string          `json:"public_key"`
+	PrivateKey   string          `json:"private_key"`
+	Email        string          `json:"email"`
+	Node         *node.Node      `json:"-"`
+	Root         string          `json:"root"`
+	Space        []ReadableSpace `json:"space"`
+	SelfFileName string          `json:"self_filename"`
 }
 
 // LoadConfig load config from config file

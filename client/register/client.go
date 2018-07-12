@@ -112,7 +112,7 @@ func resendVerifyCode(client pb.ClientRegisterServiceClient, node *node.Node) (s
 func RegisterClient(log logrus.FieldLogger, configFile, trackerServer, emailAddress string) error {
 	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
 	if err != nil {
-		log.Fatalf("RPC Dial failed: %s", err.Error())
+		log.Fatalf("Rpc dial failed: %s", err.Error())
 		return err
 	}
 	defer conn.Close()
@@ -121,16 +121,15 @@ func RegisterClient(log logrus.FieldLogger, configFile, trackerServer, emailAddr
 
 	cc, err := config.LoadConfig(configFile)
 	if err != nil {
-		fmt.Printf("load config error %v\n", err)
-		fmt.Printf("generate config\n")
+		log.Errorf("Load config error %v", err)
+		log.Errorf("Generate config")
 		no := node.NewNode(10)
 		cc = &config.ClientConfig{
-			PublicKey:     no.PublicKeyStr(),
-			PrivateKey:    no.PrivateKeyStr(),
-			NodeId:        no.NodeIdStr(),
-			Email:         emailAddress,
-			TrackerServer: trackerServer,
-			Node:          no,
+			PublicKey:  no.PublicKeyStr(),
+			PrivateKey: no.PrivateKeyStr(),
+			NodeId:     no.NodeIdStr(),
+			Email:      emailAddress,
+			Node:       no,
 			Space: []config.ReadableSpace{
 				config.ReadableSpace{SpaceNo: 0, Password: aes.RandStr(16), Home: "default", Name: "default"},
 				config.ReadableSpace{SpaceNo: 1, Password: "", Home: "private1", Name: "privacy space"},
@@ -234,7 +233,7 @@ func ResendVerifyCode(configFile string, trackerServer string) error {
 func GetPublicKey(trackerServer string) (*rsa.PublicKey, []byte, error) {
 	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
 	if err != nil {
-		fmt.Printf("RPC Dial failed: %s\n", err.Error())
+		fmt.Printf("Rpc dial failed: %s\n", err.Error())
 		return nil, nil, err
 	}
 	defer conn.Close()
