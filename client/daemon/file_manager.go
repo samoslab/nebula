@@ -98,6 +98,7 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 
 	spaceM := NewSpaceManager()
 	for _, sp := range cfg.Space {
+		log.Infof("Space %d name %s home %s", sp.SpaceNo, sp.Name, sp.Home)
 		spaceM.AddSpace(sp.SpaceNo, sp.Password, sp.Home)
 	}
 

@@ -65,6 +65,7 @@ func InitClientManager(log logrus.FieldLogger, webcfg config.Config) (*daemon.Cl
 		} else if err == config.ErrConfVerify {
 			return nil, fmt.Errorf("Config file wrong, can not start daemon.")
 		}
+		log.Errorf("Load config error %v", err)
 	}
 	cm, err := daemon.NewClientManager(log, webcfg, clientConfig)
 	if err != nil {
@@ -468,6 +469,10 @@ type ConfigExportReq struct {
 func ServiceStatusHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
+		if !s.CanBeWork() {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
+			return
+		}
 		log := s.log
 		if !validMethod(ctx, w, r, []string{http.MethodGet}) {
 			return
@@ -486,8 +491,12 @@ func ServiceStatusHandler(s *HTTPServer) http.HandlerFunc {
 // RootPathHandler set user root path handler
 func RootPathHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log := s.log
 		ctx := r.Context()
+		if !s.CanBeWork() {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
+			return
+		}
+		log := s.log
 		w.Header().Set("Accept", "application/json")
 
 		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
@@ -533,8 +542,12 @@ func RootPathHandler(s *HTTPServer) http.HandlerFunc {
 // PasswordHandler set user root path handler
 func PasswordHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log := s.log
 		ctx := r.Context()
+		if !s.CanBeWork() {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
+			return
+		}
+		log := s.log
 		w.Header().Set("Accept", "application/json")
 
 		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
@@ -580,8 +593,12 @@ func PasswordHandler(s *HTTPServer) http.HandlerFunc {
 // SpaceVerifyHandler check password correctness
 func SpaceVerifyHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log := s.log
 		ctx := r.Context()
+		if !s.CanBeWork() {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
+			return
+		}
+		log := s.log
 		w.Header().Set("Accept", "application/json")
 
 		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
@@ -627,8 +644,12 @@ func SpaceVerifyHandler(s *HTTPServer) http.HandlerFunc {
 // SpaceStatusHandler check password correctness
 func SpaceStatusHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log := s.log
 		ctx := r.Context()
+		if !s.CanBeWork() {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
+			return
+		}
+		log := s.log
 		w.Header().Set("Accept", "application/json")
 
 		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
@@ -670,8 +691,12 @@ func SpaceStatusHandler(s *HTTPServer) http.HandlerFunc {
 // ConfigImportHandler set user root path handler
 func ConfigImportHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log := s.log
 		ctx := r.Context()
+		if !s.CanBeWork() {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
+			return
+		}
+		log := s.log
 		w.Header().Set("Accept", "application/json")
 
 		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
@@ -721,8 +746,12 @@ func ConfigImportHandler(s *HTTPServer) http.HandlerFunc {
 // ConfigExportHandler set user root path handler
 func ConfigExportHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log := s.log
 		ctx := r.Context()
+		if !s.CanBeWork() {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
+			return
+		}
+		log := s.log
 		w.Header().Set("Accept", "application/json")
 
 		if !validMethod(ctx, w, r, []string{http.MethodPost}) {

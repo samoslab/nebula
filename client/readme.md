@@ -257,7 +257,7 @@ URI:/api/v1/store/remove post
 Method: POST
 Request Body: {
    target:string
-   folder:bool
+   ispath:bool
    recursion:bool
    space_no:uint32
    }
