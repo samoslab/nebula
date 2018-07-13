@@ -69,6 +69,7 @@ type ClientManager struct {
 	TrackerPubkey *rsa.PublicKey
 	PubkeyHash    []byte
 	webcfg        config.Config
+	FileTypeMap   filetype.SupportType
 }
 
 // NewClientManager create manager
@@ -115,6 +116,7 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 		TrackerPubkey: rsaPubkey,
 		PubkeyHash:    pubkeyHash,
 		webcfg:        webcfg,
+		FileTypeMap:   filetype.SupportTypes(),
 	}
 
 	collectClient.NodePtr = cfg.Node
@@ -1070,12 +1072,17 @@ func (c *ClientManager) ListFiles(path string, pageSize, pageNum uint32, sortTyp
 	for _, info := range rsp.GetFof() {
 		hash := hex.EncodeToString(info.GetFileHash())
 		id := hex.EncodeToString(info.GetId())
+		storedFileType := info.GetFileType()
+		fileType, extension := c.FileTypeMap.GetTypeAndExtension(storedFileType)
 		df := &DownFile{
-			ID:       id,
-			FileHash: hash,
-			FileName: info.GetName(),
-			Folder:   info.GetFolder(),
-			FileSize: info.GetFileSize()}
+			ID:        id,
+			FileHash:  hash,
+			FileName:  info.GetName(),
+			Folder:    info.GetFolder(),
+			ModTime:   info.GetModTime(),
+			FileType:  fileType,
+			Extension: extension,
+			FileSize:  info.GetFileSize()}
 		fileLists = append(fileLists, df)
 	}
 

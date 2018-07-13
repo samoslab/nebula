@@ -185,13 +185,20 @@ curl -X POST -H "Content-Type:application/json" -d '{"path":"/tmp/ok", "pagesize
             "filesize": 45382461,
             "filename": "/tmp/ok/testfile.big",
             "filehash": "8839307ab1fa4e37498136ddf47107058e33ecd5",
+            "modtime": 10000,
+            "filetype": "video",
+            "extension": "avi",
             "folder": false
+
         },
         {
             "id": "aa84ec51-c52c-41bf-bb65-8a28b6c8a57b",
             "filesize": 90764994,
             "filename": "/tmp/ok/erasure.12",
             "filehash": "7d5d901257ca0ac2fc170ade09f17524d195c6e8",
+            "modtime": 10000,
+            "filetype": "audio",
+            "extension": "mp3",
             "folder": false
         }
    ]

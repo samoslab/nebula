@@ -30,3 +30,11 @@ func SupportTypes() SupportType {
 	}
 	return supportTypeMap
 }
+
+func (s SupportType) GetTypeAndExtension(fileType string) (string, string) {
+	filetypeObj, ok := s[fileType]
+	if !ok {
+		return "unknown", "unknown"
+	}
+	return filetypeObj.Type, filetypeObj.Extension
+}

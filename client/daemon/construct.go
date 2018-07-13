@@ -2,11 +2,14 @@ package daemon
 
 // DownFile list files format, used when download file
 type DownFile struct {
-	ID       string `json:"id"`
-	FileSize uint64 `json:"filesize"`
-	FileName string `json:"filename"`
-	FileHash string `json:"filehash"`
-	Folder   bool   `json:"folder"`
+	ID        string `json:"id"`
+	FileSize  uint64 `json:"filesize"`
+	FileName  string `json:"filename"`
+	FileHash  string `json:"filehash"`
+	Folder    bool   `json:"folder"`
+	FileType  string `json:"filetype"`
+	ModTime   uint64 `json:"modtime"`
+	Extension string `json:"extension"`
 }
 
 // FilePages list file
