@@ -382,8 +382,14 @@ func parseStorageVolume(volStr string) (volume uint64, err error) {
 		if err != nil {
 			return 0, err
 		}
-		if val <= 10 {
-			return 0, errors.New("storage volume must more than 10G")
+		if os.Getenv("NEBULA_TEST_MODE") == "1" {
+			if val < 10 {
+				return 0, errors.New("storage volume must equal or more than 10G")
+			}
+		} else {
+			if val < 100 {
+				return 0, errors.New("storage volume must equal or more than 100G")
+			}
 		}
 		return uint64(val) * 1000 * 1000 * 1000, nil
 	} else if volStr[len(volStr)-1] == 'T' {
