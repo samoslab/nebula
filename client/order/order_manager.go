@@ -243,7 +243,7 @@ func (om *OrderManager) GetOrderInfo(orderId string) (*Order, error) {
 	if err != nil {
 		return nil, common.StatusErrFromError(err)
 	}
-	log.Infof("%+v", rsp)
+	log.Infof("Get order info %+v", rsp)
 
 	return NewOrderFromPbOrder(rsp.GetOrder()), nil
 }
@@ -270,7 +270,7 @@ func (om *OrderManager) RechargeAddress() (*AddressBalance, error) {
 	if err != nil {
 		return nil, common.StatusErrFromError(err)
 	}
-	log.Infof("%+v", rsp)
+	log.Infof("Recharge address %+v", rsp)
 
 	if rsp.GetCode() != 0 {
 		return nil, fmt.Errorf("recharge error %v", rsp.GetErrMsg())
@@ -308,7 +308,7 @@ func (om *OrderManager) PayOrdor(orderId string) (*pb.PayOrderResp, error) {
 	if err != nil {
 		return nil, common.StatusErrFromError(err)
 	}
-	log.Infof("%+v", rsp)
+	log.Infof("Pay order %+v", rsp)
 
 	return rsp, nil
 }
@@ -329,6 +329,32 @@ func (om *OrderManager) UsageAmount() (*pb.UsageAmountResp, error) {
 	if err != nil {
 		return nil, common.StatusErrFromError(err)
 	}
-	log.Infof("%+v", rsp)
+	log.Infof("Usage amount %+v", rsp)
+	return rsp, nil
+}
+
+// RemoveOrder pay order
+func (om *OrderManager) RemoveOrdor(orderId string) (*pb.RemoveOrderResp, error) {
+	log := om.Log
+	orderid, err := hex.DecodeString(orderId)
+	if err != nil {
+		return nil, err
+	}
+	req := &pb.RemoveOrderReq{
+		Version:   common.Version,
+		NodeId:    om.NodeId,
+		Timestamp: common.Now(),
+		OrderId:   orderid,
+	}
+	err = req.SignReq(om.privateKey)
+	if err != nil {
+		return nil, err
+	}
+	rsp, err := om.orderClient.RemoveOrder(context.Background(), req)
+	if err != nil {
+		return nil, common.StatusErrFromError(err)
+	}
+	log.Infof("Remove order %+v", rsp)
+
 	return rsp, nil
 }

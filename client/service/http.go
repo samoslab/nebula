@@ -19,6 +19,7 @@ import (
 	"github.com/samoslab/nebula/client/config"
 	"github.com/samoslab/nebula/client/daemon"
 	regclient "github.com/samoslab/nebula/client/register"
+	"github.com/samoslab/nebula/client/util/filetype"
 	"github.com/samoslab/nebula/util/aes"
 	"github.com/sirupsen/logrus"
 	"github.com/unrolled/secure"
@@ -311,12 +312,14 @@ func (s *HTTPServer) setupMux() *http.ServeMux {
 	handleAPI("/api/v1/order/getinfo", GetOrderInfoHandler(s))
 	handleAPI("/api/v1/order/recharge/address", RechargeAddressHandler(s))
 	handleAPI("/api/v1/order/pay", PayOrderHandler(s))
+	handleAPI("/api/v1/order/remove", RemoveOrderHandler(s))
 	handleAPI("/api/v1/usage/amount", UsageAmountHandler(s))
 
 	handleAPI("/api/v1/secret/encrypt", EncryFileHandler(s))
 	handleAPI("/api/v1/secret/decrypt", DecryFileHandler(s))
 
 	handleAPI("/api/v1/service/status", ServiceStatusHandler(s))
+	handleAPI("/api/v1/service/filetype", FileTypeHandler(s))
 	handleAPI("/api/v1/service/root", RootPathHandler(s))
 	handleAPI("/api/v1/config/import", ConfigImportHandler(s))
 	handleAPI("/api/v1/config/export", ConfigExportHandler(s))
@@ -1537,6 +1540,27 @@ func DecryFileHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 		if err := JSONResponse(w, rsp); err != nil {
+			log.Infof("Error %v\n", err)
+		}
+	}
+}
+
+// FileTypeHandler returns service status
+func FileTypeHandler(s *HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		if !s.CanBeWork() {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
+			return
+		}
+		log := s.log
+		if !validMethod(ctx, w, r, []string{http.MethodGet}) {
+			return
+		}
+
+		types := filetype.SupportTypes()
+
+		if err := JSONResponse(w, types); err != nil {
 			log.Infof("Error %v\n", err)
 		}
 	}

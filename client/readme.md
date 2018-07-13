@@ -23,11 +23,13 @@ Index
 | [/api/v1/order/getinfo](#apiv1ordergetinfo-get)                             | GET |
 | [/api/v1/order/recharge/address](#apiv1orderrechargeaddress-get)                             | GET|
 | [/api/v1/order/pay](#apiv1orderpay-post)                             | POST |
+| [/api/v1/order/remove](#apiv1orderremove-post)                             | POST |
 | [/api/v1/usage/amount](#apiv1usageamount-get)                             | GET |
 | [/api/v1/secret/encrypt](#apiv1secretencrypt-post)                             | POST |
 | [/api/v1/secret/decrypt](#apiv1secretdecrypt-post)                             | POST |
 | [/api/v1/service/status](#apiv1servicestatus-get)                             | GET |
 | [/api/v1/service/root](#apiv1serviceroot-post)                             | POST|
+| [/api/v1/service/filetype](#apiv1servicefiletype-get)                             | GET |
 | [/api/v1/config/import](#apiv1configimport-post)                             | POST |
 | [/api/v1/config/export](#apiv1configexport-get)                             | POST |
 | [/api/v1/space/password](#apiv1spacepassword-post)                             | POST |
@@ -571,6 +573,18 @@ curl  -X POST  http://127.0.0.1:7788/api/v1/order/pay  -H "Content-Type:applicat
 }
 ```
 
+## /api/v1/order/remove [POST]
+
+remove order
+```
+URI:/api/v1/order/remove POST
+Method: POST
+Request Body: {
+   order_id:string,
+   }
+
+```
+
 ## /api/v1/order/recharge/address [GET]
 
 returns pay-address and balance
@@ -681,6 +695,36 @@ Example
 curl   http://127.0.0.1:7788/api/v1/service/status
 {
     "status": true
+}
+```
+
+## /api/v1/service/filetype [GET]
+
+returns all supported file types
+```
+URI:/api/v1/service/filetype
+Method: GET
+Args: None
+
+```
+
+Example 
+
+```
+curl   http://127.0.0.1:7788/api/v1/service/filetype
+{
+  "application/epub+zip": {
+        "type": "application",
+        "sub_type": "epub+zip",
+        "value": "application/epub+zip",
+        "extension": "epub"
+    },
+    "application/font-sfnt": {
+        "type": "application",
+        "sub_type": "font-sfnt",
+        "value": "application/font-sfnt",
+        "extension": "ttf"
+    }
 }
 ```
 
