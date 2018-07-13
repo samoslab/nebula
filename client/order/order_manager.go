@@ -313,8 +313,38 @@ func (om *OrderManager) PayOrdor(orderId string) (*pb.PayOrderResp, error) {
 	return rsp, nil
 }
 
+// UsageAmount usage amount data store
+type UsageAmount struct {
+	PackageId        int64  `json:"packageId,omitempty"`
+	Volume           uint32 `json:"volume,omitempty"`
+	Netflow          uint32 `json:"netflow,omitempty"`
+	UpNetflow        uint32 `json:"upNetflow,omitempty"`
+	DownNetflow      uint32 `json:"downNetflow,omitempty"`
+	UsageVolume      uint32 `json:"usageVolume"`
+	UsageNetflow     uint32 `json:"usageNetflow"`
+	UsageUpNetflow   uint32 `json:"usageUpNetflow"`
+	UsageDownNetflow uint32 `json:"usageDownNetflow"`
+	EndTime          uint64 `json:"endTime,omitempty"`
+}
+
+// NewUsageAmount new usage amount
+func NewUsageAmount(rsp *pb.UsageAmountResp) *UsageAmount {
+	return &UsageAmount{
+		PackageId:        rsp.PackageId,
+		Volume:           rsp.Volume,
+		Netflow:          rsp.Netflow,
+		UpNetflow:        rsp.UpNetflow,
+		DownNetflow:      rsp.DownNetflow,
+		UsageVolume:      rsp.UsageVolume,
+		UsageNetflow:     rsp.UsageNetflow,
+		UsageUpNetflow:   rsp.UsageUpNetflow,
+		UsageDownNetflow: rsp.UsageDownNetflow,
+		EndTime:          rsp.EndTime,
+	}
+}
+
 // UsageAmount usage amount of package
-func (om *OrderManager) UsageAmount() (*pb.UsageAmountResp, error) {
+func (om *OrderManager) UsageAmount() (*UsageAmount, error) {
 	log := om.Log
 	req := &pb.UsageAmountReq{
 		Version:   common.Version,
@@ -330,10 +360,13 @@ func (om *OrderManager) UsageAmount() (*pb.UsageAmountResp, error) {
 		return nil, common.StatusErrFromError(err)
 	}
 	log.Infof("Usage amount %+v", rsp)
-	return rsp, nil
+	if rsp.GetCode() != 0 {
+		return nil, fmt.Errorf("%s", rsp.GetErrMsg())
+	}
+	return NewUsageAmount(rsp), nil
 }
 
-// RemoveOrder pay order
+// RemoveOrder remove order
 func (om *OrderManager) RemoveOrdor(orderId string) (*pb.RemoveOrderResp, error) {
 	log := om.Log
 	orderid, err := hex.DecodeString(orderId)
