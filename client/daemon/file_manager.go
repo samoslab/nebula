@@ -170,8 +170,42 @@ func genEncryptKey(sno uint32, password string) ([]byte, error) {
 	return shaData, nil
 }
 
+func padding(n int) string {
+	s := ""
+	for i := 0; i < n; i++ {
+		s += "0"
+	}
+	return s
+}
+
+func passwordPadding(originPasswd string, sno uint32) (string, error) {
+	realPasswd := ""
+	length := len(originPasswd)
+	switch sno {
+	case 0:
+		if length > 16 {
+			fmt.Errorf("password length must less than 16")
+		}
+		realPasswd = originPasswd + padding(16-length)
+	case 1:
+		if length > 32 {
+			fmt.Errorf("password length must less than 32")
+		}
+		realPasswd = originPasswd + padding(32-length)
+	default:
+		return "", fmt.Errorf("space %d not exist", sno)
+	}
+
+	return realPasswd, nil
+}
+
 // SetPassword set user privacy space password
 func (c *ClientManager) SetPassword(sno uint32, password string) error {
+	var err error
+	password, err = passwordPadding(password, sno)
+	if err != nil {
+		return err
+	}
 	data, err := c.GetSpaceSysFileData(sno)
 	if err == nil {
 		if len(data) != 0 {
@@ -209,8 +243,13 @@ func (c *ClientManager) SetPassword(sno uint32, password string) error {
 	return c.UploadFile(encryFile, "/", false, false, false, sno)
 }
 
-// SetPassword set user privacy space password
+// VerifyPassword set user privacy space password
 func (c *ClientManager) VerifyPassword(sno uint32, password string) error {
+	var err error
+	password, err = passwordPadding(password, sno)
+	if err != nil {
+		return err
+	}
 	data, err := c.GetSpaceSysFileData(sno)
 	if err == nil {
 		if len(data) != 0 {
