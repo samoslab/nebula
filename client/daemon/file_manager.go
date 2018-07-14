@@ -18,7 +18,6 @@ import (
 
 	collectClient "github.com/samoslab/nebula/client/collector_client"
 	"github.com/samoslab/nebula/client/util/filetype"
-	"github.com/yanzay/log"
 
 	"github.com/samoslab/nebula/client/common"
 	"github.com/samoslab/nebula/client/config"
@@ -34,6 +33,7 @@ import (
 
 	"github.com/samoslab/nebula/client/register"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 )
 
 const (
@@ -83,7 +83,11 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 	if cfg == nil {
 		return nil, errors.New("client config nil")
 	}
-	conn, err := grpc.Dial(webcfg.TrackerServer, grpc.WithInsecure())
+	conn, err := grpc.Dial(webcfg.TrackerServer, grpc.WithBlock(), grpc.WithInsecure(), grpc.WithKeepaliveParams(keepalive.ClientParameters{
+		Time:                50 * time.Millisecond,
+		Timeout:             100 * time.Millisecond,
+		PermitWithoutStream: true,
+	}))
 	if err != nil {
 		log.Errorf("Rpc dial failed: %s", err.Error())
 		return nil, err
@@ -204,6 +208,7 @@ func passwordPadding(originPasswd string, sno uint32) (string, error) {
 // SetPassword set user privacy space password
 func (c *ClientManager) SetPassword(sno uint32, password string) error {
 	var err error
+	log := c.Log
 	password, err = passwordPadding(password, sno)
 	if err != nil {
 		return err
@@ -256,7 +261,6 @@ func (c *ClientManager) VerifyPassword(sno uint32, password string) error {
 	if err == nil {
 		if len(data) != 0 {
 			if verifyPassword(sno, password, data) {
-				log.Infof("Space %d password verified success", sno)
 				return nil
 			}
 			return fmt.Errorf("Password incorrect")
@@ -476,6 +480,7 @@ func (c *ClientManager) UploadDir(parent, dest string, interactive, newVersion, 
 }
 
 func (c *ClientManager) getSpacePassword(sno uint32) ([]byte, error) {
+	log := c.Log
 	password, err := c.SpaceM.GetSpacePasswd(sno)
 	if err != nil {
 		log.Errorf("Get password of space no %d error %v", sno, err)
@@ -703,8 +708,7 @@ func deleteTemporaryFile(log logrus.FieldLogger, fileName string) {
 }
 
 func (c *ClientManager) CheckFileExists(fileName, dest string, interactive, newVersion bool, password, encryptKey []byte, sno uint32) (*mpb.CheckFileExistReq, *mpb.CheckFileExistResp, error) {
-	log := c.Log
-	log = log.WithField("filename", fileName)
+	log := c.Log.WithField("filename", fileName)
 	hash, err := util_hash.Sha1File(fileName)
 	if err != nil {
 		return nil, nil, err
@@ -762,8 +766,7 @@ func (c *ClientManager) CheckFileExists(fileName, dest string, interactive, newV
 
 // MkFolder create folder
 func (c *ClientManager) MkFolder(filepath string, folders []string, interactive bool, sno uint32) (bool, error) {
-	log := c.Log
-	log = log.WithField("folder parent", filepath)
+	log := c.Log.WithField("folder parent", filepath)
 	ctx := context.Background()
 	req := &mpb.MkFolderReq{
 		Version:     common.Version,
