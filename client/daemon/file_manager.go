@@ -271,6 +271,9 @@ func (c *ClientManager) VerifyPassword(sno uint32, password string) error {
 
 // CheckSpaceStatus check space status
 func (c *ClientManager) CheckSpaceStatus(sno uint32) error {
+	if sno == 0 {
+		return nil
+	}
 	password, err := c.SpaceM.GetSpacePasswd(sno)
 	if err != nil {
 		return err
@@ -481,6 +484,9 @@ func (c *ClientManager) UploadDir(parent, dest string, interactive, newVersion, 
 
 func (c *ClientManager) getSpacePassword(sno uint32) ([]byte, error) {
 	log := c.Log
+	if sno == 0 {
+		return []byte(aes.RandStr(16)), nil
+	}
 	password, err := c.SpaceM.GetSpacePasswd(sno)
 	if err != nil {
 		log.Errorf("Get password of space no %d error %v", sno, err)
@@ -535,27 +541,20 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 		c.PM.SetProgress(fileName, 0, req.FileSize)
 		// encrypt file
 		if isEncrypt {
-			encry, err := c.SpaceM.GetSpacePasswd(sno)
+			_, onlyFileName := filepath.Split(fileName)
+			encryptedFileName := filepath.Join(c.TempDir, onlyFileName)
+			err := aes.EncryptFile(fileName, password, encryptedFileName)
 			if err != nil {
-				log.Errorf("Get encrypt key of space no %d error %v", sno, err)
+				log.Errorf("Encrypt %s error %v", fileName, err)
 				return err
 			}
-			if len(encry) != 0 {
-				_, onlyFileName := filepath.Split(fileName)
-				encryptedFileName := filepath.Join(c.TempDir, onlyFileName)
-				err := aes.EncryptFile(fileName, encry, encryptedFileName)
-				if err != nil {
-					log.Errorf("Encrypt %s error %v", fileName, err)
-					return err
-				}
-				// todo set file size as encrypted file size
-				c.PM.SetPartitionMap(encryptedFileName, fileName)
-				// change fileName to temp file avoid origin file modified
-				fileName = encryptedFileName
-				defer func() {
-					deleteTemporaryFile(log, encryptedFileName)
-				}()
-			}
+			// todo set file size as encrypted file size
+			c.PM.SetPartitionMap(encryptedFileName, fileName)
+			// change fileName to temp file avoid origin file modified
+			fileName = encryptedFileName
+			defer func() {
+				deleteTemporaryFile(log, encryptedFileName)
+			}()
 		}
 		partitions, err := c.uploadFileByMultiReplica(fileName, req, rsp)
 		if err != nil {
@@ -588,7 +587,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 
 		realSizeAfterRS := int64(0)
 		for _, fname := range partFiles {
-			fileSlices, err := c.onlyFileSplit(fname, dataShards, verifyShards, isEncrypt, sno)
+			fileSlices, err := c.onlyFileSplit(fname, dataShards, verifyShards, isEncrypt, password, sno)
 			if err != nil {
 				return err
 			}
@@ -745,7 +744,7 @@ func (c *ClientManager) CheckFileExists(fileName, dest string, interactive, newV
 			log.Errorf("Read file data error %v", err)
 			return nil, nil, err
 		}
-		if len(encryptKey) != 0 {
+		if len(password) != 0 {
 			fileData, err = aes.Encrypt(fileData, password)
 			if err != nil {
 				log.Errorf("Encrypt file error %v", err)
@@ -796,7 +795,7 @@ func (c *ClientManager) MkFolder(filepath string, folders []string, interactive 
 	return true, nil
 }
 
-func (c *ClientManager) onlyFileSplit(fileName string, dataNum, verifyNum int, isEncrypt bool, sno uint32) ([]common.HashFile, error) {
+func (c *ClientManager) onlyFileSplit(fileName string, dataNum, verifyNum int, isEncrypt bool, password []byte, sno uint32) ([]common.HashFile, error) {
 	log := c.Log.WithField("filesplit", fileName)
 	fileSlices, err := RsEncoder(c.Log, c.TempDir, fileName, dataNum, verifyNum)
 	if err != nil {
@@ -804,29 +803,22 @@ func (c *ClientManager) onlyFileSplit(fileName string, dataNum, verifyNum int, i
 		return nil, err
 	}
 	if isEncrypt {
-		encry, err := c.SpaceM.GetSpacePasswd(sno)
-		if err != nil {
-			log.Errorf("Get encrypt key of space no %d error %v", sno, err)
-			return nil, err
-		}
-		if len(encry) != 0 {
-			for i := range fileSlices {
-				err := aes.EncryptFile(fileSlices[i].FileName, encry, fileSlices[i].FileName)
-				if err != nil {
-					log.Errorf("Encrypt error %v", err)
-					return nil, err
-				}
-				hash, err := util_hash.Sha1File(fileSlices[i].FileName)
-				if err != nil {
-					return nil, err
-				}
-				fileSlices[i].FileHash = hash
-				fileSize, err := GetFileSize(fileSlices[i].FileName)
-				if err != nil {
-					return nil, err
-				}
-				fileSlices[i].FileSize = fileSize
+		for i := range fileSlices {
+			err := aes.EncryptFile(fileSlices[i].FileName, password, fileSlices[i].FileName)
+			if err != nil {
+				log.Errorf("Encrypt error %v", err)
+				return nil, err
 			}
+			hash, err := util_hash.Sha1File(fileSlices[i].FileName)
+			if err != nil {
+				return nil, err
+			}
+			fileSlices[i].FileHash = hash
+			fileSize, err := GetFileSize(fileSlices[i].FileName)
+			if err != nil {
+				return nil, err
+			}
+			fileSlices[i].FileSize = fileSize
 		}
 	}
 
