@@ -33,7 +33,6 @@ import (
 
 	"github.com/samoslab/nebula/client/register"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/keepalive"
 )
 
 const (
@@ -83,11 +82,12 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 	if cfg == nil {
 		return nil, errors.New("client config nil")
 	}
-	conn, err := grpc.Dial(webcfg.TrackerServer, grpc.WithBlock(), grpc.WithInsecure(), grpc.WithKeepaliveParams(keepalive.ClientParameters{
-		Time:                50 * time.Millisecond,
-		Timeout:             100 * time.Millisecond,
-		PermitWithoutStream: true,
-	}))
+	//conn, err := grpc.Dial(webcfg.TrackerServer, grpc.WithTimeout(3*time.Second), grpc.WithBlock(), grpc.WithInsecure(), grpc.WithKeepaliveParams(keepalive.ClientParameters{
+	//	Time:                50 * time.Millisecond,
+	//	Timeout:             100 * time.Millisecond,
+	//	PermitWithoutStream: true,
+	//}))
+	conn, err := grpc.Dial(webcfg.TrackerServer, grpc.WithTimeout(3*time.Second), grpc.WithBlock(), grpc.WithInsecure())
 	if err != nil {
 		log.Errorf("Rpc dial failed: %s", err.Error())
 		return nil, err
@@ -510,6 +510,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 			log.WithError(err).Info("Get space password")
 			return err
 		}
+		fmt.Printf("password %s\n", string(password))
 		if len(password) == 0 {
 			log.Info("Space password not set")
 			return fmt.Errorf("Password not set")
