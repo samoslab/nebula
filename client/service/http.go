@@ -763,6 +763,7 @@ func ConfigExportHandler(s *HTTPServer) http.HandlerFunc {
 		defer r.Body.Close()
 
 		confFile := s.cm.ExportFile()
+		w.Header().Set("Content-Disposition", "attachment;filename=config.json")
 		http.ServeFile(w, r, confFile)
 	}
 }
