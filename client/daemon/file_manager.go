@@ -1006,6 +1006,7 @@ func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitio
 		FileHash:      reqCheck.GetFileHash(),
 		FileSize:      reqCheck.GetFileSize(),
 		FileName:      reqCheck.GetFileName(),
+		FileType:      reqCheck.GetFileType(),
 		FileModTime:   reqCheck.GetFileModTime(),
 		Parent:        reqCheck.GetParent(),
 		Interactive:   reqCheck.GetInteractive(),
@@ -1521,4 +1522,9 @@ func (c *ClientManager) ImportConfig(fileName, clientConfigFile string) error {
 // ExportConfig export config file
 func (c *ClientManager) ExportConfig(fileName string) error {
 	return config.SaveClientConfig(fileName, c.cfg)
+}
+
+// ExportFile export config file
+func (c *ClientManager) ExportFile() string {
+	return c.cfg.SelfFileName
 }
