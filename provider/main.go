@@ -56,7 +56,7 @@ func main() {
 	registerListenFlag := registerCommand.String("listen", ":6666", "listen address and port, eg: 111.111.111.111:6666 or :6666")
 	walletAddressFlag := registerCommand.String("walletAddress", "", "Samos wallet address to accept earnings")
 	billEmailFlag := registerCommand.String("billEmail", "", "email where send bill to")
-	availabilityFlag := registerCommand.String("availability", "", "promise availability, must more than 98%, eg: 98%, 99%, 99.9%")
+	availabilityFlag := registerCommand.String("availability", "", "promise availability, must equal or more than 97%, eg: 98%, 99%, 99.9%")
 	upBandwidthFlag := registerCommand.Uint("upBandwidth", 0, "upload bandwidth, unit: Mbps, eg: 100, 20, 8, 4")
 	downBandwidthFlag := registerCommand.Uint("downBandwidth", 0, "download bandwidth, unit: Mbps, eg: 100, 20")
 	mainStoragePathFlag := registerCommand.String("mainStoragePath", "", "main storage path")
@@ -276,8 +276,8 @@ func register(configDir string, trackerServer string, listen string, walletAddre
 		os.Exit(9)
 	}
 	availFloat = availFloat / 100
-	if availFloat < 0.98 {
-		fmt.Println("availability must more than 98%.")
+	if availFloat < 0.97 {
+		fmt.Println("availability must equal or more than 97%.")
 		os.Exit(10)
 	}
 	if upBandwidth == 0 {
@@ -477,7 +477,15 @@ func doRegister(configDir string, trackerServer string, listen string, walletAdd
 				}
 				continue
 			}
-			fmt.Println(errMsg)
+			if code == 27 {
+				h := host
+				if len(host) == 0 {
+					h = dynamicDomain
+				}
+				fmt.Printf("Register failed, ping %s:%d failed, You may not have a public network ip, error message: %s\n", h, port, errMsg)
+			} else {
+				fmt.Printf("Error Code: %d, error message:%s\n", code, errMsg)
+			}
 			os.Exit(56)
 		}
 		if len(host) == 0 && len(dynamicDomain) > 0 {
