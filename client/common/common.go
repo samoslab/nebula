@@ -20,6 +20,7 @@ type ProgressCell struct {
 	Total   uint64
 	Current uint64
 	Rate    float64
+	Time    uint64
 }
 
 // UnifiedResponse for all reponse format
@@ -69,7 +70,7 @@ func SendRequest(method, url, token string, reqBody io.Reader) (*http.Response, 
 		return nil, err
 	}
 
-	timestamp := fmt.Sprintf("%d", time.Now().UTC().Unix())
+	timestamp := fmt.Sprintf("%d", Now())
 	hash := hmac.New(sha256.New, []byte(token))
 	hash.Write([]byte(timestamp))
 	req.Header.Set("Content-Type", "application/json")
@@ -125,7 +126,7 @@ func NewProgressManager() *ProgressManager {
 
 // SetProgress set current progress file size
 func (pm *ProgressManager) SetProgress(fileName string, currentSize, totalSize uint64) {
-	pm.Progress[fileName] = ProgressCell{Total: totalSize, Current: currentSize, Rate: 0.0}
+	pm.Progress[fileName] = ProgressCell{Total: totalSize, Current: currentSize, Rate: 0.0, Time: Now()}
 }
 
 // SetPartitionMap set progress file map
@@ -139,6 +140,7 @@ func (pm *ProgressManager) SetIncrement(fileName string, increment uint64) error
 	defer pm.Mutex.Unlock()
 	if cell, ok := pm.Progress[fileName]; ok {
 		cell.Current = cell.Current + increment
+		cell.Time = Now()
 		pm.Progress[fileName] = cell
 		return nil
 	}
@@ -165,7 +167,7 @@ func (pm *ProgressManager) GetProgress(files []string) (map[string]float64, erro
 			continue
 		}
 		if v.Total != 0 {
-			rate := fmt.Sprintf("%0.2f", float64(v.Current)/float64(v.Total))
+			rate := fmt.Sprintf("%0.2f", float64(v.Current%v.Total)/float64(v.Total))
 			x, err := strconv.ParseFloat(rate, 10)
 			if err != nil {
 				return a, err

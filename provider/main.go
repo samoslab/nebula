@@ -54,7 +54,7 @@ func main() {
 	registerConfigDirFlag := registerCommand.String("configDir", usr.HomeDir+string(os.PathSeparator)+home_config_folder, "config director")
 	registerTrackerServerFlag := registerCommand.String("trackerServer", "tracker.store.samos.io:6677", "tracker server address, eg: tracker.store.samos.io:6677")
 	registerListenFlag := registerCommand.String("listen", ":6666", "listen address and port, eg: 111.111.111.111:6666 or :6666")
-	walletAddressFlag := registerCommand.String("walletAddress", "", "samos wallet address to accept earnings")
+	walletAddressFlag := registerCommand.String("walletAddress", "", "Samos wallet address to accept earnings")
 	billEmailFlag := registerCommand.String("billEmail", "", "email where send bill to")
 	availabilityFlag := registerCommand.String("availability", "", "promise availability, must more than 98%, eg: 98%, 99%, 99.9%")
 	upBandwidthFlag := registerCommand.Uint("upBandwidth", 0, "upload bandwidth, unit: Mbps, eg: 100, 20, 8, 4")
