@@ -82,12 +82,12 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 	if cfg == nil {
 		return nil, errors.New("client config nil")
 	}
-	//conn, err := grpc.Dial(webcfg.TrackerServer, grpc.WithTimeout(3*time.Second), grpc.WithBlock(), grpc.WithInsecure(), grpc.WithKeepaliveParams(keepalive.ClientParameters{
+	//conn, err := grpc.Dial(webcfg.TrackerServer, grpc.WithBlock(), grpc.WithInsecure(), grpc.WithKeepaliveParams(keepalive.ClientParameters{
 	//	Time:                50 * time.Millisecond,
 	//	Timeout:             100 * time.Millisecond,
 	//	PermitWithoutStream: true,
 	//}))
-	conn, err := grpc.Dial(webcfg.TrackerServer, grpc.WithTimeout(3*time.Second), grpc.WithBlock(), grpc.WithInsecure())
+	conn, err := grpc.Dial(webcfg.TrackerServer, grpc.WithBlock(), grpc.WithInsecure())
 	if err != nil {
 		log.Errorf("Rpc dial failed: %s", err.Error())
 		return nil, err
