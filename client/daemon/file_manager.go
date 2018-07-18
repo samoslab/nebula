@@ -278,11 +278,14 @@ func (c *ClientManager) CheckSpaceStatus(sno uint32) error {
 	if err != nil {
 		return err
 	}
-	if len(password) == 0 {
-		return fmt.Errorf("password not set")
+	if len(password) > 0 {
+		return nil
 	}
-
-	return nil
+	data, err := c.GetSpaceSysFileData(sno)
+	if err == nil && len(data) >= 0 {
+		return nil
+	}
+	return fmt.Errorf("space %d password not set", sno)
 }
 
 func (c *ClientManager) getPingTime(ip string, port uint32) int {

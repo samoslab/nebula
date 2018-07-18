@@ -31,7 +31,7 @@ Index
 | [/api/v1/service/root](#apiv1serviceroot-post)                             | POST|
 | [/api/v1/service/filetype](#apiv1servicefiletype-get)                             | GET |
 | [/api/v1/config/import](#apiv1configimport-post)                             | POST |
-| [/api/v1/config/export](#apiv1configexport-get)                             | POST |
+| [/api/v1/config/export](#apiv1configexport-get)                             | GET |
 | [/api/v1/space/password](#apiv1spacepassword-post)                             | POST |
 | [/api/v1/space/verify](#apiv1spaceverify-post)                             | POST |
 | [/api/v1/space/status](#apiv1spacestatus-post)                             | POST |
@@ -802,9 +802,8 @@ Args:
 export client config info
 ```
 URI:/api/v1/config/export
-Method: POST
+Method: GET
 Args: 
-   filename : string
 
 ```
 
