@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"strings"
 	"time"
 
 	collectClient "github.com/samoslab/nebula/client/collector_client"
@@ -144,9 +145,9 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadP
 		} else {
 			if err := stream.Send(&pb.StoreReq{Data: buf[:bytesRead]}); err != nil {
 				log.Errorf("RPC Send non-first StoreReq failed: %s", err.Error())
-				//if err == io.EOF {
-				//break
-				//}
+				if err == io.EOF {
+					break
+				}
 				return err
 			}
 		}
@@ -163,6 +164,9 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadP
 	storeResp, err := stream.CloseAndRecv()
 	if err != nil {
 		log.Errorf("RPC CloseAndRecv failed: %s", err.Error())
+		if strings.Contains(err.Error(), "AlreadyExists") {
+			return nil
+		}
 
 		SetActionLog(err, al)
 		return err

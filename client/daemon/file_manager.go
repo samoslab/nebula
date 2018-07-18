@@ -313,7 +313,13 @@ func (c *ClientManager) getPingTime(ip string, port uint32) int {
 
 // UsingBestProvider ping provider
 func (c *ClientManager) UsingBestProvider(pros []*mpb.BlockProviderAuth, needNum int) ([]*mpb.BlockProviderAuth, error) {
-	return pros, nil
+	normalPros := []*mpb.BlockProviderAuth{}
+	for _, proInfo := range pros {
+		if !proInfo.GetSpare() {
+			normalPros = append(normalPros, proInfo)
+		}
+	}
+	return normalPros, nil
 	//todo if provider ip is same
 	type SortablePro struct {
 		Pro         *mpb.BlockProviderAuth
@@ -647,13 +653,12 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 		for i, part := range rspPartitions {
 			auth := part.GetProviderAuth()
 			for _, pa := range auth {
-				log.Debugf("Partition %d, server %s, port %d hashauth %d", i, pa.GetServer(), pa.GetPort(), len(pa.GetHashAuth()))
+				log.Debugf("Partition %d, %s:%d %v hashauth %d", i, pa.Server, pa.Port, pa.Spare, len(pa.HashAuth))
 			}
 		}
 
 		partitions := []*mpb.StorePartition{}
 		for i, partInfo := range fileInfos {
-
 			partition, err := c.uploadFileBatchByErasure(ufpr, rspPartitions[i], partInfo, dataShards)
 			if err != nil {
 				return err
