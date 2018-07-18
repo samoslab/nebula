@@ -167,7 +167,7 @@ func (pm *ProgressManager) GetProgress(files []string) (map[string]float64, erro
 			continue
 		}
 		if v.Total != 0 {
-			rate := fmt.Sprintf("%0.2f", float64(v.Current%v.Total)/float64(v.Total))
+			rate := fmt.Sprintf("%0.2f", float64(v.Current)/float64(v.Total))
 			x, err := strconv.ParseFloat(rate, 10)
 			if err != nil {
 				return a, err

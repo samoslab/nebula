@@ -510,6 +510,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 			log.WithError(err).Info("Get space password")
 			return err
 		}
+		fmt.Printf("password %s\n", string(password))
 		if len(password) == 0 {
 			log.Info("Space password not set")
 			return fmt.Errorf("Password not set")
@@ -538,25 +539,24 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 	switch rsp.GetStoreType() {
 	case mpb.FileStoreType_MultiReplica:
 		log.Infof("Upload manner is multi-replication")
-		c.PM.SetProgress(fileName, 0, req.FileSize)
 		// encrypt file
+		originFileName := fileName
 		if isEncrypt {
 			_, onlyFileName := filepath.Split(fileName)
-			encryptedFileName := filepath.Join(c.TempDir, onlyFileName)
-			err := aes.EncryptFile(fileName, password, encryptedFileName)
+			originFileName := filepath.Join(c.TempDir, onlyFileName)
+			err := aes.EncryptFile(fileName, password, originFileName)
 			if err != nil {
 				log.Errorf("Encrypt %s error %v", fileName, err)
 				return err
 			}
-			// todo set file size as encrypted file size
-			c.PM.SetPartitionMap(encryptedFileName, fileName)
 			// change fileName to temp file avoid origin file modified
-			fileName = encryptedFileName
 			defer func() {
-				deleteTemporaryFile(log, encryptedFileName)
+				deleteTemporaryFile(log, originFileName)
 			}()
+		} else {
+			c.PM.SetPartitionMap(fileName, fileName)
 		}
-		partitions, err := c.uploadFileByMultiReplica(fileName, req, rsp)
+		partitions, err := c.uploadFileByMultiReplica(originFileName, fileName, req, rsp)
 		if err != nil {
 			return err
 		}
@@ -911,7 +911,7 @@ func (c *ClientManager) uploadFileToReplicaProvider(pro *mpb.ReplicaProvider, up
 	pclient := pb.NewProviderServiceClient(conn)
 	log.Debugf("Upload file hash %x size %d to %s", fileInfo.FileHash, fileInfo.FileSize, server)
 
-	err = client.StorePiece(log, pclient, uploadPara, pro.GetAuth(), pro.GetTicket(), pro.GetTimestamp(), c.PM)
+	err = client.StorePiece(log, pclient, uploadPara, pro.Auth, pro.Ticket, pro.Timestamp, c.PM)
 	if err != nil {
 		log.Errorf("Upload error %v", err)
 		return nil, err
@@ -922,8 +922,7 @@ func (c *ClientManager) uploadFileToReplicaProvider(pro *mpb.ReplicaProvider, up
 	return pro.GetNodeId(), nil
 }
 
-func (c *ClientManager) uploadFileByMultiReplica(fileName string, req *mpb.CheckFileExistReq, rsp *mpb.CheckFileExistResp) ([]*mpb.StorePartition, error) {
-
+func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string, req *mpb.CheckFileExistReq, rsp *mpb.CheckFileExistResp) ([]*mpb.StorePartition, error) {
 	log := c.Log
 	hash, err := util_hash.Sha1File(fileName)
 	if err != nil {
@@ -976,8 +975,17 @@ func (c *ClientManager) uploadFileByMultiReplica(fileName string, req *mpb.Check
 		Checksum:    false,
 		StoreNodeId: [][]byte{},
 	}
-	c.PM.SetPartitionMap(fileName, fileName)
-	for _, pro := range ufprsp.GetProvider() {
+
+	c.PM.SetPartitionMap(originFileName, fileName)
+
+	providers := ufprsp.GetProvider()
+	if fileName == originFileName {
+		c.PM.SetProgress(fileName, 0, uint64(len(providers))*req.FileSize)
+	} else {
+		c.PM.SetProgress(fileName, 0, uint64(int64(len(providers))*fileSize))
+	}
+
+	for _, pro := range providers {
 		proID, err := c.uploadFileToReplicaProvider(pro, uploadPara)
 		if err != nil {
 			return nil, err
@@ -998,6 +1006,7 @@ func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitio
 		FileHash:      reqCheck.GetFileHash(),
 		FileSize:      reqCheck.GetFileSize(),
 		FileName:      reqCheck.GetFileName(),
+		FileType:      reqCheck.GetFileType(),
 		FileModTime:   reqCheck.GetFileModTime(),
 		Parent:        reqCheck.GetParent(),
 		Interactive:   reqCheck.GetInteractive(),
@@ -1513,4 +1522,9 @@ func (c *ClientManager) ImportConfig(fileName, clientConfigFile string) error {
 // ExportConfig export config file
 func (c *ClientManager) ExportConfig(fileName string) error {
 	return config.SaveClientConfig(fileName, c.cfg)
+}
+
+// ExportFile export config file
+func (c *ClientManager) ExportFile() string {
+	return c.cfg.SelfFileName
 }

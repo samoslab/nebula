@@ -754,44 +754,17 @@ func ConfigExportHandler(s *HTTPServer) http.HandlerFunc {
 			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
 			return
 		}
-		log := s.log
 		w.Header().Set("Accept", "application/json")
 
-		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
-			return
-		}
-
-		if r.Header.Get("Content-Type") != "application/json" {
-			errorResponse(ctx, w, http.StatusUnsupportedMediaType, errors.New("Invalid content type"))
-			return
-		}
-
-		req := &ConfigExportReq{}
-		decoder := json.NewDecoder(r.Body)
-		if err := decoder.Decode(&req); err != nil {
-			err = fmt.Errorf("Invalid json request body: %v", err)
-			errorResponse(ctx, w, http.StatusBadRequest, err)
+		if !validMethod(ctx, w, r, []string{http.MethodGet}) {
 			return
 		}
 
 		defer r.Body.Close()
 
-		err := s.cm.ExportConfig(req.Filename)
-		result, code, errmsg := "ok", 0, ""
-		if err != nil {
-			code = 1
-			errmsg = err.Error()
-			result = ""
-		}
-
-		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
-		if err != nil {
-			errorResponse(ctx, w, http.StatusBadRequest, err)
-			return
-		}
-		if err := JSONResponse(w, rsp); err != nil {
-			log.Infof("Error %v\n", err)
-		}
+		confFile := s.cm.ExportFile()
+		w.Header().Set("Content-Disposition", "attachment;filename=config.json")
+		http.ServeFile(w, r, confFile)
 	}
 }
 
