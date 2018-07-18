@@ -313,6 +313,7 @@ func (c *ClientManager) getPingTime(ip string, port uint32) int {
 
 // UsingBestProvider ping provider
 func (c *ClientManager) UsingBestProvider(pros []*mpb.BlockProviderAuth, needNum int) ([]*mpb.BlockProviderAuth, error) {
+	return pros, nil
 	//todo if provider ip is same
 	type SortablePro struct {
 		Pro         *mpb.BlockProviderAuth
@@ -382,8 +383,7 @@ func (c *ClientManager) UsingBestProvider(pros []*mpb.BlockProviderAuth, needNum
 		}
 	}
 
-	//return availablePros[0:needNum], nil
-	return pros, nil
+	return availablePros[0:needNum], nil
 }
 
 type IndexStatus struct {
