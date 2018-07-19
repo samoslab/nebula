@@ -1107,7 +1107,7 @@ func (c *ClientManager) ListFiles(path string, pageSize, pageNum uint32, sortTyp
 // DownloadDir download dir
 func (c *ClientManager) DownloadDir(path, destDir string, sno uint32) error {
 	log := c.Log.WithField("download dir", path)
-	if !filepath.IsAbs(path) {
+	if !strings.HasPrefix(path, "/") {
 		return fmt.Errorf("path %s must absolute", path)
 	}
 	errResult := []error{}
