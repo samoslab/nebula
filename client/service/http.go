@@ -1149,7 +1149,7 @@ func DownloadDirHandler(s *HTTPServer) http.HandlerFunc {
 		defer r.Body.Close()
 
 		if req.Parent == "" || req.Dest == "" {
-			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument parent must not empty"))
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument parent and dest_dir  must not empty"))
 			return
 		}
 

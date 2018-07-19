@@ -15,6 +15,7 @@ import (
 	tcppb "github.com/samoslab/nebula/tracker/collector/client/pb"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
+	"google.golang.org/grpc/status"
 )
 
 const streamDataSize = 32 * 1024
@@ -92,6 +93,10 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadP
 		}
 		al.TransportSize = uint64(len(req.Data))
 		resp, err := client.StoreSmall(context.Background(), req)
+		if err == io.EOF {
+			SetActionLog(err, al)
+			return nil
+		}
 		if err != nil {
 			SetActionLog(err, al)
 			return err
@@ -164,7 +169,12 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadP
 	storeResp, err := stream.CloseAndRecv()
 	if err != nil {
 		log.Errorf("RPC CloseAndRecv failed: %s", err.Error())
-		if strings.Contains(err.Error(), "AlreadyExists") {
+		st, ok := status.FromError(err)
+		if !ok {
+			return err
+		}
+		log.Errorf("Status error %d, %s", st.Code(), st.Message())
+		if st.Code() == 6 || strings.Contains(err.Error(), "AlreadyExists") {
 			return nil
 		}
 

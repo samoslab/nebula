@@ -33,6 +33,7 @@ import (
 
 	"github.com/samoslab/nebula/client/register"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/status"
 )
 
 const (
@@ -352,12 +353,12 @@ func (c *ClientManager) UsingBestProvider(pros []*mpb.BlockProviderAuth, needNum
 		sortPros = append(sortPros, SortablePro{Pro: bpa, Delay: pingTime, OriginIndex: i})
 	}
 
-	// TODO need consider Spare , Spare = false is backup provider
+	// TODO need consider Spare , Spare = true is backup provider
 	//sort.Slice(sortPros, func(i, j int) bool { return sortPros[i].Delay < sortPros[j].Delay })
 	workPros := []SortablePro{}
 	backupPros := []SortablePro{}
 	for _, proInfo := range sortPros {
-		if proInfo.Pro.GetSpare() {
+		if !proInfo.Pro.GetSpare() {
 			workPros = append(workPros, proInfo)
 		} else {
 			backupPros = append(backupPros, proInfo)
@@ -768,6 +769,30 @@ func (c *ClientManager) CheckFileExists(fileName, dest string, interactive, newV
 	}
 	log.Info("Check file exist request")
 	rsp, err := c.mclient.CheckFileExist(ctx, req)
+	if err != nil {
+		// tracker public key expired
+		st, ok := status.FromError(err)
+		if !ok {
+			return nil, nil, fmt.Errorf("get status error failed")
+		}
+		if st.Code() == 500 || st.Message() == "tracker public key expired" {
+			rsaPubkey, pubkeyHash, err := register.GetPublicKey(c.webcfg.TrackerServer)
+			if err != nil {
+				return nil, nil, err
+			}
+			c.PubkeyHash = pubkeyHash
+			c.TrackerPubkey = rsaPubkey
+			req.Timestamp = common.Now()
+			req.PublicKeyHash = pubkeyHash
+			err = req.SignReq(c.cfg.Node.PriKey)
+			if err != nil {
+				return nil, nil, err
+			}
+			log.Info("Check file exist request")
+			rsp, err := c.mclient.CheckFileExist(ctx, req)
+			return req, rsp, err
+		}
+	}
 	return req, rsp, err
 }
 
@@ -1033,7 +1058,30 @@ func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitio
 	log.Info("Upload file done request")
 	ufdrsp, err := c.mclient.UploadFileDone(ctx, req)
 	if err != nil {
-		return common.StatusErrFromError(err)
+		// tracker public key expired
+		st, ok := status.FromError(err)
+		if !ok {
+			return err
+		}
+		if st.Code() == 500 || st.Message() == "tracker public key expired" {
+			rsaPubkey, pubkeyHash, err := register.GetPublicKey(c.webcfg.TrackerServer)
+			if err != nil {
+				return err
+			}
+			c.PubkeyHash = pubkeyHash
+			c.TrackerPubkey = rsaPubkey
+			req.Timestamp = common.Now()
+			req.PublicKeyHash = pubkeyHash
+			err = req.SignReq(c.cfg.Node.PriKey)
+			if err != nil {
+				return err
+			}
+			log.Info("Check file exist request")
+			ufdrsp, err = c.mclient.UploadFileDone(ctx, req)
+			if err != nil {
+				return common.StatusErrFromError(err)
+			}
+		}
 	}
 	log.Infof("Upload done code %d", ufdrsp.GetCode())
 	if ufdrsp.GetCode() != 0 {
@@ -1129,8 +1177,8 @@ func (c *ClientManager) DownloadDir(path, destDir string, sno uint32) error {
 			destFile := filepath.Join(destDir, fileInfo.FileName)
 			if fileInfo.Folder {
 				log.Infof("Create folder %s", currentFile)
-				if _, err := os.Stat(currentFile); os.IsNotExist(err) {
-					os.Mkdir(currentFile, 0744)
+				if _, err := os.Stat(destFile); os.IsNotExist(err) {
+					os.Mkdir(destFile, 0744)
 				}
 				err = c.DownloadDir(currentFile, destFile, sno)
 				if err != nil {
@@ -1141,7 +1189,7 @@ func (c *ClientManager) DownloadDir(path, destDir string, sno uint32) error {
 				log.Infof("Start download %s", currentFile)
 				if fileInfo.FileSize == 0 {
 					log.Infof("Only create %s because file size is 0", fileInfo.FileName)
-					saveFile(currentFile, []byte{})
+					saveFile(destFile, []byte{})
 				} else {
 					err = c.DownloadFile(currentFile, destDir, fileInfo.FileHash, fileInfo.FileSize, sno)
 					if err != nil {
