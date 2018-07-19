@@ -261,7 +261,7 @@ func (c *ClientManager) VerifyPassword(sno uint32, password string) error {
 	if err == nil {
 		if len(data) != 0 {
 			if verifyPassword(sno, password, data) {
-				return nil
+				return c.SpaceM.SetSpacePasswd(sno, password)
 			}
 			return fmt.Errorf("Password incorrect")
 		}
