@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta content="text/html; charset=utf-8" http-equiv="Content-Type"/>
+    <title>samos</title>
+    <meta content="SkyDrive,samos SkyDrive,Network U disk, network hard disk, free SkyDrive, SkyDrive download, SkyDrive resources, synchronization, cloud storage, external chain sharing, offline Download" name="keywords"/>
+    <meta content="samos SkyDrive To provide you with network backup, synchronization and sharing services. Large space, fast speed, safe and stable." name="description"/>
+    <link href="./images/favicon.ico" rel="shortcut icon" type="images/x-icon"/>
+    <link href="./css/style.css" rel="stylesheet" type="text/css"/>
+    <link rel="Shortcut Icon" href="favicon.ico">
+    <script>if (typeof module === 'object') {window.module = module; module = undefined;}</script>
+    <script src="./js/jquery.min.js"></script>
+    <script>if (window.module) module = window.module;</script>
+    <script src="./js/modal.js"></script>
+    <!--<script src="https://cdn.bootcss.com/jquery/3.3.1/jquery.min.js"></script>-->
+    <script src="./js/jquery.i18n.properties.js"></script>
+    <script src="./js/qrcode.js"></script>
+    <script src="./js/clipboard.js"></script>
+</head>
+<body>
+<div id="layoutApp" class="frame-all">
+    <div id="layoutHeader" class="layoutHeader"><!--页部开始-->
+        <div class="module-header">
+            <dl class="xtjbHcb">
+                <dt class="EHazOI">
+                    <a href="javascript:;" target="_blank" title="samos"></a>
+                </dt>
+              
+                <dd class="languageBox">
+                    <a href="javascript:changeLang('index', 'zh_CN');" class="s-cnen" id="changeToCn">EN</a>
+                    <a href="javascript:changeLang('index', 'en');" class="s-cnen" id="changeToEn"  style="display:none;">CN</a>
+                </dd>
+                <dd class="languageBox">
+                    <a id="exportConfig" href="/api/v1/config/export" data-locale="exportConfig" target="_blank"  download="config">导出配置文件</a>
+                </dd>
+            </dl>
+        </div>
+    </div><!--页头结束-->
+    <div class="frame-aside"><!--左侧栏开始-->
+        <ul id="frameAsideUl" class="fOHAbxb">
+            <li class="sevwwlVn active">
+                <a id="mySpace"  href="#myspace:">
+                    <span class="text">
+                        <span class="icon icon-disk">
+                            <svg t="1529560912210" class="icon"  viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1659" xmlns:xlink="http://www.w3.org/1999/xlink" width="20" height="20">
+                                <defs><style type="text/css"></style></defs>
+                                <path d="M898.722909 1005.963636l-628.363636 0c-64.162909 0-116.363636-52.200727-116.363636-116.363636l0-628.363636c0-64.162909 52.200727-116.363636 116.363636-116.363636l628.363636 0c64.162909 0 116.363636 52.200727 116.363636 116.363636l0 628.363636C1015.086545 953.762909 962.885818 1005.963636 898.722909 1005.963636zM270.359273 191.418182c-38.493091 0-69.818182 31.325091-69.818182 69.818182l0 628.363636c0 38.493091 31.325091 69.818182 69.818182 69.818182l628.363636 0c38.493091 0 69.818182-31.325091 69.818182-69.818182l0-628.363636c0-38.493091-31.325091-69.818182-69.818182-69.818182L270.359273 191.418182z" p-id="1660" fill="#3b8cff"></path><path d="M130.722909 884.363636c-69.818182 0-116.363636-53.294545-116.363636-116.363636L14.359273 139.636364c0-68.654545 65.024-111.127273 125.277091-111.127273l628.363636 0c64 0 114.129455 46.545455 114.129455 116.363636l-46.545455 0c0-46.545455-29.067636-69.818182-67.584-69.818182L139.636364 75.054545C101.608727 75.054545 60.904727 101.003636 60.904727 139.636364l0 628.363636c0 37.189818 23.272727 69.818182 69.818182 69.818182L130.722909 884.363636z" p-id="1661" fill="#3b8cff"></path><path d="M270.359273 377.6l605.090909 0 0 46.545455-605.090909 0 0-46.545455Z" p-id="1662" fill="#3b8cff"></path><path d="M270.359273 610.327273l605.090909 0 0 46.545455-605.090909 0 0-46.545455Z" p-id="1663" fill="#3b8cff"></path><path d="M270.359273 796.509091l349.090909 0 0 46.545455-349.090909 0 0-46.545455Z" p-id="1664" fill="#3b8cff"></path>
+                            </svg>
+                        </span>
+                        <span data-locale="mySpace">My Space</span>
+                    </span>
+                </a>
+            </li>
+            <li class="sevwwlVn">
+                <a id="privteSpace" href="#privite:">
+                    <span class="text">
+                        <span class="icon icon-disk">
+                            <svg t="1529560912210" class="icon"  viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1659" xmlns:xlink="http://www.w3.org/1999/xlink" width="20" height="20">
+                                <defs><style type="text/css"></style></defs>
+                                <path d="M898.722909 1005.963636l-628.363636 0c-64.162909 0-116.363636-52.200727-116.363636-116.363636l0-628.363636c0-64.162909 52.200727-116.363636 116.363636-116.363636l628.363636 0c64.162909 0 116.363636 52.200727 116.363636 116.363636l0 628.363636C1015.086545 953.762909 962.885818 1005.963636 898.722909 1005.963636zM270.359273 191.418182c-38.493091 0-69.818182 31.325091-69.818182 69.818182l0 628.363636c0 38.493091 31.325091 69.818182 69.818182 69.818182l628.363636 0c38.493091 0 69.818182-31.325091 69.818182-69.818182l0-628.363636c0-38.493091-31.325091-69.818182-69.818182-69.818182L270.359273 191.418182z" p-id="1660" fill="#3b8cff"></path><path d="M130.722909 884.363636c-69.818182 0-116.363636-53.294545-116.363636-116.363636L14.359273 139.636364c0-68.654545 65.024-111.127273 125.277091-111.127273l628.363636 0c64 0 114.129455 46.545455 114.129455 116.363636l-46.545455 0c0-46.545455-29.067636-69.818182-67.584-69.818182L139.636364 75.054545C101.608727 75.054545 60.904727 101.003636 60.904727 139.636364l0 628.363636c0 37.189818 23.272727 69.818182 69.818182 69.818182L130.722909 884.363636z" p-id="1661" fill="#3b8cff"></path><path d="M270.359273 377.6l605.090909 0 0 46.545455-605.090909 0 0-46.545455Z" p-id="1662" fill="#3b8cff"></path><path d="M270.359273 610.327273l605.090909 0 0 46.545455-605.090909 0 0-46.545455Z" p-id="1663" fill="#3b8cff"></path><path d="M270.359273 796.509091l349.090909 0 0 46.545455-349.090909 0 0-46.545455Z" p-id="1664" fill="#3b8cff"></path>
+                            </svg>
+                        </span>
+                        <span data-locale="priviteSpace">Privite Space</span>
+                    </span>
+                </a>
+            </li>
+            <li class="sevwwlVn">
+                <a id="transport" href="#transport:">
+                    <span class="text">
+                        <span class="icon icon-disk">
+                            <svg t="1529560912210" class="icon"  viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1659" xmlns:xlink="http://www.w3.org/1999/xlink" width="20" height="20">
+                                <defs><style type="text/css"></style></defs>
+                                <path d="M898.722909 1005.963636l-628.363636 0c-64.162909 0-116.363636-52.200727-116.363636-116.363636l0-628.363636c0-64.162909 52.200727-116.363636 116.363636-116.363636l628.363636 0c64.162909 0 116.363636 52.200727 116.363636 116.363636l0 628.363636C1015.086545 953.762909 962.885818 1005.963636 898.722909 1005.963636zM270.359273 191.418182c-38.493091 0-69.818182 31.325091-69.818182 69.818182l0 628.363636c0 38.493091 31.325091 69.818182 69.818182 69.818182l628.363636 0c38.493091 0 69.818182-31.325091 69.818182-69.818182l0-628.363636c0-38.493091-31.325091-69.818182-69.818182-69.818182L270.359273 191.418182z" p-id="1660" fill="#3b8cff"></path><path d="M130.722909 884.363636c-69.818182 0-116.363636-53.294545-116.363636-116.363636L14.359273 139.636364c0-68.654545 65.024-111.127273 125.277091-111.127273l628.363636 0c64 0 114.129455 46.545455 114.129455 116.363636l-46.545455 0c0-46.545455-29.067636-69.818182-67.584-69.818182L139.636364 75.054545C101.608727 75.054545 60.904727 101.003636 60.904727 139.636364l0 628.363636c0 37.189818 23.272727 69.818182 69.818182 69.818182L130.722909 884.363636z" p-id="1661" fill="#3b8cff"></path><path d="M270.359273 377.6l605.090909 0 0 46.545455-605.090909 0 0-46.545455Z" p-id="1662" fill="#3b8cff"></path><path d="M270.359273 610.327273l605.090909 0 0 46.545455-605.090909 0 0-46.545455Z" p-id="1663" fill="#3b8cff"></path><path d="M270.359273 796.509091l349.090909 0 0 46.545455-349.090909 0 0-46.545455Z" p-id="1664" fill="#3b8cff"></path>
+                            </svg>
+                        </span>
+                        <span data-locale="transportList">Transport List</span>
+                    </span>
+                </a>
+            </li>
+            <li class="sevwwlVn myPackageLi">
+                <a id="package" href="#package:">
+                    <span class="text">
+                        <span class="icon icon-disk">
+                            <svg t="1529560912210" class="icon"  viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="1659" xmlns:xlink="http://www.w3.org/1999/xlink" width="20" height="20">
+                                <defs><style type="text/css"></style></defs>
+                                <path d="M898.722909 1005.963636l-628.363636 0c-64.162909 0-116.363636-52.200727-116.363636-116.363636l0-628.363636c0-64.162909 52.200727-116.363636 116.363636-116.363636l628.363636 0c64.162909 0 116.363636 52.200727 116.363636 116.363636l0 628.363636C1015.086545 953.762909 962.885818 1005.963636 898.722909 1005.963636zM270.359273 191.418182c-38.493091 0-69.818182 31.325091-69.818182 69.818182l0 628.363636c0 38.493091 31.325091 69.818182 69.818182 69.818182l628.363636 0c38.493091 0 69.818182-31.325091 69.818182-69.818182l0-628.363636c0-38.493091-31.325091-69.818182-69.818182-69.818182L270.359273 191.418182z" p-id="1660" fill="#3b8cff"></path><path d="M130.722909 884.363636c-69.818182 0-116.363636-53.294545-116.363636-116.363636L14.359273 139.636364c0-68.654545 65.024-111.127273 125.277091-111.127273l628.363636 0c64 0 114.129455 46.545455 114.129455 116.363636l-46.545455 0c0-46.545455-29.067636-69.818182-67.584-69.818182L139.636364 75.054545C101.608727 75.054545 60.904727 101.003636 60.904727 139.636364l0 628.363636c0 37.189818 23.272727 69.818182 69.818182 69.818182L130.722909 884.363636z" p-id="1661" fill="#3b8cff"></path><path d="M270.359273 377.6l605.090909 0 0 46.545455-605.090909 0 0-46.545455Z" p-id="1662" fill="#3b8cff"></path><path d="M270.359273 610.327273l605.090909 0 0 46.545455-605.090909 0 0-46.545455Z" p-id="1663" fill="#3b8cff"></path><path d="M270.359273 796.509091l349.090909 0 0 46.545455-349.090909 0 0-46.545455Z" p-id="1664" fill="#3b8cff"></path>
+                            </svg>
+                        </span>
+                        <span data-locale="myPackage">My Package</span>
+                    </span>
+                </a>
+                <div id="useCondition" class="useCondition hidden">
+                    <div class="usage">
+                        <div class="totalBar">
+                            <div id="volumeUseBar" class="progressBar" style="width:0;"></div>
+                        </div>
+                        <p>volume：<span id="volumeUseSpan">0G</span>/<span id="volumeSpan">1T</span></p>
+                    </div>
+                    <!-- <div class="usage">
+                        <div class="totalBar">
+                            <div id="netFlowUseBar" class="progressBar" style="width:0;"></div>
+                        </div>
+                        <p>netflow：<span id="netFlowUseSpan">0G</span>/<span id="netFlowSpan">6T</span></p>
+                    </div> -->
+                    <div class="usage">
+                        <div class="totalBar">
+                            <div id="upNetFlowUseBar" class="progressBar" style="width:0;"></div>
+                        </div>
+                        <p>upNetflow：<span id="upNetFlowUseSpan">0G</span>/<span id="upNetFlowSpan">3T</span></p>
+                    </div>
+                    <div class="usage">
+                        <div class="totalBar">
+                            <div id="downNetFlowUseBar" class="progressBar" style="width:0;"></div>
+                        </div>
+                        <p>downNetflow：<span id="downNetFlowUseSpan">0G</span>/<span id="downNetFlowSpan">3T</span></p>
+                    </div>
+                    <div class="usage">
+                        <p>endTime:<span id="endTimeSpan"></span> </p>
+                    </div>
+                </div> 
+            </li>
+
+        </ul>
+    </div><!--左侧栏结束-->
+    <div class="frame-main"><!--右侧主内容区开始-->
+
+        <div id="diskDiv" class="diskDiv hidden"><!--（默认空间/隐私空间）网盘开始-->
+            <div id="priviteCondition" class="priviteCondition hidden"><!--隐私空间进入开始-->
+                <div class="priviteConditionContent">
+                    <div class="priviteConditionContentBox hidden"><!--未设置过密码开始-->
+                            <h2 data-locale="priviteTitle">隐私空间</h2>
+                            <ul>
+                                <li data-locale="priviteLi1">1、隐秘空间需要设置密码,10-32位，数字英文特殊字符至少两种组合的字符。</li>
+                                <li data-locale="priviteLi2">2、密码丢失后无法找回，请您牢记。</li>
+                                <li data-locale="priviteLi3">3、存储在隐私空间的文件不能分享。</li>
+                            </ul>
+                            <div class="privite-inpt-div">
+                                <label data-locale="setCode">设置密码：</label>
+                                <input id="setPassword" type="password" />
+                            </div>
+                            <div  class="privite-inpt-div">
+                                <label data-locale="confirmPassword">确认密码：</label>
+                                <input id="confirmPassword" type="password" />
+                            </div>
+                            <div class="privite-inpt-div">
+                                <input id="goInPriviteSpace1" class="goInPriviteSpace" type="button" data-locale="enterPrivacy" value="进入隐私空间" />
+                            </div>
+                    </div> <!--未设置过密码开始-->
+                    <div class="priviteConditionContentBox hidden"><!--输入密码登录开始-->
+                            <h2 data-locale="priviteTitle">隐私空间</h2>
+                            <ul>
+                                <li data-locale="priviteHint">提示：隐私空间的文件不能分享,隐私空间文件不能复制或剪切到全部文件中。</li>
+                            </ul>
+                            <div  class="privite-inpt-div">
+                                <label data-locale="password">密码：</label>
+                                <input id="importPassword" type="password" />
+                            </div>
+                            <div class="privite-inpt-div">
+                                <input id="goInPriviteSpace2" class="goInPriviteSpace" type="button" data-locale="enterPrivacy" value="进入隐私空间" />
+                            </div>
+                    </div> <!--输入密码登录结束-->                
+                </div>             
+            </div><!--隐私空间进入结束-->
+
+
+            <div id="diskDivAll" class="hidden"><!--内容区-->
+                <div class="frame-main-header clearfix"><!--主内容区头部开始-->
+                    <div id="upLoadFileBtn" class="s-button">
+                        <span>
+                            <svg t="1529562880136" class="icon"  viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="2373" xmlns:xlink="http://www.w3.org/1999/xlink" width="16" height="16">
+                                <defs><style type="text/css"></style></defs><path d="M512 66.016q18.016 0 30.336 12.32l213.344 213.344q12.32 12.32 12.32 30.336 0 18.336-12.16 30.496t-30.496 12.16q-18.016 0-30.336-12.32l-140.32-140.672 0 494.336q0 17.664-12.512 30.176t-30.176 12.512-30.176-12.512-12.512-30.176l0-494.336-140.32 140.672q-12.992 12.32-30.336 12.32-17.664 0-30.176-12.512t-12.512-30.176q0-17.344 12.32-30.336l213.344-213.344q12.32-12.32 30.336-12.32zM938.656 663.328q17.664 0 30.176 12.512t12.512 30.176l0 170.656q0 53.344-36.992 90.336-37.664 37.664-90.016 37.664l-683.68 0q-52.32 0-90.656-37.344-37.344-38.336-37.344-90.656l0-170.656q0-17.664 12.512-30.176t30.176-12.512 30.176 12.512 12.512 30.176l0 170.656q0 17.664 12.512 30.176t30.176 12.512l683.68 0q17.344 0 29.504-12.512t12.16-30.176l0-170.656q0-17.664 12.512-30.176t30.176-12.512z" p-id="2374" fill="#ffffff"></path>
+                            </svg>
+                        </span>
+                        <span data-locale="upLoadFile">Upload File</span>
+                        <form class="h5-uploader-form">
+                            <input id="upLoadFileIpt" title="Click the select file"   multiple  accept="*/*" type="file" />
+                        </form>
+                    </div>
+                    <div id="upLoadFolderBtn" class="s-button">
+                        <span>
+                            <svg t="1529562880136" class="icon"  viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="2373" xmlns:xlink="http://www.w3.org/1999/xlink" width="16" height="16">
+                                <defs><style type="text/css"></style></defs><path d="M512 66.016q18.016 0 30.336 12.32l213.344 213.344q12.32 12.32 12.32 30.336 0 18.336-12.16 30.496t-30.496 12.16q-18.016 0-30.336-12.32l-140.32-140.672 0 494.336q0 17.664-12.512 30.176t-30.176 12.512-30.176-12.512-12.512-30.176l0-494.336-140.32 140.672q-12.992 12.32-30.336 12.32-17.664 0-30.176-12.512t-12.512-30.176q0-17.344 12.32-30.336l213.344-213.344q12.32-12.32 30.336-12.32zM938.656 663.328q17.664 0 30.176 12.512t12.512 30.176l0 170.656q0 53.344-36.992 90.336-37.664 37.664-90.016 37.664l-683.68 0q-52.32 0-90.656-37.344-37.344-38.336-37.344-90.656l0-170.656q0-17.664 12.512-30.176t30.176-12.512 30.176 12.512 12.512 30.176l0 170.656q0 17.664 12.512 30.176t30.176 12.512l683.68 0q17.344 0 29.504-12.512t12.16-30.176l0-170.656q0-17.664 12.512-30.176t30.176-12.512z" p-id="2374" fill="#ffffff"></path>
+                            </svg>
+                        </span>
+                        <span data-locale="upLoadFolder">Upload Folder</span>
+                        <form class="h5-uploader-form">
+                            <input id="upLoadFolderIpt" title="Click the select Folder"  multiple webkitdirectory accept="*/*" type="file" />
+                        </form>
+                    </div>
+                    <div id="addFolderBtn" class="s-button s-button1" onclick="trigger()">
+                        <span>
+                        <svg t="1529564255770" class="icon"  viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="4994" xmlns:xlink="http://www.w3.org/1999/xlink" width="16" height="16">
+                            <defs><style type="text/css"></style></defs><path d="M1018.23488 882.664107c0 0 0-559.342933 0-621.01504 0-83.749547-76.26752-75.97056-76.26752-75.97056s-363.779413 0.539307-339.69152 0c-26.170027 0.58368-39.03488-13.70112-39.03488-13.70112s-18.10432-31.20128-50.72896-80.530773c-34.194773-51.725653-73.786027-43.277653-73.786027-43.277653L102.85056 48.16896c-93.057707 0-94.08512 89.51808-94.08512 89.51808s0 675.874133 0 740.3008c0 99.853653 75.421013 87.487147 75.421013 87.487147s807.857493 0 864.679253 0C1029.533013 965.471573 1018.23488 882.664107 1018.23488 882.664107zM857.091413 873.68704c-56.825173 0-681.12384 0-681.12384 0s-75.424427 12.36992-75.424427-87.487147c0-64.41984 0-556.73856 0-556.73856s1.030827-89.51808 94.088533-89.51808l175.264427 0c0 0 39.594667-8.448 73.78944 43.281067 32.62464 49.329493 50.72896 80.52736 50.72896 80.52736s12.858027 14.288213 39.031467 13.704533c-24.087893 0.535893 316.740267 0 316.740267 0s76.27776-7.775573 76.27776 75.97056c0 61.672107 0 437.46304 0 437.46304S937.751893 873.68704 857.091413 873.68704z" p-id="4995" fill="#3b8cff"></path><path d="M685.605547 553.079467l-149.138773 0 0-149.138773c0-6.331733-5.13024-11.472213-11.472213-11.472213l-22.944427 0c-6.33856 0-11.472213 5.14048-11.472213 11.472213l0 149.138773-149.138773 0c-6.341973 0-11.472213 5.143893-11.472213 11.472213l0 22.94784c0 6.335147 5.126827 11.461973 11.472213 11.461973l149.138773 0 0 149.1456c0 6.341973 5.133653 11.472213 11.472213 11.472213l22.944427 0c6.341973 0 11.472213-5.13024 11.472213-11.472213l0-149.1456 149.138773 0c6.341973 0 11.475627-5.126827 11.475627-11.461973l0-22.94784C697.084587 558.22336 691.950933 553.079467 685.605547 553.079467z" p-id="4996" fill="#3b8cff"></path>
+                            </svg>
+                        </span>
+                        <span data-locale="addFolder">Add Folder</span>
+                    </div>
+                    <div id="s-button-group" class="s-button-group hidden">
+                        <div id="downLoadBtn" class="s-button1 s-button2">
+                            <span>
+                            <svg t="1529565144872" class="icon"  viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="6402" xmlns:xlink="http://www.w3.org/1999/xlink" width="16" height="16">
+                                <defs><style type="text/css"></style></defs><path d="M199.3216 552.704v284.3648h655.9232v-284.3648a31.3856 31.3856 0 0 1 62.8224 0v284.3648c0 34.6624-28.16 62.7712-62.8224 62.7712H199.3728c-34.7136 0-62.8224-28.1088-62.8224-62.7712v-284.3648a31.3856 31.3856 0 1 1 62.7712 0z" p-id="6403" fill="#3b8cff"></path><path d="M531.2 171.1104c17.408 0 31.4368 14.0288 31.4368 31.3856v487.2192H499.8144V202.496c0-17.3568 14.08-31.3856 31.3856-31.3856z" p-id="6404" fill="#3b8cff"></path><path d="M532.48 669.2352l128.3584-128.256a31.3856 31.3856 0 0 1 44.3904 44.3904L532.48 758.0672l-172.6976-172.6976a31.3856 31.3856 0 1 1 44.3904-44.3904l128.3072 128.256z" p-id="6405" fill="#3b8cff"></path>
+                                </svg>
+                            </span>
+                            <span data-locale="downLoad">Download</span>
+                            <form class="h5-uploader-form" id="downLoadIpt1">
+                                <input id="downLoadIpt" title="Click the select Folder"  multiple webkitdirectory accept="*/*" type="file" />
+                            </form>
+                        </div>
+                        <div id="deleteBtn" class="s-button1">
+                            <span>
+                                <svg t="1529565511794" class="icon"  viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="7147" xmlns:xlink="http://www.w3.org/1999/xlink" width="16" height="16">
+                                    <defs><style type="text/css"></style></defs><path d="M677.35552 204.8l0-61.44c0-33.91488-29.61408-61.44-66.1504-61.44l-198.49216 0c-36.57728 0-66.19136 27.52512-66.19136 61.44l0 61.44-264.64256 0 0 61.44 99.24608 0 0 614.4c0 33.95584 29.65504 61.44 66.1504 61.44l529.32608 0c36.57728 0 66.19136-27.48416 66.19136-61.44l0-614.4 99.24608 0 0-61.44L677.35552 204.8 677.35552 204.8zM412.71296 143.36l198.49216 0 0 61.44-198.49216 0L412.71296 143.36 412.71296 143.36zM776.6016 880.64 247.27552 880.64l0-614.4 529.32608 0L776.6016 880.64 776.6016 880.64zM346.5216 358.4l66.19136 0 0 430.08-66.19136 0L346.5216 358.4 346.5216 358.4zM478.86336 358.4l66.1504 0 0 430.08-66.1504 0L478.86336 358.4 478.86336 358.4zM611.20512 358.4l66.1504 0 0 430.08-66.1504 0L611.20512 358.4 611.20512 358.4zM611.20512 358.4" p-id="7148" fill="#3b8cff"></path>
+                                </svg>
+                            </span>
+                            <span data-locale="delete">Delete</span>
+                        </div>
+                        <div id="renameBtn" class="s-button1 s-button3">
+                            <span>
+                                <svg t="1529565661279" class="icon"  viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="7381" xmlns:xlink="http://www.w3.org/1999/xlink" width="16" height="16">
+                                    <defs><style type="text/css"></style></defs><path d="M949.2 63.44c-33.696-32.4-70.88-48.832-110.576-48.832-62.064 0-107.344 40.224-119.728 52.56C701.488 84.48 106.832 681.488 106.832 681.488c-3.888 3.92-6.72 8.8-8.176 14.176-13.424 49.728-80.592 270.416-81.264 272.624-3.456 11.296-0.384 23.616 7.92 31.936 5.984 5.952 13.936 9.168 22.08 9.168 3.2 0 6.432-0.496 9.6-1.52 2.288-0.752 229.248-74.384 266.608-85.568 4.912-1.472 9.424-4.16 13.072-7.792 23.6-23.408 578.224-573.824 615.04-611.968 38.08-39.392 56.992-80.384 56.256-121.872C1007.248 139.712 987.472 100.272 949.2 63.44zM285.472 744.288c-32.368-32.736-65.296-51.216-90.688-61.616 109.2-109.632 394.464-396 514.272-516.208 15.632 3.76 52.768 16.16 90.912 54.784 38.528 38.992 48.8 83.472 50.672 93.344-121.632 121.44-401.616 399.44-512 509.008C328.432 799.776 311.968 771.088 285.472 744.288zM152.736 735.104c16.96 4.512 52.272 17.6 88.32 54.08 27.76 28.096 40.8 58.992 46.656 77.856-43.008 13.872-137.152 46.48-196.976 65.84C108.48 874.336 138.4 783.2 152.736 735.104zM906.832 258.16c-1.264 1.312-3.36 3.424-5.856 5.968-9.776-25.28-26.928-57.728-56.624-87.792-30.336-30.704-61.12-48.8-85.792-59.52 2.096-2.096 3.728-3.728 4.368-4.368 3.536-3.504 35.664-34.32 75.696-34.32 23.056 0 45.68 10.544 67.296 31.344 25.632 24.672 38.848 49.024 39.28 72.368C945.616 205.696 932.72 231.36 906.832 258.16z" fill="#3b8cff" p-id="7382"></path>
+                                </svg>
+                            </span>
+                            <span data-locale="rename">Rename</span>
+                        </div>
+                    </div>
+                </div><!--主内容区头部结束-->
+                <div class="frame-main-content"><!--主内容区列表开始-->
+                    <div  class="JDeHdxb"><!--导航开始-->
+                        <!-- <a class="EgMMec hidden" data-locale="allFileFrame" href="#/index?index=1">all files</span> -->
+                        <!--<span class="FcucHsb" >已全部加载，共7个</span>-->
+                        <ul id="breadNav" class="FuIxtL">
+                            <li>
+                                <a href="#/" title="all files"  data-locale="allFileOther">all files</a>
+                            </li>
+                            <!-- <li>
+                                <!-- <a href="#/index?index=2" title="all files" data-deep="0"  data-locale="allFileOther">  all files </a> -->
+                                <!-- <span class="KLxwHFb">  &gt; </span>
+                                <a href="javascript:;" title="全部文件/新建文件夹(1)" data-deep="1" >新建文件夹(1)</a>
+                            </li>
+                            <li>
+                                <span class="KLxwHFb">&gt;</span>
+                                <span title="全部文件/新建文件夹(1)/新建文件夹">新建文件夹</span>
+                            </li> --> 
+                        </ul>
+                    </div><!--导航结束-->
+
+                    <div class="file-list-box"><!--列表区开始-->
+                        <div class="QxJxtg"><!--列表头部标题、全选 开始-->
+                            <ul class="tvPMvPb">
+                                <li data-key="name" class="fufHyA" style="width:44%;">
+                                    <input id="s-selectAll" class="s-selectAll" type="checkbox" data-check-target=".s-select-check">
+                                    <label class="s-selectAll-label" data-locale="selectAll">select all</label>
+                                </li>
+
+                                <li data-key="size" class="fufHyA" style="width:16%;">
+                                    <span class="text" data-locale="size">size</span>
+                                </li>
+                                <li data-key="size" class="fufHyA" style="width:16%;">
+                                    <span class="text" data-locale="type">type</span>
+                                </li>
+                                <li data-key="time" class="fufHyA" style="width:23%;">
+                                    <span class="text" data-locale="date">date</span>
+                                </li>
+                            </ul>
+                        </div><!--列表头部标题、全选 开始-->
+                        <div class="no-file-ab"><!--没有文件情况开始-->
+                            <div class="no-file">
+                                <div class="no-file-img-box">
+                                    <p data-locale="noFile">You haven't uploaded the file yet, and click the upload button~</p>
+                                </div>
+                            </div>
+                        </div><!--没有文件情况结束-->
+                        <div id="listBox" class="zJMtAEb"><!--列表list开始-->
+                            <!--
+                            <dd class="AuPKyz"><!--单行--
+                                <div data-key="name" class="AuPKyz-li" style="width:44%;">
+                                    <input class="s-select-check" type="checkbox" name="fileSelect" data-name="文件名称" data-id="">
+                                    <span class="file-icon"></span>
+                                    <span class="file-name" title="文件名称">文件名称</span>
+                                </div>
+                                <div data-key="size" class="AuPKyz-li" style="width:16%;">
+                                    <span class="text">-</span>
+                                </div>
+                                <div data-key="size" class="AuPKyz-li" style="width:16%;">
+                                    <span class="text">-</span>
+                                </div>
+                                <div data-key="time" class="AuPKyz-li" style="width:23%;">
+                                    <span class="text">-</span>
+                                </div>
+                            </dd><!--单行--
+                            -->
+                        </div><!--列表list结束-->
+                    </div><!--列表区结束-->
+
+                    <div id="file-rename-box" class="file-rename-box"><!--重命名行开始-->
+                        <div class="tzzgyAm">
+                            <input class="renameInput" type="text" value="new folder" autofocus>
+                            <span id="rename-cfm" class="rename-icon">
+                                <svg t="1529648975355" class="icon"  viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="4192" xmlns:xlink="http://www.w3.org/1999/xlink" width="25" height="25"><defs><style type="text/css"></style></defs><path d="M512 960C265.6 960 64 758.4 64 512S265.6 64 512 64s448 201.6 448 448-201.6 448-448 448z m0-832c-211.2 0-384 172.8-384 384s172.8 384 384 384 384-172.8 384-384-172.8-384-384-384z m-16 528c-8 0-16-3.2-22.4-9.6l-160-160c-12.8-12.8-12.8-32 0-44.8 12.8-12.8 32-12.8 44.8 0L496 579.2l217.6-217.6c12.8-12.8 32-12.8 44.8 0 12.8 12.8 12.8 32 0 44.8l-240 240C512 652.8 504 656 496 656z" p-id="4193" fill="#3b8cff"></path></svg>
+                            </span>
+                            <span id="rename-cancel" class="rename-icon">
+                                <svg t="1529649149532" class="icon"  viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="5031" xmlns:xlink="http://www.w3.org/1999/xlink" width="23" height="23"><defs><style type="text/css"></style></defs><path d="M499.104 83.392c239.68 0 434.656 194.976 434.656 434.624 0 239.648-195.008 434.656-434.656 434.656S64.448 757.664 64.448 518.016 259.456 83.392 499.104 83.392m0 933.28c274.944 0 498.656-223.712 498.656-498.656S774.08 19.392 499.104 19.392C224.16 19.392 0.448 243.072 0.448 518.016s223.712 498.656 498.656 498.656" p-id="5032" fill="#3b8cff"></path><path d="M278.72 704.512h-0.032a31.968 31.968 0 1 0 45.248 45.28l186.496-186.56 186.528 186.56a31.968 31.968 0 1 0 45.248-45.248l-0.032-0.032-186.464-186.496 186.464-186.464 0.032-0.032a31.968 31.968 0 1 0-45.248-45.248l-186.528 186.496-186.496-186.496A31.968 31.968 0 1 0 278.72 331.52l186.464 186.464-186.464 186.496z" p-id="5033" fill="#3b8cff"></path></svg>
+                            </span>
+                        </div>
+                    </div><!--重命名行结束-->
+                </div><!--主内容区列表结束-->
+            </div><!--内容区-->
+        </div><!--（默认空间/隐私空间）网盘结束-->
+
+
+
+
+        <div id="transportDiv" class="tabDiv hidden"><!--传输列表开始-->
+            <h2 class="tsTitle" data-locale="transferList">Transfer list</h2>
+            <ul id="tsMenu" class="tsMenu">
+                <!-- <li class="tsList">
+                    <div class="tsList-l" title="文件路径">文件名称</div>
+                    <div class="tsList-r">
+                        <div class="tsList-r-Bar">
+                            <div class="tsList-r-progressBar" style="width:10%;">10%</div>
+                        </div>
+                    </div>
+                </li>   -->
+            </ul>
+        </div><!--传输列结束-->
+
+        <div id="PackageDiv" class="tabDiv PackageDiv hidden"><!--我的套餐开始-->
+            <h2 class="packageTitle" data-locale="myPackage">My Package</h2>
+            <div class="balanceRow">
+                <span data-locale="balance">余额：</span>
+                <span id="balanceNo">0</span><span>samos</span>
+                <input id="refreshBtn" class="btn btn-default" type="button" value="refresh">
+                <input id="topUp" class="btn btn-default" type="button" value="充值" data-target="#myModal" data-toggle="modal" data-locale="rechange">
+            </div>
+           
+
+            <div>
+                <ul id="packageUl" class="packageUl clearfix">
+                    <li class="packageOnLi" data-locale="package">套餐</li>|
+                    <li>我的订单</li>
+                </ul>
+                <div id="packageItem">
+                    <div class="pan-buy">
+                        <div  id="pan-buy-menu" class="pan-buy-menu"></div><!--套餐内容-->
+                    </div>
+                    <div class="myOrder hidden">
+                        <div id="no-order" class="no-order hidden" data-locale="noOrder">暂时还没有订单哦~</div>
+                        <div id="orders" class="orders hidden">
+                            <!-- <div class="order-list">
+                                <div class="order-list-head clearfix">
+                                    <span>日期：<span>----</span></span>
+                                    <span>订单号：<span>----</span></span>
+                                    <div id="order-list-del" class="order-list-del">
+                                        &times;
+                                    </div>
+                                </div>
+                                <div class="order-list-body">
+                                    <div class="order-list-name">
+                                        <div class="order-list-t">套餐名字</div>
+                                        <div>packageName</div>
+                                    </div>
+                                    <div class="order-list-inf">
+                                        <div class="order-list-t">套餐信息</div>
+                                        <div>packageName</div>
+                                    </div>
+                                    <div class="order-list-inf">
+                                        <div class="order-list-t">总计信息</div>
+                                        <div>packageName</div>
+                                    </div>
+                                    <div class="order-list-total">
+                                        <div class="order-list-t">总额</div>
+                                        <div>55</div>
+                                    </div>
+                                    <div class="order-list-quanlity">
+                                        <div class="order-list-t">数量</div>
+                                        <div>1</div>
+                                    </div>
+                                    <div class="order-list-pay">
+                                        <div class="order-list-t">购买</div>
+                                        <div>已付款</div>
+                                    </div>
+                                </div>
+                            </div> -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div><!--我的套餐结束-->
+
+    </div><!--右侧主内容区结束-->
+</div>
+
+
+ <!--充值弹层-->
+<!-- 模态框（Modal）开始 -->
+<div class="modal fade" id="myModal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="close" data-dismiss="modal" aria-hidden="true">
+                    &times;
+                </div>
+                <h4 class="modal-title" id="myModalLabel" data-local="rechange">
+                   充值
+                </h4>
+            </div>
+            <div class="modal-body">
+                <div class="payIllustrate" data-locale="wallet">
+                    请打开钱包，往如下地址转账，
+                    <input id="samosWalletAddress" value="" /><input id="samosWalletCopyBtn" class="samosWalletCopyBtn" data-clipboard-text="ddd"  type="button" value="cppy"/>
+                    <p class="qrcodeP">或打开钱包，扫描二维码：</p>
+                    <div id="qrcode" class="qrcode"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="initBalance" type="button" class="btn btn-default" data-dismiss="modal" data-locale="confirm">确定</button>
+            </div>
+        </div><!-- /.modal-content -->
+    </div><!-- /.modal -->
+</div><!-- 模态框（Modal）结束 -->
+
+
+<script src="js/common.js"></script>
+<!-- <script src="js/i18.js"></script> -->
+<script src="js/jquery.cookie.js"></script>
+<script>
+    //语言
+    // $(document).ready(function () {
+    //     var l = getLanguage();
+    //     // loadProperties('index', l);
+    //     // showSwitch(l);
+    // })
+
+    //<!--网盘 传输列表 选项卡-->
+    // $(".vyQhNyb0").click(function(){
+    //     $(this).addClass("vyQhNyb").siblings().removeClass("vyQhNyb");
+    //     $("div.tabDiv").hide().eq($(this).index()-1).show();
+    // });
+
+
+$(function(){
+    //第一步判断是否注册过；
+    //method.login();
+
+    //页面刷新或第一次加载时初始化页面；
+    window.addEventListener('load',function(){
+        if(method.getParamsUrl().path){
+            method.firstInit();
+        }else{
+            location.hash = 'myspace:';
+            method.init('myspace:');  
+        }
+    },false);
+
+    //页面路径发生变化时初始化页面；
+    window.addEventListener('hashchange',function(){
+         if(method.getParamsUrl().path){
+            method.firstInit();
+        }
+    },false);
+
+   if(!$.cookie("privitePsd")){  
+        $.ajax({
+            url:"/api/v1/space/status",
+            contentType:"application/json",
+            method:'POST',
+            data:JSON.stringify({"space_no":1}),
+            success:function(res){
+                console.log(res);
+                if(res.code==1){
+                    $.cookie("privitePsd", 0, { expires: 365,path: '/' });
+                    //未设过
+
+                }else if(res.code==0){
+                    $.cookie("privitePsd", 1, { expires: 365,path: '/' });
+                    //设过密码
+
+                }
+            }
+        });
+  }
+
+});
+
+   
+</script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -1,1 +1,216 @@
-<!DOCTYPE html><html><body>You need to enable JavaScript to run this app</body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta content="text/html; charset=utf-8" http-equiv="Content-Type"/>
+    <title>samos</title>
+    <meta content="SkyDrive,samos SkyDrive,Network U disk, network hard disk, free SkyDrive, SkyDrive download, SkyDrive resources, synchronization, cloud storage, external chain sharing, offline Download" name="keywords"/>
+    <meta content="samos SkyDrive To provide you with network backup, synchronization and sharing services. Large space, fast speed, safe and stable." name="description"/>
+    <link href="./images/favicon.ico" rel="shortcut icon" type="images/x-icon"/>
+    <link href="./css/style.css" rel="stylesheet" type="text/css"/>
+    <link rel="Shortcut Icon" href="favicon.ico">
+    <!-- <script>if (typeof module === 'object') {window.module = module; module = undefined;}</script> -->
+    <!-- <script src="./js/jquery.min.js"></script> -->
+    <!-- <script>if (window.module) module = window.module;</script> -->
+</head>
+<body>
+    <div id="login-container"><!--登录内容区开始-->
+        <div class="ibg-bg index-banner-0"></div>
+        <div id="login-header">
+            <div class="logo">
+                <a class="pan-logo" href="javascript:;" data-locale="logoName" title="samos network disk">samos network disk</a>
+            </div>
+        </div>
+        <div class="login-main">
+            <div class="all-index-banner">
+                <div class="index-body-content">
+                    <p><span class="left-quote"></span><span data-locale="storageBanner1">安全存储</span></p>
+                    <p><span data-locale="storageBanner2">放心优选</span><span class="right-quote"></span></p>
+                </div>
+            </div>
+            <div class="login-sdk-v4">           
+                <div class="header-login">
+                    <!-- 引导 -->
+                    <div id="guide" class="guide">
+                        <h2 data-locale="guideTitle">设置 Samos 网盘</h4>
+                        <p data-locale="guideWelcome">欢迎使用Samos网盘，请先创建网盘，如果已有网盘，请点击“导入钱包”按钮，根据提示导入已有的网盘配置文件。</p>
+                        <a class="guide-btn guide-btn-create" href="#/create" data-locale="createDisk">创建网盘</a>
+                        <a class="guide-btn guide-btn-had" href="#/had" data-locale="ownedDisk">已有网盘</a>
+                    </div>
+
+                    <!--邮箱-->
+                    <div id="guideMail" class="tang-pass-login" style="display:none;">
+                        <form id="TANGRAM__PSP_4__form" class="pass-form pass-form-normal">
+                            <p class="pass-form-logo" data-locale="setEmail">设置邮箱</p>
+                            <div class="inputLine">
+                                <label for="pass-form-inpt" data-locale="email">邮箱：</label>
+                                <input id="pass-form-inpt" class="pass-form-inpt" type="text" name="email" data-locale="importEmail" placeholder="请输入你的邮箱(用于接收账单)"/>
+                            </div>
+                            <div class="inputLine">
+                                <label for="pass-form-cf" data-locale="verifyEmail">确认邮箱：</label>
+                                <input id="pass-form-cf" class="pass-form-inpt" type="text" name="email" data-locale="importEmail" placeholder="请输入你的邮箱(用于接收账单)"/>
+                            </div>
+                            <input id="submit-btn" class="submit-btn" type="button" data-locale="sendEmail" value="发送邮件"/>
+                            <div class="inputLine">
+                                <label for="code-inpt" data-locale="verificationCode">验证码：</label>
+                                <input  id="code-inpt" class="pass-form-inpt" type="text" name="code" data-locale="importCode" placeholder="填写邮箱验证码"/>
+                            </div>
+                            <div class="inputLine mailGrounpBtns">
+                                <a class="guide-btn-had" href="#/" data-locale="prviousStep">上一步</a>
+                                <input id="code-submit-btn" class="submit-btn" type="button" data-locale="verify" value="验证"/>
+                            </div>
+                            
+
+                            <p class="register-infro" data-locale="registerInf">注册说明：输入您的邮箱，我们会给给你的邮箱发送一份邮件，请打开邮箱进行验证。</p>
+                        </form>
+                    </div>
+                    <!-- 导入网盘 -->
+                    <div id="guideLeadIn" class="leadIn hidden">
+                        <p class="pass-form-logo" data-locale="importConfig">导入网盘配置文件</p>
+                        <p class="register-infro" data-locale="importPath">请在磁盘中选择导出的网盘配置文件</p>
+                        <div class="inputLine">
+                            <input id="configFile" class="configFile" type="file" accept="*/*" >
+                        </div>
+                        <div class="inputLine mailGrounpBtns">
+                            <a class="guide-btn-had" href="#/" data-locale="prviousStep">上一步</a>
+                            <input id="config-submit-btn" class="submit-btn" type="button" data-locale="affirm" value="确认"/>
+                        </div>
+
+                    </div>
+                </div>
+                
+
+            </div>
+        </div>
+    </div><!--登录内容区结束-->
+
+
+
+<script>
+    var $ = require("jquery");
+    var util = {
+        //获取hashName;
+        getParamsUrl:function (){
+            var hashDeatail = location.hash.split("?"),
+                hashName = hashDeatail[0].split("#")[1];//路由地址
+            return 	{
+                path:hashName
+            }
+        },
+        //切换引导
+        guide: function (){
+            let path = util.getParamsUrl();
+            console.log(path);
+            if(path.path=="/create"){
+                $('#guide').hide();
+                $('#guideLeadIn').hide();
+                $('#guideMail').show();
+            }else if(path.path=="/had"){
+                $('#guide').hide();
+                $('#guideMail').hide();
+                $('#guideLeadIn').show();
+            }else{
+                $('#guideLeadIn').hide();
+                $('#guideMail').hide();
+                $('#guide').show();
+            }
+        },
+        //页面跳转
+        render:function(){
+            const {ipcRenderer} = require('electron')
+            ipcRenderer.send('filemanage') 
+        }
+
+    };
+   
+    window.addEventListener('load',function(){
+        util.guide();
+    });
+    window.addEventListener('hashchange',function(res){
+        util.guide();
+    },false);
+
+
+
+
+    //判断是否注册过邮箱！
+    $.ajax({
+        url:"/api/v1/service/status",
+        method:"GET",
+        success:function(res){
+            console.log(res);
+            if(res.status){
+                util.render();
+            }
+        }
+    })
+
+    $(function(){
+        // <!--发送邮件-->
+        $("#submit-btn").click(function(){
+            let mailReg = /^\w+([-+.]\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*$/;
+            let mail = $("#pass-form-inpt").val();
+            let mailCf = $("#pass-form-cf").val();
+            if(!mailReg.test(mail)||!mailReg.test(mailCf)){
+                alert("Please enter the correct email address！");
+                return false;
+            }else if(mail!=mailCf){
+                alert("The email you entered is different！");
+                return false;
+            }else{
+                $.ajax({
+                    url:"/api/v1/store/register",
+                    contentType: "application/json",
+                    method:'POST',
+                    data:JSON.stringify({
+                        'email':mail,
+                        'resend':false
+                    }),
+                    success:function(res){
+                        if(res.code==0){
+                            alert("The mail has been sent！");
+                        }
+                    }
+                });
+            }
+        });
+        // <!--邮件验证-->
+        $("#code-submit-btn").click(function(){
+            let code =  $("#code-inpt").val();
+            $.ajax({
+                url:"/api/v1/store/verifyemail",
+                contentType:"application/json",
+                method:'POST',
+                data:JSON.stringify({'code':code}),
+                success:function(res){
+                    console.log(res);
+                    if(res.code==0){
+                        //alert("验证成功");
+                        util.render();
+                    }
+                    
+                }
+            });
+        });
+        //配置文件验证
+        $("#config-submit-btn").click(function(){
+          let filename =  document.getElementById("configFile").files[0].path;
+            $.ajax({
+                url:"/api/v1/config/import",
+                contentType:"application/json",
+                method:'POST',
+                data:JSON.stringify({'filename':filename}),
+                success:function(res){
+                    console.log(res);
+                    if(res.code==0){
+                        alert("verify successfully!");
+                        util.render();
+                    }
+                    
+                }
+            });
+        });
+
+    });
+</script>
+</body>
+</html>
