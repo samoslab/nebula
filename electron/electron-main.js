@@ -25,10 +25,12 @@ portfinder.basePort=7788;
 portfinder.getPort(function (err, p) {
   port = p;
   defaultURL = 'http://127.0.0.1:'+port+'/';
+  filemanageURL = 'http://127.0.0.1:'+port+'/disk.html';
 });
 
 let defaultURL;
 let currentURL;
+let filemanageURL;
 
 // Force everything localhost, in case of a leak
 app.commandLine.appendSwitch('host-rules', 'MAP * 127.0.0.1, EXCLUDE *.store.samos.io, *.samos.io');
@@ -119,6 +121,8 @@ function startSamos() {
     reset();
   });
 }
+
+
 
 function createWindow(url) {
   console.log(url);
@@ -249,6 +253,10 @@ app.on('will-quit', () => {
     samos.kill('SIGINT');
   }
 });
-
+const {ipcMain} = require('electron')
+ipcMain.on('filemanage', (code) => {
+  console.log(filemanageURL)
+  win.loadURL(filemanageURL);
+});
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and require them here.
