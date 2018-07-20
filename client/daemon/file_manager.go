@@ -1174,7 +1174,7 @@ func (c *ClientManager) DownloadDir(path, destDir string, sno uint32) error {
 		page++
 		for _, fileInfo := range downFiles.Files {
 			currentFile := filepath.Join(path, fileInfo.FileName)
-			destFile := filepath.Join(destDir, fileInfo.FileName)
+			destFile := strings.Join([]string{destDir, fileInfo.FileName}, "/")
 			if fileInfo.Folder {
 				log.Infof("Create folder %s", currentFile)
 				if _, err := os.Stat(destFile); os.IsNotExist(err) {
