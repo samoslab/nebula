@@ -1154,10 +1154,26 @@ func (c *ClientManager) ListFiles(path string, pageSize, pageNum uint32, sortTyp
 
 // DownloadDir download dir
 func (c *ClientManager) DownloadDir(path, destDir string, sno uint32) error {
-	log := c.Log.WithField("download dir", path)
 	if !strings.HasPrefix(path, "/") {
 		return fmt.Errorf("path %s must absolute", path)
 	}
+	if !util_file.Exists(destDir) {
+		return fmt.Errorf("dir %s not exists", destDir)
+	}
+	downFolders := strings.Split(path, "/")
+	// make sure path is not "/"
+	if len(downFolders) > 1 {
+		downloadFolder := downFolders[len(downFolders)-1]
+		destDir = filepath.Join(destDir, downloadFolder)
+		if _, err := os.Stat(destDir); os.IsNotExist(err) {
+			os.Mkdir(destDir, 0744)
+		}
+	}
+	return c.startDownloadDir(path, destDir, sno)
+}
+
+func (c *ClientManager) startDownloadDir(path, destDir string, sno uint32) error {
+	log := c.Log.WithField("download dir", path)
 	errResult := []error{}
 	page := uint32(1)
 	for {
@@ -1173,14 +1189,14 @@ func (c *ClientManager) DownloadDir(path, destDir string, sno uint32) error {
 		// next page
 		page++
 		for _, fileInfo := range downFiles.Files {
-			currentFile := filepath.Join(path, fileInfo.FileName)
-			destFile := strings.Join([]string{destDir, fileInfo.FileName}, "/")
+			currentFile := strings.Join([]string{path, fileInfo.FileName}, "/")
+			destFile := filepath.Join(destDir, fileInfo.FileName)
 			if fileInfo.Folder {
 				log.Infof("Create folder %s", currentFile)
 				if _, err := os.Stat(destFile); os.IsNotExist(err) {
 					os.Mkdir(destFile, 0744)
 				}
-				err = c.DownloadDir(currentFile, destFile, sno)
+				err = c.startDownloadDir(currentFile, destFile, sno)
 				if err != nil {
 					log.Errorf("Recursive download %s failed %v", currentFile, err)
 					return err
