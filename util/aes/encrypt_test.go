@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"crypto/rand"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func checkErr(err error) {
@@ -48,4 +50,29 @@ func randAesKey(bits int) []byte {
 		checkErr(err)
 	}
 	return token
+}
+
+func TestEncryptWithDecrypt(t *testing.T) {
+	content := "acnde"
+	key := "12345678abcdef00"
+	data, err := Encrypt([]byte(content), []byte(key))
+	assert.NoError(t, err)
+	assert.Equal(t, true, len(data) > 0)
+
+	origin, err := Decrypt(data, []byte(key))
+	assert.NoError(t, err)
+	assert.Equal(t, string(origin), content)
+
+	content = "123123123bdsafadsfyasdf7123ndsafadsf,adsf,asfjewrewrwacnde"
+	key = "12345678abcdef00abcdefgh00000000"
+	data, err = Encrypt([]byte(content), []byte(key))
+	assert.NoError(t, err)
+	assert.Equal(t, true, len(data) > 0)
+
+	origin, err = Decrypt(data, []byte(key))
+	assert.NoError(t, err)
+	assert.Equal(t, string(origin), content)
+	data = data[0 : len(data)-2]
+	key = "12345678abcdef00abcdefgh00000000"
+	assert.Panics(t, func() { Decrypt(data, []byte(key)) })
 }
