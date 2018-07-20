@@ -553,18 +553,16 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 		originFileName := fileName
 		if isEncrypt {
 			_, onlyFileName := filepath.Split(fileName)
-			originFileName := filepath.Join(c.TempDir, onlyFileName)
-			err := aes.EncryptFile(fileName, password, originFileName)
+			// change fileName to encypted file avoid origin file modified
+			fileName = filepath.Join(c.TempDir, onlyFileName)
+			err := aes.EncryptFile(originFileName, password, fileName)
 			if err != nil {
 				log.Errorf("Encrypt %s error %v", fileName, err)
 				return err
 			}
-			// change fileName to temp file avoid origin file modified
 			defer func() {
-				deleteTemporaryFile(log, originFileName)
+				deleteTemporaryFile(log, fileName)
 			}()
-		} else {
-			c.PM.SetPartitionMap(fileName, fileName)
 		}
 		partitions, err := c.uploadFileByMultiReplica(originFileName, fileName, req, rsp)
 		if err != nil {
@@ -1009,7 +1007,8 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 		StoreNodeId: [][]byte{},
 	}
 
-	c.PM.SetPartitionMap(originFileName, fileName)
+	log.Infof("curr %s origin %s", fileName, originFileName)
+	c.PM.SetPartitionMap(fileName, originFileName)
 
 	providers := ufprsp.GetProvider()
 	if fileName == originFileName {
@@ -1298,6 +1297,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 				return err
 			}
 			if len(password) != 0 {
+				fmt.Printf("password:%s\n", string(password))
 				return aes.DecryptFile(downFileName, password, downFileName)
 			}
 			return nil
@@ -1313,7 +1313,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 		for j, block := range partition.GetBlock() {
 			c.PM.SetPartitionMap(hex.EncodeToString(block.GetHash()), downFileName)
 			realSizeAfterRS += block.GetSize()
-			log.Infof("Partition %d block %d hash %x size %d checksum %v seq %d\n", i, j, block.Hash, block.Size, block.Checksum, block.BlockSeq)
+			log.Infof("Partition %d block %d hash %x size %d checksum %v seq %d", i, j, block.Hash, block.Size, block.Checksum, block.BlockSeq)
 		}
 	}
 	c.PM.SetProgress(downFileName, 0, realSizeAfterRS)
