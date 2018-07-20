@@ -1,10 +1,12 @@
 package daemon
 
 import (
+	"io"
 	"math"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"github.com/samoslab/nebula/client/config"
@@ -68,4 +70,41 @@ func Fping(ips []string) ([]string, error) {
 		}
 	}
 	return aliveIps, nil
+}
+
+func sameDisk(src, dst string) bool {
+	rootSrc := strings.ToUpper(src[0:2])
+	rootDst := strings.ToUpper(dst[0:2])
+	return rootSrc == rootDst
+}
+
+func RenameCrossOS(src, dest string) error {
+	if runtime.GOOS == "windows" {
+		//move in same disk, copy in diff disk
+		if sameDisk(src, dest) {
+			return os.Rename(src, dest)
+		}
+		_, err := CopyFile(src, dest)
+		if err != nil {
+			return err
+		}
+
+		return os.Remove(src)
+	}
+
+	return os.Rename(src, dest)
+}
+
+func CopyFile(srcName, dstName string) (written int64, err error) {
+	src, err := os.Open(srcName)
+	if err != nil {
+		return
+	}
+	defer src.Close()
+	dst, err := os.OpenFile(dstName, os.O_WRONLY|os.O_CREATE, 0644)
+	if err != nil {
+		return
+	}
+	defer dst.Close()
+	return io.Copy(dst, src)
 }

@@ -1360,11 +1360,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 			}
 		}()
 
-		if err := os.Rename(tempDownFileName, downFileName); err != nil {
-			return err
-		}
-
-		return nil
+		return RenameCrossOS(tempDownFileName, downFileName)
 	}
 	partFiles := []string{}
 	for i, partition := range partitions {

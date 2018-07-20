@@ -46,3 +46,18 @@ func TestReverseCalcuPartFileSize(t *testing.T) {
 	assert.Equal(t, int64(1159), ReverseCalcuatePartFileSize(fileSize, partitionNum, 1))
 	assert.Equal(t, int64(1161), ReverseCalcuatePartFileSize(fileSize, partitionNum, 2))
 }
+
+func TestSameDisk(t *testing.T) {
+	src := "C:"
+	dst := "D:"
+	assert.Equal(t, false, sameDisk(src, dst))
+	src = "C:\\abc.txt"
+	dst = "D:\\abc.txt"
+	assert.Equal(t, false, sameDisk(src, dst))
+	src = "C:\\abc.txt"
+	dst = "C:\\test\\download\\abc.txt"
+	assert.Equal(t, true, sameDisk(src, dst))
+	src = "d:\\abc.txt"
+	dst = "D:\\test\\download\\abc.txt"
+	assert.Equal(t, true, sameDisk(src, dst))
+}
