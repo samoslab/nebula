@@ -18,6 +18,13 @@ type Slice struct {
 	End   int64
 }
 
+// DirPair dir and its parent is a pair
+type DirPair struct {
+	Name   string
+	Parent string
+	Folder bool
+}
+
 // FileSlice split file into slices
 func FileSlice(fileName string, chunkSize int64) ([]Slice, error) {
 	fileInfo, err := os.Stat(fileName)

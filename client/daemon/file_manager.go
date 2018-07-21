@@ -56,6 +56,24 @@ var (
 	ReplicaNum = 5
 )
 
+// DownFile list files format, used when download file
+type DownFile struct {
+	ID        string `json:"id"`
+	FileSize  uint64 `json:"filesize"`
+	FileName  string `json:"filename"`
+	FileHash  string `json:"filehash"`
+	Folder    bool   `json:"folder"`
+	FileType  string `json:"filetype"`
+	ModTime   uint64 `json:"modtime"`
+	Extension string `json:"extension"`
+}
+
+// FilePages list file
+type FilePages struct {
+	Total uint32      `json:"total"`
+	Files []*DownFile `json:"files"`
+}
+
 // ClientManager client manager
 type ClientManager struct {
 	mclient       mpb.MatadataServiceClient

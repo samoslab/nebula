@@ -11,28 +11,20 @@ import (
 	"github.com/yanzay/log"
 )
 
-type IndexStatus struct {
-	Index int
-	Used  bool
-}
-
-func chooseBackupProvicer(current int, backupMap map[int][]IndexStatus) int {
-	choosed := -1
+func chooseBackupProvicer(current int, backupMap map[int][]int, usedBackupMap map[int]struct{}) int {
 	if arr, ok := backupMap[current]; ok {
-		for i, _ := range arr {
-			if !arr[i].Used {
-				choosed = arr[i].Index
-				arr[i].Used = true
-				backupMap[current] = arr
-				return choosed
+		for _, i := range arr {
+			if _, ok := usedBackupMap[i]; !ok {
+				usedBackupMap[i] = struct{}{}
+				return i
 			}
 		}
 	}
-	return choosed
+	return -1
 }
 
-func createBackupProvicer(workedNum, backupNum int) map[int][]IndexStatus {
-	backupMap := map[int][]IndexStatus{}
+func createBackupProvicer(workedNum, backupNum int) map[int][]int {
+	backupMap := map[int][]int{}
 	if workedNum != 40 || backupNum != 10 {
 		return backupMap
 	}
@@ -42,17 +34,14 @@ func createBackupProvicer(workedNum, backupNum int) map[int][]IndexStatus {
 	span := (workedNum / backupNum) * 2
 	nextGroup := backupNum / 2
 	for i := 0; i < workedNum; i++ {
-		backupMap[i] = append(backupMap[i], IndexStatus{Index: i / span, Used: false})
-		backupMap[i] = append(backupMap[i], IndexStatus{Index: i/span + nextGroup, Used: false})
+		backupMap[i] = append(backupMap[i], i/span)
+		backupMap[i] = append(backupMap[i], i/span+nextGroup)
 	}
 
 	return backupMap
 }
 
 func GetBestReplicaProvider(pros []*mpb.ReplicaProvider, needNum int) ([]*mpb.ReplicaProvider, error) {
-	if len(pros) <= needNum {
-		return pros, nil
-	}
 	type SortablePro struct {
 		Pro   *mpb.ReplicaProvider
 		Delay int
@@ -88,18 +77,12 @@ func GetBestReplicaProvider(pros []*mpb.ReplicaProvider, needNum int) ([]*mpb.Re
 			wellPros = append(wellPros, pro.Pro)
 		}
 	}
+
 	return wellPros[0:needNum], nil
 }
 
 // UsingBestProvider ping provider
 func UsingBestProvider(pros []*mpb.BlockProviderAuth) ([]*mpb.BlockProviderAuth, error) {
-	normalPros := []*mpb.BlockProviderAuth{}
-	for _, proInfo := range pros {
-		if !proInfo.GetSpare() {
-			normalPros = append(normalPros, proInfo)
-		}
-	}
-	return normalPros, nil
 	type SortablePro struct {
 		Pro         *mpb.BlockProviderAuth
 		Delay       int
@@ -107,7 +90,6 @@ func UsingBestProvider(pros []*mpb.BlockProviderAuth) ([]*mpb.BlockProviderAuth,
 	}
 
 	sortPros := []SortablePro{}
-	// TODO can ping concurrent
 	pingResultMap := map[int]int{}
 	var pingResultMutex sync.Mutex
 
@@ -145,6 +127,7 @@ func UsingBestProvider(pros []*mpb.BlockProviderAuth) ([]*mpb.BlockProviderAuth,
 	backupMap := createBackupProvicer(workedNum, backupNum)
 
 	availablePros := []*mpb.BlockProviderAuth{}
+	usedBackProMap := map[int]struct{}{}
 	for _, proInfo := range workPros {
 		if proInfo.Delay == common.NetworkUnreachable {
 			// provider cannot connect , choose one from backup
@@ -153,7 +136,7 @@ func UsingBestProvider(pros []*mpb.BlockProviderAuth) ([]*mpb.BlockProviderAuth,
 				log.Errorf("No backup provider for provider %d", proInfo.OriginIndex)
 				return nil, fmt.Errorf("one of provider cannot connected and no backup provider")
 			}
-			choosed := chooseBackupProvicer(proInfo.OriginIndex, backupMap)
+			choosed := chooseBackupProvicer(proInfo.OriginIndex, backupMap, usedBackProMap)
 			if choosed == -1 {
 				log.Errorf("No availbe provider for provider %d", proInfo.OriginIndex)
 				return nil, fmt.Errorf("no more backup provider can be choosed")
