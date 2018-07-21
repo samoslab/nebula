@@ -230,6 +230,11 @@ func (self *ProviderService) Store(stream pb.ProviderService_StoreServer) (er er
 		logWarnAndSetActionLog(er, al)
 		return
 	}
+	if err := file.Close(); err != nil {
+		er = status.Errorf(codes.Internal, "close temp file failed, tempFilePath: %s blockKey: %x error: %s", tempFilePath, blockKey, err)
+		logWarnAndSetActionLog(er, al)
+		return
+	}
 	if err := self.saveFile(blockKey, blockSize, tempFilePath, storage); err != nil {
 		er = status.Errorf(codes.Internal, "save file failed, tempFilePath: %s blockKey: %x error: %s", tempFilePath, blockKey, err)
 		logWarnAndSetActionLog(er, al)
