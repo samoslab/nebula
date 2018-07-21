@@ -303,6 +303,7 @@ func (s *HTTPServer) setupMux() *http.ServeMux {
 	handleAPI("/api/v1/store/uploaddir", UploadDirHandler(s))
 	handleAPI("/api/v1/store/downloaddir", DownloadDirHandler(s))
 	handleAPI("/api/v1/store/rename", RenameHandler(s))
+	handleAPI("/api/v1/task/upload", TaskUploadHandler(s))
 
 	handleAPI("/api/v1/package/all", GetAllPackageHandler(s))
 	handleAPI("/api/v1/package", GetPackageInfoHandler(s))
@@ -941,7 +942,7 @@ func MkfolderHandler(s *HTTPServer) http.HandlerFunc {
 	}
 }
 
-// UploadDirHandler upload file handler
+// UploadHandler upload file handler
 func UploadHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -978,6 +979,60 @@ func UploadHandler(s *HTTPServer) http.HandlerFunc {
 
 		log.Infof("Upload files %+v", req.Filename)
 		err := s.cm.UploadFile(req.Filename, req.Dest, req.Interactive, req.NewVersion, req.IsEncrypt, req.Sno)
+		result, code, errmsg := "ok", 0, ""
+		if err != nil {
+			log.Errorf("Upload %+v error %v", req, err)
+			result, code, errmsg = "", 1, err.Error()
+		}
+
+		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
+		if err != nil {
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+		if err := JSONResponse(w, rsp); err != nil {
+			log.Infof("Error %v\n", err)
+		}
+	}
+}
+
+// TaskUploadHandler upload file handler
+func TaskUploadHandler(s *HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		if !s.CanBeWork() {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
+			return
+		}
+		log := s.cm.Log
+		w.Header().Set("Accept", "application/json")
+
+		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
+			return
+		}
+
+		if r.Header.Get("Content-Type") != "application/json" {
+			errorResponse(ctx, w, http.StatusUnsupportedMediaType, errors.New("Invalid content type"))
+			return
+		}
+
+		req := &common.UploadReq{}
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&req); err != nil {
+			err = fmt.Errorf("Invalid json request body: %v", err)
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+
+		defer r.Body.Close()
+
+		if req.Filename == "" || req.Dest == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument filename or dest_dir must not empty"))
+			return
+		}
+
+		log.Infof("Upload files %+v", req.Filename)
+		err := s.cm.AddTask(*req)
 		result, code, errmsg := "ok", 0, ""
 		if err != nil {
 			log.Errorf("Upload %+v error %v", req, err)

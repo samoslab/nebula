@@ -90,6 +90,9 @@ type ClientManager struct {
 	PubkeyHash    []byte
 	webcfg        config.Config
 	FileTypeMap   filetype.SupportType
+	TM            *TaskManager
+	done          chan struct{}
+	quit          chan struct{}
 }
 
 // NewClientManager create manager
@@ -142,6 +145,9 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 		PubkeyHash:    pubkeyHash,
 		webcfg:        webcfg,
 		FileTypeMap:   filetype.SupportTypes(),
+		TM:            NewTaskManager(),
+		done:          make(chan struct{}),
+		quit:          make(chan struct{}),
 	}
 
 	collectClient.NodePtr = cfg.Node
@@ -156,6 +162,8 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 
 	collectClient.Start(webcfg.CollectServer)
 
+	go c.ExecuteTask()
+
 	return c, nil
 }
 
@@ -163,6 +171,30 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 func (c *ClientManager) Shutdown() {
 	c.serverConn.Close()
 	collectClient.Stop()
+	close(c.quit)
+	<-c.done
+}
+
+func (c *ClientManager) ExecuteTask() {
+	fmt.Printf("start task goroutine...\n")
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		defer close(c.done)
+		for {
+			select {
+			case <-c.quit:
+				return
+			case <-time.After(3 * time.Second):
+			}
+			for c.TM.Count() > 0 {
+				task := c.TM.First()
+				fmt.Printf("task is %+v\n", task)
+			}
+		}
+	}()
+	wg.Wait()
 }
 
 // SetRoot set user root directory
@@ -314,6 +346,11 @@ func (c *ClientManager) getSpacePassword(sno uint32) ([]byte, error) {
 		return nil, fmt.Errorf("please set space %d password first", sno)
 	}
 	return password, nil
+}
+
+func (c *ClientManager) AddTask(req common.UploadReq) error {
+	c.TM.Add(req)
+	return nil
 }
 
 // UploadFile upload file to provider
