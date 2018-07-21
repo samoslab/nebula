@@ -4,13 +4,12 @@ import (
 	"io"
 	"math"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 
 	"github.com/samoslab/nebula/client/config"
-	"github.com/samoslab/nebula/client/util/file"
+	"github.com/samoslab/nebula/util/file"
 )
 
 // GetConfigFile get config file
@@ -53,23 +52,6 @@ func ReverseCalcuatePartFileSize(fileSize int64, partitionNum, currentPartition 
 		return fileSize - chunkSize*int64(currentPartition)
 	}
 	return chunkSize
-}
-
-// Fping ping ips using fping commands
-func Fping(ips []string) ([]string, error) {
-	commands := "fping " + strings.Join(ips, " ")
-	cmd := exec.Command("/bin/sh", "-c", commands)
-	ip, err := cmd.Output()
-	if err != nil {
-		return nil, err
-	}
-	aliveIps := []string{}
-	for _, ip := range strings.Split(string(ip), "\n") {
-		if strings.HasSuffix(ip, "is alive") {
-			aliveIps = append(aliveIps, strings.Trim(ip, " is alive"))
-		}
-	}
-	return aliveIps, nil
 }
 
 func sameDisk(src, dst string) bool {

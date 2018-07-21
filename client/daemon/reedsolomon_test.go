@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/samoslab/nebula/client/util/logger"
+	"github.com/samoslab/nebula/util/logger"
 	"github.com/stretchr/testify/require"
 )
 

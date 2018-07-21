@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/samoslab/nebula/client/util/file"
+	"github.com/samoslab/nebula/util/file"
 )
 
 const (

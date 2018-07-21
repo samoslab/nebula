@@ -16,7 +16,7 @@ import (
 
 	collectClient "github.com/samoslab/nebula/client/collector_client"
 	"github.com/samoslab/nebula/client/progress"
-	"github.com/samoslab/nebula/client/util/filetype"
+	"github.com/samoslab/nebula/util/filetype"
 
 	"github.com/samoslab/nebula/client/common"
 	"github.com/samoslab/nebula/client/config"

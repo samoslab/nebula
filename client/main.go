@@ -9,9 +9,9 @@ import (
 	"github.com/samoslab/nebula/client/config"
 	"github.com/samoslab/nebula/client/daemon"
 	"github.com/samoslab/nebula/client/service"
-	"github.com/samoslab/nebula/client/util/file"
-	"github.com/samoslab/nebula/client/util/logger"
 	"github.com/samoslab/nebula/util/browser"
+	"github.com/samoslab/nebula/util/file"
+	"github.com/samoslab/nebula/util/logger"
 	"github.com/spf13/pflag"
 )
 
