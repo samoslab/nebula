@@ -12,6 +12,16 @@ import (
 	"time"
 )
 
+// UploadReq request struct for upload file
+type UploadReq struct {
+	Filename    string `json:"filename"`
+	Dest        string `json:"dest_dir"`
+	Interactive bool   `json:"interactive"`
+	NewVersion  bool   `json:"newversion"`
+	Sno         uint32 `json:"space_no"`
+	IsEncrypt   bool   `json:"is_encrypt"`
+}
+
 // UnifiedResponse for all reponse format
 type UnifiedResponse struct {
 	Errmsg string `json:"errmsg"`

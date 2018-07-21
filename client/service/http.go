@@ -352,16 +352,6 @@ type MkfolderReq struct {
 	Sno         uint32   `json:"space_no"`
 }
 
-// UploadReq request struct for upload file
-type UploadReq struct {
-	Filename    string `json:"filename"`
-	Dest        string `json:"dest_dir"`
-	Interactive bool   `json:"interactive"`
-	NewVersion  bool   `json:"newversion"`
-	Sno         uint32 `json:"space_no"`
-	IsEncrypt   bool   `json:"is_encrypt"`
-}
-
 // UploadDirReq request struct for upload directory
 type UploadDirReq struct {
 	Parent      string `json:"parent"`
@@ -971,7 +961,7 @@ func UploadHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		req := &UploadReq{}
+		req := &common.UploadReq{}
 		decoder := json.NewDecoder(r.Body)
 		if err := decoder.Decode(&req); err != nil {
 			err = fmt.Errorf("Invalid json request body: %v", err)

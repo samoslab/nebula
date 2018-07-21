@@ -1038,6 +1038,11 @@ func (c *ClientManager) startDownloadDir(path, destDir string, sno uint32) error
 // DownloadFile download file
 func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fileSize uint64, sno uint32) error {
 	log := c.Log.WithField("download file", downFileName)
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error("!!!!!get panic info, recover it %s", r)
+		}
+	}()
 	fileHash, err := hex.DecodeString(filehash)
 	if err != nil {
 		return err
@@ -1108,7 +1113,9 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 			}
 			if len(password) != 0 {
 				fmt.Printf("password:%s\n", string(password))
-				return aes.DecryptFile(downFileName, password, downFileName)
+				if err := aes.DecryptFile(downFileName, password, downFileName); err != nil {
+					log.Errorf("Maybe")
+				}
 			}
 			return nil
 		}
