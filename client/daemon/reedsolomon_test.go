@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/samoslab/nebula/client/util/logger"
 	"github.com/stretchr/testify/require"
 )
 
@@ -31,7 +32,7 @@ func TestEncoder(t *testing.T) {
 	currentDir, err := os.Getwd()
 	require.NoError(t, err)
 	fname := filepath.Join(currentDir, "testdata/test.zip")
-	log, err := NewLogger("", true)
+	log, err := logger.NewLogger("", true)
 	require.NoError(t, err)
 	originMd5, err := getFileMd5(fname)
 	require.NoError(t, err)
@@ -70,7 +71,7 @@ func TestOddFileSize(t *testing.T) {
 			currentDir, err := os.Getwd()
 			require.NoError(t, err)
 			fname := filepath.Join(currentDir, "testdata/odd_filesize.txt")
-			log, err := NewLogger("", false)
+			log, err := logger.NewLogger("", false)
 			require.NoError(t, err)
 			originMd5, err := getFileMd5(fname)
 			require.NoError(t, err)

@@ -10,6 +10,7 @@ import (
 	"github.com/samoslab/nebula/client/daemon"
 	"github.com/samoslab/nebula/client/service"
 	"github.com/samoslab/nebula/client/util/file"
+	"github.com/samoslab/nebula/client/util/logger"
 	"github.com/samoslab/nebula/util/browser"
 	"github.com/spf13/pflag"
 )
@@ -29,7 +30,7 @@ func main() {
 			panic(err)
 		}
 	}
-	log, err := daemon.NewLogger("", true)
+	log, err := logger.NewLogger("", true)
 	if err != nil {
 		return
 	}

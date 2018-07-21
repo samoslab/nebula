@@ -3,6 +3,7 @@ package provider_client
 import (
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -11,10 +12,12 @@ import (
 
 	collectClient "github.com/samoslab/nebula/client/collector_client"
 	"github.com/samoslab/nebula/client/common"
+	"github.com/samoslab/nebula/client/progress"
 	pb "github.com/samoslab/nebula/provider/pb"
 	tcppb "github.com/samoslab/nebula/tracker/collector/client/pb"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/net/context"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/status"
 )
 
@@ -52,16 +55,30 @@ func newActionLogFromRetrieveReq(req *pb.RetrieveReq) *tcppb.ActionLog {
 		BeginTime: now()}
 }
 
-// Ping test connectivity
-func Ping(client pb.ProviderServiceClient) error {
+func GetPingTime(ip string, port uint32) int {
+	server := fmt.Sprintf("%s:%d", ip, port)
+	timeStart := time.Now().Unix()
+	conn, err := grpc.Dial(server, grpc.WithInsecure())
+	if err != nil {
+		return common.NetworkUnreachable
+	}
+	defer conn.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	_, err := client.Ping(ctx, &pb.PingReq{})
-	return err
+	pclient := pb.NewProviderServiceClient(conn)
+	req := &pb.PingReq{
+		Version: common.Version,
+	}
+	_, err = pclient.Ping(ctx, req)
+	if err != nil {
+		return common.NetworkUnreachable
+	}
+	timeEnd := time.Now().Unix()
+	return int(timeEnd - timeStart)
 }
 
 // StorePiece store blocks to privider
-func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadPara *common.UploadParameter, auth []byte, ticket string, tm uint64, pm *common.ProgressManager) error {
+func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadPara *common.UploadParameter, auth []byte, ticket string, tm uint64, pm *progress.ProgressManager) error {
 	fileInfo := uploadPara.HF
 	filePath := fileInfo.FileName
 	fileSize := uint64(fileInfo.FileSize)
@@ -191,7 +208,7 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadP
 }
 
 // Retrieve download file from provider piece by piece
-func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, tm uint64, fileKey, blockKey []byte, fileSize, blockSize uint64, pm *common.ProgressManager) error {
+func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, tm uint64, fileKey, blockKey []byte, fileSize, blockSize uint64, pm *progress.ProgressManager) error {
 	fileHashString := hex.EncodeToString(blockKey)
 	file, err := os.OpenFile(filePath,
 		os.O_WRONLY|os.O_TRUNC|os.O_CREATE,

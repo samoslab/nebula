@@ -15,6 +15,12 @@ func TestProviderBackupMap(t *testing.T) {
 		assert.Equal(t, 2, len(v))
 	}
 
+	choosed := chooseBackupProvicer(0, backMap)
+	assert.Equal(t, 0, choosed)
+	choosed = chooseBackupProvicer(4, backMap)
+	assert.Equal(t, 5, choosed)
+	choosed = chooseBackupProvicer(5, backMap)
+	assert.Equal(t, -1, choosed)
 }
 
 func TestFolderUpload(t *testing.T) {

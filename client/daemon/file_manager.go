@@ -3,7 +3,6 @@ package daemon
 import (
 	"context"
 	"crypto/rsa"
-	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -11,12 +10,12 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"sort"
 	"strings"
 	"sync"
 	"time"
 
 	collectClient "github.com/samoslab/nebula/client/collector_client"
+	"github.com/samoslab/nebula/client/progress"
 	"github.com/samoslab/nebula/client/util/filetype"
 
 	"github.com/samoslab/nebula/client/common"
@@ -52,6 +51,9 @@ var (
 
 	// DefaultTempDir default temporary file
 	DefaultTempDir = "/tmp/nebula_client"
+
+	// ReplicaNum number of muliti-replication
+	ReplicaNum = 5
 )
 
 // ClientManager client manager
@@ -62,7 +64,7 @@ type ClientManager struct {
 	Log           logrus.FieldLogger
 	cfg           *config.ClientConfig
 	serverConn    *grpc.ClientConn
-	PM            *common.ProgressManager
+	PM            *progress.ProgressManager
 	OM            *order.OrderManager
 	Root          string
 	SpaceM        *SpaceManager
@@ -114,7 +116,7 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 		cfg:           cfg,
 		TempDir:       os.TempDir(),
 		NodeId:        cfg.Node.NodeId,
-		PM:            common.NewProgressManager(),
+		PM:            progress.NewProgressManager(),
 		mclient:       mpb.NewMatadataServiceClient(conn),
 		OM:            om,
 		SpaceM:        spaceM,
@@ -154,56 +156,6 @@ func (c *ClientManager) SetRoot(path string) error {
 	c.cfg.Root = path
 	// todo save root into config
 	return config.SaveClientConfig(c.cfg.SelfFileName, c.cfg)
-}
-
-func verifyPassword(sno uint32, password string, encryData []byte) bool {
-	encryInfo, err := genEncryptKey(sno, password)
-	if err != nil {
-		return false
-	}
-	return string(encryInfo) == string(encryData)
-}
-
-func genEncryptKey(sno uint32, password string) ([]byte, error) {
-	digestinfo := fmt.Sprintf("msg:%s:%d", InfoForEncrypt, sno)
-	encryptData, err := aes.Encrypt([]byte(digestinfo), []byte(password))
-	if err != nil {
-		return nil, err
-	}
-
-	h := sha256.New()
-	h.Write(encryptData)
-	shaData := h.Sum(nil)
-	return shaData, nil
-}
-
-func padding(n int) string {
-	s := ""
-	for i := 0; i < n; i++ {
-		s += "0"
-	}
-	return s
-}
-
-func passwordPadding(originPasswd string, sno uint32) (string, error) {
-	realPasswd := ""
-	length := len(originPasswd)
-	switch sno {
-	case 0:
-		if length > 16 {
-			fmt.Errorf("password length must less than 16")
-		}
-		realPasswd = originPasswd + padding(16-length)
-	case 1:
-		if length > 32 {
-			fmt.Errorf("password length must less than 32")
-		}
-		realPasswd = originPasswd + padding(32-length)
-	default:
-		return "", fmt.Errorf("space %d not exist", sno)
-	}
-
-	return realPasswd, nil
 }
 
 // SetPassword set user privacy space password
@@ -287,169 +239,6 @@ func (c *ClientManager) CheckSpaceStatus(sno uint32) error {
 		return nil
 	}
 	return fmt.Errorf("space %d password not set", sno)
-}
-
-func (c *ClientManager) getPingTime(ip string, port uint32) int {
-	server := fmt.Sprintf("%s:%d", ip, port)
-	timeStart := time.Now().Unix()
-	conn, err := grpc.Dial(server, grpc.WithInsecure())
-	if err != nil {
-		c.Log.Errorf("Rpc dial failed: %s", err.Error())
-		return 99999
-	}
-	defer conn.Close()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	pclient := pb.NewProviderServiceClient(conn)
-	req := &pb.PingReq{
-		Version: common.Version,
-	}
-	_, err = pclient.Ping(ctx, req)
-	if err != nil {
-		return 99999
-	}
-	timeEnd := time.Now().Unix()
-	return int(timeEnd - timeStart)
-}
-
-// UsingBestProvider ping provider
-func (c *ClientManager) UsingBestProvider(pros []*mpb.BlockProviderAuth, needNum int) ([]*mpb.BlockProviderAuth, error) {
-	normalPros := []*mpb.BlockProviderAuth{}
-	for _, proInfo := range pros {
-		if !proInfo.GetSpare() {
-			normalPros = append(normalPros, proInfo)
-		}
-	}
-	return normalPros, nil
-	//todo if provider ip is same
-	type SortablePro struct {
-		Pro         *mpb.BlockProviderAuth
-		Delay       int
-		OriginIndex int
-	}
-
-	log := c.Log
-
-	sortPros := []SortablePro{}
-	// TODO can ping concurrent
-	pingResultMap := map[int]int{}
-	var pingResultMutex sync.Mutex
-
-	var wg sync.WaitGroup
-
-	for i, bpa := range pros {
-		wg.Add(1)
-		go func(i int, bpa *mpb.BlockProviderAuth) {
-			defer wg.Done()
-			pingTime := c.getPingTime(bpa.GetServer(), bpa.GetPort())
-			pingResultMutex.Lock()
-			defer pingResultMutex.Unlock()
-			pingResultMap[i] = pingTime
-		}(i, bpa)
-	}
-	wg.Wait()
-	for i, bpa := range pros {
-		pingTime, _ := pingResultMap[i]
-		sortPros = append(sortPros, SortablePro{Pro: bpa, Delay: pingTime, OriginIndex: i})
-	}
-
-	// TODO need consider Spare , Spare = true is backup provider
-	//sort.Slice(sortPros, func(i, j int) bool { return sortPros[i].Delay < sortPros[j].Delay })
-	workPros := []SortablePro{}
-	backupPros := []SortablePro{}
-	for _, proInfo := range sortPros {
-		if !proInfo.Pro.GetSpare() {
-			workPros = append(workPros, proInfo)
-		} else {
-			backupPros = append(backupPros, proInfo)
-		}
-	}
-
-	workedNum := len(workPros)
-	backupNum := len(backupPros)
-
-	backupMap := createBackupProvicer(workedNum, backupNum)
-
-	availablePros := []*mpb.BlockProviderAuth{}
-	for _, proInfo := range workPros {
-		if proInfo.Delay == 99999 {
-			// provider cannot connect , choose one from backup
-			log.Errorf("Provider %v cannot connected")
-			if backupNum == 0 {
-				log.Errorf("No backup provider for provider %d", proInfo.OriginIndex)
-				return nil, fmt.Errorf("one of provider cannot connected and no backup provider")
-			}
-			choosed := chooseBackupProvicer(proInfo.OriginIndex, backupMap)
-			if choosed == -1 {
-				log.Errorf("No availbe provider for provider %d", proInfo.OriginIndex)
-				return nil, fmt.Errorf("no more backup provider can be choosed")
-			}
-			availablePros = append(availablePros, backupPros[choosed].Pro)
-		} else {
-			availablePros = append(availablePros, proInfo.Pro)
-		}
-	}
-
-	return availablePros[0:needNum], nil
-}
-
-type IndexStatus struct {
-	Index int
-	Used  bool
-}
-
-func chooseBackupProvicer(current int, backupMap map[int][]IndexStatus) int {
-	choosed := -1
-	if arr, ok := backupMap[current]; ok {
-		for i, _ := range arr {
-			if !arr[i].Used {
-				choosed = arr[i].Index
-				arr[i].Used = true
-				backupMap[current] = arr
-				return choosed
-			}
-		}
-	}
-	return choosed
-}
-
-func createBackupProvicer(workedNum, backupNum int) map[int][]IndexStatus {
-	// workedNum = 40 , backupNum = 10
-	// span = 40 /10 * 2 = 8 nextGroup = 10 /2 = 5
-	// 0-7 --> [0, 5] ; 8-15 --> [1, 6] ; 16-23 --> [2, 7] ; 24-31 -->[3, 8]; 32-39 --> [4, 9]
-	backupMap := map[int][]IndexStatus{}
-	span := (workedNum / backupNum) * 2
-	nextGroup := backupNum / 2
-	for i := 0; i < workedNum; i++ {
-		backupMap[i] = append(backupMap[i], IndexStatus{Index: i / span, Used: false})
-		backupMap[i] = append(backupMap[i], IndexStatus{Index: i/span + nextGroup, Used: false})
-	}
-
-	return backupMap
-}
-
-// BestRetrieveNode ping retrieve node
-func (c *ClientManager) BestRetrieveNode(pros []*mpb.RetrieveNode) *mpb.RetrieveNode {
-	//todo if provider ip is same
-	type SortablePro struct {
-		Pro   *mpb.RetrieveNode
-		Delay int
-	}
-
-	sortPros := []SortablePro{}
-	for _, bpa := range pros {
-		pingTime := c.getPingTime(bpa.GetServer(), bpa.GetPort())
-		sortPros = append(sortPros, SortablePro{Pro: bpa, Delay: pingTime})
-	}
-
-	sort.Slice(sortPros, func(i, j int) bool { return sortPros[i].Delay < sortPros[j].Delay })
-
-	availablePros := []*mpb.RetrieveNode{}
-	for _, proInfo := range sortPros {
-		availablePros = append(availablePros, proInfo.Pro)
-	}
-
-	return availablePros[0]
 }
 
 // UploadDir upload all files in dir to provider
@@ -862,7 +651,7 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 	partition := &mpb.StorePartition{}
 	partition.Block = []*mpb.StoreBlock{}
 	phas := rspPartition.GetProviderAuth()
-	providers, err := c.UsingBestProvider(phas, len(phas))
+	providers, err := UsingBestProvider(phas)
 	if err != nil {
 		return nil, err
 	}
@@ -1010,7 +799,10 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 	log.Infof("curr %s origin %s", fileName, originFileName)
 	c.PM.SetPartitionMap(fileName, originFileName)
 
-	providers := ufprsp.GetProvider()
+	providers, err := GetBestReplicaProvider(ufprsp.GetProvider(), ReplicaNum)
+	if err != nil {
+		return nil, err
+	}
 	if fileName == originFileName {
 		c.PM.SetProgress(fileName, 0, uint64(len(providers))*req.FileSize)
 	} else {
@@ -1204,7 +996,7 @@ func (c *ClientManager) startDownloadDir(path, destDir string, sno uint32) error
 				log.Infof("Start download %s", currentFile)
 				if fileInfo.FileSize == 0 {
 					log.Infof("Only create %s because file size is 0", fileInfo.FileName)
-					saveFile(destFile, []byte{})
+					SaveFile(destFile, []byte{})
 				} else {
 					err = c.DownloadFile(currentFile, destDir, fileInfo.FileHash, fileInfo.FileSize, sno)
 					if err != nil {
@@ -1275,7 +1067,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 				return err
 			}
 		}
-		saveFile(downFileName, filedata)
+		SaveFile(downFileName, filedata)
 		c.PM.SetProgress(downFileName, req.FileSize, req.FileSize)
 		log.Info("Download tiny file")
 		return nil
@@ -1331,6 +1123,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 
 		if len(password) != 0 {
 			for _, file := range middleFiles {
+				fmt.Printf("password:%s\n", string(password))
 				if err := aes.DecryptFile(file, password, file); err != nil {
 					return err
 				}
@@ -1426,7 +1219,7 @@ func (c *ClientManager) saveFileByPartition(fileName string, partition *mpb.Retr
 		} else {
 			dataShards++
 		}
-		node := c.BestRetrieveNode(block.GetStoreNode())
+		node := BestRetrieveNode(block.GetStoreNode())
 		server := fmt.Sprintf("%s:%d", node.GetServer(), node.GetPort())
 		tempFileName := fileName
 		if !multiReplica {
@@ -1465,19 +1258,6 @@ func (c *ClientManager) saveFileByPartition(fileName string, partition *mpb.Retr
 		return dataShards, parityShards, failedCount, middleFiles, errRtn
 	}
 	return dataShards, parityShards, failedCount, middleFiles, nil
-}
-
-func saveFile(fileName string, content []byte) error {
-	// open output file
-	fo, err := os.Create(fileName)
-	if err != nil {
-		return err
-	}
-	defer fo.Close()
-	if _, err := fo.Write(content); err != nil {
-		return err
-	}
-	return nil
 }
 
 // RemoveFile remove file

@@ -108,3 +108,16 @@ func CopyFile(srcName, dstName string) (written int64, err error) {
 	defer dst.Close()
 	return io.Copy(dst, src)
 }
+
+func SaveFile(fileName string, content []byte) error {
+	// open output file
+	fo, err := os.Create(fileName)
+	if err != nil {
+		return err
+	}
+	defer fo.Close()
+	if _, err := fo.Write(content); err != nil {
+		return err
+	}
+	return nil
+}
