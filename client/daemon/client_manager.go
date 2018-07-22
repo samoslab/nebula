@@ -204,6 +204,10 @@ func map2Req(taskInfo TaskInfo) (TaskInfo, error) {
 		req = &common.UploadReq{}
 	case common.TaskUploadDirType:
 		req = &common.UploadDirReq{}
+	case common.TaskDownloadFileType:
+		req = &common.DownloadReq{}
+	case common.TaskDownloadDirType:
+		req = &common.DownloadDirReq{}
 	default:
 		return taskInfo, errors.New("unknown task type")
 	}
@@ -267,6 +271,12 @@ func (c *ClientManager) ExecuteTask() error {
 				case common.TaskUploadDirType:
 					req := task.Payload.(*common.UploadDirReq)
 					err = c.UploadDir(req.Parent, req.Dest, req.Interactive, req.NewVersion, req.IsEncrypt, req.Sno)
+				case common.TaskDownloadFileType:
+					req := task.Payload.(*common.DownloadReq)
+					err = c.DownloadFile(req.FileName, req.Dest, req.FileHash, req.FileSize, req.Sno)
+				case common.TaskDownloadDirType:
+					req := task.Payload.(*common.DownloadDirReq)
+					err = c.DownloadDir(req.Parent, req.Dest, req.Sno)
 				default:
 					err = errors.New("unknown")
 				}
@@ -448,7 +458,7 @@ func (c *ClientManager) getSpacePassword(sno uint32) ([]byte, error) {
 
 // AddTask add a task into db and queue
 func (c *ClientManager) AddTask(tp string, req interface{}) (string, error) {
-	log := c.Log.WithField("task-add", "add")
+	log := c.Log.WithField("task", "add")
 	task := NewTask(tp, req)
 	taskInfo, err := c.store.StoreTask(task)
 	if err != nil {

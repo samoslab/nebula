@@ -305,6 +305,8 @@ func (s *HTTPServer) setupMux() *http.ServeMux {
 	handleAPI("/api/v1/store/rename", RenameHandler(s))
 	handleAPI("/api/v1/task/upload", TaskUploadHandler(s))
 	handleAPI("/api/v1/task/uploaddir", TaskUploadDirHandler(s))
+	handleAPI("/api/v1/task/download", TaskDownloadHandler(s))
+	handleAPI("/api/v1/task/downloaddir", TaskDownloadDirHandler(s))
 	handleAPI("/api/v1/task/status", TaskStatusHandler(s))
 
 	handleAPI("/api/v1/package/all", GetAllPackageHandler(s))
@@ -360,27 +362,11 @@ type MkfolderReq struct {
 	Sno         uint32   `json:"space_no"`
 }
 
-// DownloadDirReq request struct for download directory
-type DownloadDirReq struct {
-	Parent string `json:"parent"`
-	Dest   string `json:"dest_dir"`
-	Sno    uint32 `json:"space_no"`
-}
-
 // RenameReq request struct for move file, src is source file id which get by list
 type RenameReq struct {
 	Source string `json:"src"`
 	Dest   string `json:"dest"`
 	Sno    uint32 `json:"space_no"`
-}
-
-// DownloadReq request struct for download file
-type DownloadReq struct {
-	FileHash string `json:"filehash"`
-	FileSize uint64 `json:"filesize"`
-	FileName string `json:"filename"`
-	Dest     string `json:"dest_dir"`
-	Sno      uint32 `json:"space_no"`
 }
 
 // ListReq request struct for list files
@@ -1101,6 +1087,114 @@ func TaskUploadDirHandler(s *HTTPServer) http.HandlerFunc {
 	}
 }
 
+// TaskDownloadHandler download file handler
+func TaskDownloadHandler(s *HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		if !s.CanBeWork() {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
+			return
+		}
+		log := s.cm.Log
+		w.Header().Set("Accept", "application/json")
+
+		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
+			return
+		}
+
+		if r.Header.Get("Content-Type") != "application/json" {
+			errorResponse(ctx, w, http.StatusUnsupportedMediaType, errors.New("Invalid content type"))
+			return
+		}
+
+		req := &common.DownloadReq{}
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&req); err != nil {
+			err = fmt.Errorf("Invalid json request body: %v", err)
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+
+		defer r.Body.Close()
+
+		if req.FileHash == "" || req.Dest == "" || req.FileSize == 0 || req.FileName == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument filehash, dest_dir, filesize or filename must not empty"))
+			return
+		}
+
+		log.Infof("Download  %+v", req)
+		result, err := s.cm.AddTask(common.TaskDownloadFileType, req)
+		code, errmsg := 0, ""
+		if err != nil {
+			log.Errorf("Download files %+v error %v", req, err)
+			code, errmsg = 1, err.Error()
+		}
+
+		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
+		if err != nil {
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+		if err := JSONResponse(w, rsp); err != nil {
+			log.Infof("Error %v\n", err)
+		}
+	}
+}
+
+// TaskDownloadDirHandler download directory from provider
+func TaskDownloadDirHandler(s *HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		if !s.CanBeWork() {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
+			return
+		}
+		log := s.cm.Log
+		w.Header().Set("Accept", "application/json")
+
+		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
+			return
+		}
+
+		if r.Header.Get("Content-Type") != "application/json" {
+			errorResponse(ctx, w, http.StatusUnsupportedMediaType, errors.New("Invalid content type"))
+			return
+		}
+
+		req := &common.DownloadDirReq{}
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&req); err != nil {
+			err = fmt.Errorf("Invalid json request body: %v", err)
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+
+		defer r.Body.Close()
+
+		if req.Parent == "" || req.Dest == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument parent and dest_dir  must not empty"))
+			return
+		}
+
+		log.Infof("downloaddir request %+v", req)
+		result, err := s.cm.AddTask(common.TaskDownloadDirType, req)
+		code, errmsg := 0, ""
+		if err != nil {
+			log.Errorf("Download dir %+v error %v", req, err)
+			code, errmsg = 1, err.Error()
+		}
+
+		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
+		if err != nil {
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+		if err := JSONResponse(w, rsp); err != nil {
+			log.Infof("Error %v\n", err)
+		}
+	}
+}
+
 // TaskStatusHandler upload directory handler
 func TaskStatusHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -1234,9 +1328,9 @@ func DownloadHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		downReq := &DownloadReq{}
+		req := &common.DownloadReq{}
 		decoder := json.NewDecoder(r.Body)
-		if err := decoder.Decode(&downReq); err != nil {
+		if err := decoder.Decode(&req); err != nil {
 			err = fmt.Errorf("Invalid json request body: %v", err)
 			errorResponse(ctx, w, http.StatusBadRequest, err)
 			return
@@ -1244,16 +1338,16 @@ func DownloadHandler(s *HTTPServer) http.HandlerFunc {
 
 		defer r.Body.Close()
 
-		if downReq.FileHash == "" || downReq.Dest == "" || downReq.FileSize == 0 || downReq.FileName == "" {
+		if req.FileHash == "" || req.Dest == "" || req.FileSize == 0 || req.FileName == "" {
 			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument filehash, dest_dir, filesize or filename must not empty"))
 			return
 		}
 
-		log.Infof("Download  %+v", downReq)
-		err := s.cm.DownloadFile(downReq.FileName, downReq.Dest, downReq.FileHash, downReq.FileSize, downReq.Sno)
+		log.Infof("Download  %+v", req)
+		err := s.cm.DownloadFile(req.FileName, req.Dest, req.FileHash, req.FileSize, req.Sno)
 		result, code, errmsg := "ok", 0, ""
 		if err != nil {
-			log.Errorf("Download files %+v error %v", downReq, err)
+			log.Errorf("Download files %+v error %v", req, err)
 			result, code, errmsg = "", 1, err.Error()
 		}
 
@@ -1288,7 +1382,7 @@ func DownloadDirHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		req := &DownloadDirReq{}
+		req := &common.DownloadDirReq{}
 		decoder := json.NewDecoder(r.Body)
 		if err := decoder.Decode(&req); err != nil {
 			err = fmt.Errorf("Invalid json request body: %v", err)
