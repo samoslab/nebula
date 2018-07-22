@@ -16,7 +16,8 @@ func TestTask(t *testing.T) {
 		Sno:       0,
 	}
 
-	tm.Add(req)
+	task := NewTask(common.TaskUploadFileType, req)
+	tm.Add(task)
 	assert.Equal(t, 1, tm.Count())
 
 	req1 := common.UploadReq{
@@ -26,13 +27,14 @@ func TestTask(t *testing.T) {
 		Sno:       1,
 	}
 
-	tm.Add(req1)
+	task1 := NewTask(common.TaskUploadFileType, req1)
+	tm.Add(task1)
 	assert.Equal(t, 2, tm.Count())
 
 	origin := tm.First()
-	assert.Equal(t, req, origin)
+	assert.Equal(t, req, origin.Payload.(common.UploadReq))
 
 	origin = tm.First()
-	assert.Equal(t, req1, origin)
+	assert.Equal(t, req1, origin.Payload.(common.UploadReq))
 	assert.Equal(t, 0, tm.Count())
 }

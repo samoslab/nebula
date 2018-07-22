@@ -1032,8 +1032,8 @@ func TaskUploadHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		log.Infof("Upload files %+v", req.Filename)
-		err := s.cm.AddTask(*req)
-		result, code, errmsg := "ok", 0, ""
+		result, err := s.cm.AddTask(common.TaskUploadFileType, *req)
+		code, errmsg := 0, ""
 		if err != nil {
 			log.Errorf("Upload %+v error %v", req, err)
 			result, code, errmsg = "", 1, err.Error()

@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/boltdb/bolt"
 	collectClient "github.com/samoslab/nebula/client/collector_client"
 	"github.com/samoslab/nebula/client/progress"
 	"github.com/samoslab/nebula/util/filetype"
@@ -40,6 +41,9 @@ const (
 	InfoForEncrypt = "this is a interesting info for encrypt msg"
 	// SysFile store password hash file
 	SysFile = ".nebula"
+
+	// ClientDBName client db name
+	ClientDBName = "data.db"
 )
 
 var (
@@ -91,8 +95,10 @@ type ClientManager struct {
 	webcfg        config.Config
 	FileTypeMap   filetype.SupportType
 	TM            *TaskManager
+	TaskChan      chan TaskInfo
 	done          chan struct{}
 	quit          chan struct{}
+	store         *store
 }
 
 // NewClientManager create manager
@@ -131,6 +137,20 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 		spaceM.AddSpace(sp.SpaceNo, sp.Password, sp.Home)
 	}
 
+	dbPath := filepath.Join(webcfg.ConfigDir, ClientDBName)
+	db, err := bolt.Open(dbPath, 0700, &bolt.Options{
+		Timeout: 1 * time.Second,
+	})
+	if err != nil {
+		log.WithError(err).Error("Open db failed")
+		return nil, err
+	}
+	store, err := newStore(db, log)
+	if err != nil {
+		log.WithError(err).Error("New store failed")
+		return nil, err
+	}
+
 	c := &ClientManager{
 		serverConn:    conn,
 		Log:           log,
@@ -148,6 +168,8 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 		TM:            NewTaskManager(),
 		done:          make(chan struct{}),
 		quit:          make(chan struct{}),
+		store:         store,
+		TaskChan:      make(chan TaskInfo, 1000),
 	}
 
 	collectClient.NodePtr = cfg.Node
@@ -172,29 +194,72 @@ func (c *ClientManager) Shutdown() {
 	c.serverConn.Close()
 	collectClient.Stop()
 	close(c.quit)
+	close(c.TaskChan)
 	<-c.done
 }
 
-func (c *ClientManager) ExecuteTask() {
-	fmt.Printf("start task goroutine...\n")
+// ExecuteTask start handle task
+func (c *ClientManager) ExecuteTask() error {
+	log := c.Log
+	log.Info("Start task goroutine, handle unfinished task first")
+	// unfinished task
+	unconfirmTasks, err := c.store.GetTaskArray(func(rwd TaskInfo) bool {
+		return rwd.Status == StatusGotTask
+	})
+	if err != nil {
+		return err
+	}
+	for _, taskInfo := range unconfirmTasks {
+		c.TaskChan <- taskInfo
+	}
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		defer wg.Done()
-		defer close(c.done)
+		defer func() {
+			wg.Done()
+			close(c.done)
+			log.Infof("Shutdown task goroutine")
+		}()
 		for {
 			select {
 			case <-c.quit:
 				return
 			case <-time.After(3 * time.Second):
-			}
-			for c.TM.Count() > 0 {
-				task := c.TM.First()
-				fmt.Printf("task is %+v\n", task)
+				continue
+			case taskInfo := <-c.TaskChan:
+				var err error
+				task := taskInfo.Task
+				log := log.WithField("task key", taskInfo.Key)
+				log.Infof("Handle task %+v", taskInfo)
+				switch task.Type {
+				case common.TaskUploadFileType:
+					req := task.Payload.(common.UploadReq)
+					err = c.UploadFile(req.Filename, req.Dest, req.Interactive, req.NewVersion, req.IsEncrypt, req.Sno)
+				case common.TaskUploadDirType:
+				default:
+					err = errors.New("unknown")
+				}
+				if err != nil {
+					log.WithError(err).Error("task failed")
+				} else {
+					log.Infof("execute task success")
+				}
+				taskInfo, err = c.store.UpdateTaskInfo(taskInfo.Key, func(rs TaskInfo) TaskInfo {
+					rs.Status = StatusDone
+					rs.UpdatedAt = common.Now()
+					rs.Err = err
+					return rs
+				})
+				if err != nil {
+					log.WithError(err).Error("update task failed")
+				} else {
+					log.Infof("update task success")
+				}
 			}
 		}
 	}()
 	wg.Wait()
+	return nil
 }
 
 // SetRoot set user root directory
@@ -348,9 +413,17 @@ func (c *ClientManager) getSpacePassword(sno uint32) ([]byte, error) {
 	return password, nil
 }
 
-func (c *ClientManager) AddTask(req common.UploadReq) error {
-	c.TM.Add(req)
-	return nil
+// AddTask add a task into db and queue
+func (c *ClientManager) AddTask(tp string, req interface{}) (string, error) {
+	log := c.Log.WithField("task-add", "add")
+	task := NewTask(tp, req)
+	taskInfo, err := c.store.StoreTask(task)
+	if err != nil {
+		log.WithError(err).Error("store task failed")
+		return "", err
+	}
+	c.TaskChan <- taskInfo
+	return taskInfo.Key, nil
 }
 
 // UploadFile upload file to provider
@@ -380,7 +453,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 		return common.StatusErrFromError(err)
 	}
 
-	log.Infof("Check file %s exists resp code:%d", fileName, rsp.GetCode())
+	log.Infof("Check file exists resp code %d", rsp.GetCode())
 	if rsp.GetCode() == 0 {
 		log.Infof("Upload %s success", fileName)
 		return nil
@@ -401,7 +474,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 			fileName = filepath.Join(c.TempDir, onlyFileName)
 			err := aes.EncryptFile(originFileName, password, fileName)
 			if err != nil {
-				log.Errorf("Encrypt %s error %v", fileName, err)
+				log.Errorf("Encrypt error %v", err)
 				return err
 			}
 			defer func() {
