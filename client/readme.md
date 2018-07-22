@@ -15,6 +15,11 @@ Index
 | [/api/v1/store/remove](#apiv1storeremove-post)                             | POST      |
 | [/api/v1/store/rename](#apiv1storerename-post)                             | POST      |
 | [/api/v1/store/progress](#apiv1storeprogress-post)                             | POST      |
+| [/api/v1/task/upload](#apiv1taskupload-post)                                   | POST      |
+| [/api/v1/task/uploaddir](#apiv1taskuploaddir-post)                                   | POST      |
+| [/api/v1/task/download](#apiv1taskdownload-post)                                   | POST      |
+| [/api/v1/task/downloaddir](#apiv1taskdownloaddir-post)                                   | POST      |
+| [/api/v1/task/status](#apiv1taskstatus-post)                                   | POST      |
 | [/api/v1/package/all](#apiv1packageall-get)                             | GET |
 | [/api/v1/package](#apiv1package-get)                             | GET |
 | [/api/v1/package/buy](#apiv1packagebuy-post)                             | POST|
@@ -331,6 +336,136 @@ curl -X POST -H "Content-Type:application/json" -d '{"files":[]}' http://127.0.0
 }
 ```
 
+## /api/v1/task/upload [POST]
+
+async interface , task run at back-end
+
+```
+URI:/api/v1/task/upload
+Method: POST
+Request Body: {
+  "filename":string
+  "dest_dir":string
+  "interactive":bool
+  "newversion" :bool
+  "space_no":int
+  "is_encrypt":bool
+  }
+```
+
+Example 
+
+```
+curl -X POST -H "Content-Type:application/json" -d '{"space_no":0, "dest_dir":"/tmp", "filename":"/tmp/config-test.json", "interactive":false, "newversion":false, "is_encrypt":false}' http://127.0.0.1:7788/api/v1/task/upload
+{
+    "errmsg": "",
+    "code": 0,
+    "Data": "client-task:6"
+}
+```
+
+## /api/v1/task/uploaddir [POST]
+
+async interface , task run at back-end
+
+```
+URI:/api/v1/task/uploaddir
+Method: POST
+Request Body: {
+  "parent":string
+  "dest_dir": string
+  "interactive":bool
+  "newversion" :bool
+  "space_no":int
+  "is_encrypt":bool
+  }
+```
+
+Example 
+
+```
+curl -X POST -H "Content-Type:application/json" -d '{"space_no":0, "dest_dir":"/tmp", "parent":"/tmp", "interactive":false, "newversion":false, "is_encrypt":false}' http://127.0.0.1:7788/api/v1/task/uploaddir
+{
+    "errmsg": "",
+    "code": 0,
+    "Data": "client-task:7"
+}
+```
+
+## /api/v1/task/download [POST]
+
+filehash and filehash is from /api/v1/store/list result
+download directory if parent isn't empty but others is empty , or download filename
+async interface , task run at back-end
+```
+URI:/api/v1/task/download
+Method: POST
+Request Body: {
+  filehash:string
+  filesize:uint64
+  filename:string
+  space_no:uint32
+  dest_dir:string
+  }
+```
+
+Example 
+
+```
+curl -X POST -H "Content-Type:application/json" -d '{"filehash":"732e7a7d3db77ffb6dde834c81d263dfd05922dc","filesize":68073855, "filename":"/tmp/ok/abc.txt", "space_no":0, "dest_dir": "/tmp/ok"}' http://127.0.0.1:7788/api/v1/task/download
+{
+    "errmsg": "client-task:12",
+    "code": 0,
+    "Data": ""
+}
+
+```
+
+## /api/v1/task/downloaddir [POST]
+
+async interface , task run at back-end
+
+```
+URI:/api/v1/task/downloaddir
+Method: POST
+Request Body: {
+  parent:string
+  space_no:uint32
+  dest_dir:string
+  }
+```
+
+Example 
+
+```
+curl -X POST -H "Content-Type:application/json" -d '{"parent":"/tmp/abc", "dest_dir":"/tmp/abc", "space_no":0}' http://127.0.0.1:7788/api/v1/task/downloaddir
+{
+    "errmsg": "",
+    "code": 0,
+    "Data": "client-task:13"
+}
+```
+
+## /api/v1/task/status [POST]
+
+```
+URI:/api/v1/task/status
+Method: POST
+Request Body: {
+  "task_id":string
+  }
+```
+
+Example 
+
+```
+curl -X POST -H "Content-Type:application/json" -d '{"task_id":"client-task:7"}' http://127.0.0.1:7788/api/v1/task/status
+{
+    "errmsg": "",
+    "code": 0,
+    "Data": "done"
+}
+```
 ## /order/packages [GET]
 
 returns all packages

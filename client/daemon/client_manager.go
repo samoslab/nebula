@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -14,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/boltdb/bolt"
 	collectClient "github.com/samoslab/nebula/client/collector_client"
 	"github.com/samoslab/nebula/client/progress"
 	"github.com/samoslab/nebula/util/filetype"
@@ -40,6 +42,9 @@ const (
 	InfoForEncrypt = "this is a interesting info for encrypt msg"
 	// SysFile store password hash file
 	SysFile = ".nebula"
+
+	// ClientDBName client db name
+	ClientDBName = "data.db"
 )
 
 var (
@@ -90,6 +95,10 @@ type ClientManager struct {
 	PubkeyHash    []byte
 	webcfg        config.Config
 	FileTypeMap   filetype.SupportType
+	TaskChan      chan TaskInfo
+	done          chan struct{}
+	quit          chan struct{}
+	store         *store
 }
 
 // NewClientManager create manager
@@ -128,6 +137,20 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 		spaceM.AddSpace(sp.SpaceNo, sp.Password, sp.Home)
 	}
 
+	dbPath := filepath.Join(webcfg.ConfigDir, ClientDBName)
+	db, err := bolt.Open(dbPath, 0700, &bolt.Options{
+		Timeout: 1 * time.Second,
+	})
+	if err != nil {
+		log.WithError(err).Error("Open db failed")
+		return nil, err
+	}
+	store, err := newStore(db, log)
+	if err != nil {
+		log.WithError(err).Error("New store failed")
+		return nil, err
+	}
+
 	c := &ClientManager{
 		serverConn:    conn,
 		Log:           log,
@@ -142,6 +165,10 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 		PubkeyHash:    pubkeyHash,
 		webcfg:        webcfg,
 		FileTypeMap:   filetype.SupportTypes(),
+		done:          make(chan struct{}),
+		quit:          make(chan struct{}),
+		store:         store,
+		TaskChan:      make(chan TaskInfo, 1000),
 	}
 
 	collectClient.NodePtr = cfg.Node
@@ -156,6 +183,8 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 
 	collectClient.Start(webcfg.CollectServer)
 
+	go c.ExecuteTask()
+
 	return c, nil
 }
 
@@ -163,6 +192,117 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 func (c *ClientManager) Shutdown() {
 	c.serverConn.Close()
 	collectClient.Stop()
+	close(c.quit)
+	close(c.TaskChan)
+	<-c.done
+}
+
+func map2Req(taskInfo TaskInfo) (TaskInfo, error) {
+	var req interface{}
+	switch taskInfo.Task.Type {
+	case common.TaskUploadFileType:
+		req = &common.UploadReq{}
+	case common.TaskUploadDirType:
+		req = &common.UploadDirReq{}
+	case common.TaskDownloadFileType:
+		req = &common.DownloadReq{}
+	case common.TaskDownloadDirType:
+		req = &common.DownloadDirReq{}
+	default:
+		return taskInfo, errors.New("unknown task type")
+	}
+	data, err := json.Marshal(taskInfo.Task.Payload)
+	if err != nil {
+		return taskInfo, err
+	}
+	err = json.Unmarshal(data, req)
+	if err != nil {
+		return taskInfo, err
+	}
+	taskInfo.Task.Payload = req
+	return taskInfo, nil
+}
+
+// ExecuteTask start handle task
+func (c *ClientManager) ExecuteTask() error {
+	log := c.Log
+	log.Info("Start task goroutine, handle unfinished task first")
+	// unfinished task
+	unhandleTasks, err := c.store.GetTaskArray(func(rwd TaskInfo) bool {
+		return rwd.Status == StatusGotTask
+	})
+	if err != nil {
+		log.WithError(err).Error("Get unhandle task failed")
+		return err
+	}
+	log.Infof("Unhandle task number %d", len(unhandleTasks))
+	for _, taskInfo := range unhandleTasks {
+		log := log.WithField("taskkey", taskInfo.Key)
+		taskInfo, err = map2Req(taskInfo)
+		if err != nil {
+			log.WithError(err).Error("task cannot deserialization")
+			continue
+		}
+		c.TaskChan <- taskInfo
+	}
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer func() {
+			wg.Done()
+			close(c.done)
+			log.Infof("Shutdown task goroutine")
+		}()
+		for {
+			select {
+			case <-c.quit:
+				return
+			case <-time.After(3 * time.Second):
+				continue
+			case taskInfo := <-c.TaskChan:
+				var err error
+				task := taskInfo.Task
+				log := log.WithField("task key", taskInfo.Key)
+				log.Infof("Handle task %+v", taskInfo)
+				switch task.Type {
+				case common.TaskUploadFileType:
+					req := task.Payload.(*common.UploadReq)
+					err = c.UploadFile(req.Filename, req.Dest, req.Interactive, req.NewVersion, req.IsEncrypt, req.Sno)
+				case common.TaskUploadDirType:
+					req := task.Payload.(*common.UploadDirReq)
+					err = c.UploadDir(req.Parent, req.Dest, req.Interactive, req.NewVersion, req.IsEncrypt, req.Sno)
+				case common.TaskDownloadFileType:
+					req := task.Payload.(*common.DownloadReq)
+					err = c.DownloadFile(req.FileName, req.Dest, req.FileHash, req.FileSize, req.Sno)
+				case common.TaskDownloadDirType:
+					req := task.Payload.(*common.DownloadDirReq)
+					err = c.DownloadDir(req.Parent, req.Dest, req.Sno)
+				default:
+					err = errors.New("unknown")
+				}
+				errStr := ""
+				if err != nil {
+					log.WithError(err).Error("task failed")
+					errStr = err.Error()
+				} else {
+					log.Infof("execute task success")
+				}
+				taskInfo, err = c.store.UpdateTaskInfo(taskInfo.Key, func(rs TaskInfo) TaskInfo {
+					rs.Status = StatusDone
+					rs.UpdatedAt = common.Now()
+					rs.Err = errStr
+					return rs
+				})
+				if err != nil {
+					log.WithError(err).Error("update task failed")
+				} else {
+					log.Infof("update task success")
+				}
+			}
+		}
+	}()
+	wg.Wait()
+	return nil
 }
 
 // SetRoot set user root directory
@@ -316,6 +456,19 @@ func (c *ClientManager) getSpacePassword(sno uint32) ([]byte, error) {
 	return password, nil
 }
 
+// AddTask add a task into db and queue
+func (c *ClientManager) AddTask(tp string, req interface{}) (string, error) {
+	log := c.Log.WithField("task", "add")
+	task := NewTask(tp, req)
+	taskInfo, err := c.store.StoreTask(task)
+	if err != nil {
+		log.WithError(err).Error("store task failed")
+		return "", err
+	}
+	c.TaskChan <- taskInfo
+	return taskInfo.Key, nil
+}
+
 // UploadFile upload file to provider
 func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersion, isEncrypt bool, sno uint32) error {
 	var err error
@@ -343,7 +496,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 		return common.StatusErrFromError(err)
 	}
 
-	log.Infof("Check file %s exists resp code:%d", fileName, rsp.GetCode())
+	log.Infof("Check file exists resp code %d", rsp.GetCode())
 	if rsp.GetCode() == 0 {
 		log.Infof("Upload %s success", fileName)
 		return nil
@@ -364,7 +517,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 			fileName = filepath.Join(c.TempDir, onlyFileName)
 			err := aes.EncryptFile(originFileName, password, fileName)
 			if err != nil {
-				log.Errorf("Encrypt %s error %v", fileName, err)
+				log.Errorf("Encrypt error %v", err)
 				return err
 			}
 			defer func() {
@@ -1038,6 +1191,11 @@ func (c *ClientManager) startDownloadDir(path, destDir string, sno uint32) error
 // DownloadFile download file
 func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fileSize uint64, sno uint32) error {
 	log := c.Log.WithField("download file", downFileName)
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error("!!!!!get panic info, recover it %s", r)
+		}
+	}()
 	fileHash, err := hex.DecodeString(filehash)
 	if err != nil {
 		return err
@@ -1108,7 +1266,9 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 			}
 			if len(password) != 0 {
 				fmt.Printf("password:%s\n", string(password))
-				return aes.DecryptFile(downFileName, password, downFileName)
+				if err := aes.DecryptFile(downFileName, password, downFileName); err != nil {
+					log.Errorf("Maybe")
+				}
 			}
 			return nil
 		}
@@ -1393,4 +1553,16 @@ func (c *ClientManager) ExportConfig(fileName string) error {
 // ExportFile export config file
 func (c *ClientManager) ExportFile() string {
 	return c.cfg.SelfFileName
+}
+
+// TaskStatus get task status
+func (c *ClientManager) TaskStatus(taskID string) (string, error) {
+	taskInfo, err := c.store.GetTask(taskID)
+	if err != nil {
+		return "", err
+	}
+	if taskInfo.Err != "" {
+		return "", errors.New(taskInfo.Err)
+	}
+	return taskInfo.Status.String(), nil
 }
