@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	// affiliate task bucket
+	// task bucket
 	taskBkt = []byte("client_task")
 )
 
@@ -39,7 +39,7 @@ func (s Status) String() string {
 	return statusString[s]
 }
 
-// store storage for affiliate task
+// store storage for task
 type store struct {
 	db  *bolt.DB
 	log logrus.FieldLogger
@@ -79,7 +79,7 @@ type TaskInfo struct {
 	Err       string
 }
 
-//StoreTask save affiliate task into db
+//StoreTask save task into db
 func (s *store) StoreTask(task Task) (TaskInfo, error) {
 	var taskInfo TaskInfo
 	if err := s.db.Update(func(tx *bolt.Tx) error {
@@ -162,4 +162,18 @@ func (s *store) GetTaskArray(flt TaskFilter) ([]TaskInfo, error) {
 	}
 
 	return tasks, nil
+}
+
+//GetTask returns task
+func (s *store) GetTask(taskID string) (TaskInfo, error) {
+	var taskInfo TaskInfo
+	if err := s.db.View(func(tx *bolt.Tx) error {
+		if err := dbutil.GetBucketObject(tx, taskBkt, taskID, &taskInfo); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return TaskInfo{}, err
+	}
+	return taskInfo, nil
 }

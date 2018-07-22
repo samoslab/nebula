@@ -304,6 +304,8 @@ func (s *HTTPServer) setupMux() *http.ServeMux {
 	handleAPI("/api/v1/store/downloaddir", DownloadDirHandler(s))
 	handleAPI("/api/v1/store/rename", RenameHandler(s))
 	handleAPI("/api/v1/task/upload", TaskUploadHandler(s))
+	handleAPI("/api/v1/task/uploaddir", TaskUploadDirHandler(s))
+	handleAPI("/api/v1/task/status", TaskStatusHandler(s))
 
 	handleAPI("/api/v1/package/all", GetAllPackageHandler(s))
 	handleAPI("/api/v1/package", GetPackageInfoHandler(s))
@@ -345,22 +347,17 @@ type VerifyEmailReq struct {
 	Code string `json:"code"`
 }
 
+// TaskStatusReq task status request
+type TaskStatusReq struct {
+	TaskID string `json:"task_id"`
+}
+
 // MkfolderReq request struct for make folder
 type MkfolderReq struct {
 	Folders     []string `json:"folders"`
 	Parent      string   `json:"parent"`
 	Interactive bool     `json:"interactive"`
 	Sno         uint32   `json:"space_no"`
-}
-
-// UploadDirReq request struct for upload directory
-type UploadDirReq struct {
-	Parent      string `json:"parent"`
-	Dest        string `json:"dest_dir"`
-	Interactive bool   `json:"interactive"`
-	NewVersion  bool   `json:"newversion"`
-	Sno         uint32 `json:"space_no"`
-	IsEncrypt   bool   `json:"is_encrypt"`
 }
 
 // DownloadDirReq request struct for download directory
@@ -1050,6 +1047,114 @@ func TaskUploadHandler(s *HTTPServer) http.HandlerFunc {
 	}
 }
 
+// TaskUploadDirHandler upload directory handler
+func TaskUploadDirHandler(s *HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		if !s.CanBeWork() {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
+			return
+		}
+		log := s.cm.Log
+		w.Header().Set("Accept", "application/json")
+
+		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
+			return
+		}
+
+		if r.Header.Get("Content-Type") != "application/json" {
+			errorResponse(ctx, w, http.StatusUnsupportedMediaType, errors.New("Invalid content type"))
+			return
+		}
+
+		req := &common.UploadDirReq{}
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&req); err != nil {
+			err = fmt.Errorf("Invalid json request body: %v", err)
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+
+		defer r.Body.Close()
+
+		if req.Parent == "" || req.Dest == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument parent or dest_dir must not empty"))
+			return
+		}
+
+		log.Infof("Upload parent %s", req.Parent)
+		result, err := s.cm.AddTask(common.TaskUploadDirType, req)
+		code, errmsg := 0, ""
+		if err != nil {
+			log.Errorf("Upload %+v error %v", req, err)
+			code, errmsg = 1, err.Error()
+		}
+
+		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
+		if err != nil {
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+		if err := JSONResponse(w, rsp); err != nil {
+			log.Infof("Error %v\n", err)
+		}
+	}
+}
+
+// TaskStatusHandler upload directory handler
+func TaskStatusHandler(s *HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		if !s.CanBeWork() {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
+			return
+		}
+		log := s.cm.Log
+		w.Header().Set("Accept", "application/json")
+
+		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
+			return
+		}
+
+		if r.Header.Get("Content-Type") != "application/json" {
+			errorResponse(ctx, w, http.StatusUnsupportedMediaType, errors.New("Invalid content type"))
+			return
+		}
+
+		req := &TaskStatusReq{}
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&req); err != nil {
+			err = fmt.Errorf("Invalid json request body: %v", err)
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+
+		defer r.Body.Close()
+
+		if req.TaskID == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument task_id must not empty"))
+			return
+		}
+
+		log.Infof("task id %s", req.TaskID)
+		result, err := s.cm.TaskStatus(req.TaskID)
+		code, errmsg := 0, ""
+		if err != nil {
+			log.Errorf("Upload %+v error %v", req, err)
+			code, errmsg = 1, err.Error()
+		}
+
+		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
+		if err != nil {
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+		if err := JSONResponse(w, rsp); err != nil {
+			log.Infof("Error %v\n", err)
+		}
+	}
+}
+
 // UploadDirHandler upload directory handler
 func UploadDirHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -1070,7 +1175,7 @@ func UploadDirHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		req := &UploadDirReq{}
+		req := &common.UploadDirReq{}
 		decoder := json.NewDecoder(r.Body)
 		if err := decoder.Decode(&req); err != nil {
 			err = fmt.Errorf("Invalid json request body: %v", err)

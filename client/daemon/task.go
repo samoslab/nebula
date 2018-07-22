@@ -16,6 +16,8 @@ func NewTask(tp string, req interface{}) Task {
 	switch tp {
 	case common.TaskUploadFileType:
 		t.Payload = req.(common.UploadReq)
+	case common.TaskUploadDirType:
+		t.Payload = req.(common.UploadDirReq)
 	}
 	return t
 }

@@ -15,6 +15,9 @@ Index
 | [/api/v1/store/remove](#apiv1storeremove-post)                             | POST      |
 | [/api/v1/store/rename](#apiv1storerename-post)                             | POST      |
 | [/api/v1/store/progress](#apiv1storeprogress-post)                             | POST      |
+| [/api/v1/task/upload](#apiv1taskupload-post)                                   | POST      |
+| [/api/v1/task/uploaddir](#apiv1taskuploaddir-post)                                   | POST      |
+| [/api/v1/task/status](#apiv1taskstatus-post)                                   | POST      |
 | [/api/v1/package/all](#apiv1packageall-get)                             | GET |
 | [/api/v1/package](#apiv1package-get)                             | GET |
 | [/api/v1/package/buy](#apiv1packagebuy-post)                             | POST|
@@ -331,6 +334,78 @@ curl -X POST -H "Content-Type:application/json" -d '{"files":[]}' http://127.0.0
 }
 ```
 
+## /api/v1/task/upload [POST]
+
+```
+URI:/api/v1/task/upload
+Method: POST
+Request Body: {
+  "filename":string
+  "dest_dir":string
+  "interactive":bool
+  "newversion" :bool
+  "space_no":int
+  "is_encrypt":bool
+  }
+```
+
+Example 
+
+```
+curl -X POST -H "Content-Type:application/json" -d '{"space_no":0, "dest_dir":"/tmp", "filename":"/tmp/config-test.json", "interactive":false, "newversion":false, "is_encrypt":false}' http://127.0.0.1:7788/api/v1/task/upload
+{
+    "errmsg": "",
+    "code": 0,
+    "Data": "client-task:6"
+}
+```
+
+## /api/v1/task/uploaddir [POST]
+
+```
+URI:/api/v1/task/uploaddir
+Method: POST
+Request Body: {
+  "parent":string
+  "dest_dir": string
+  "interactive":bool
+  "newversion" :bool
+  "space_no":int
+  "is_encrypt":bool
+  }
+```
+
+Example 
+
+```
+curl -X POST -H "Content-Type:application/json" -d '{"space_no":0, "dest_dir":"/tmp", "parent":"/tmp", "interactive":false, "newversion":false, "is_encrypt":false}' http://127.0.0.1:7788/api/v1/task/uploaddir
+{
+    "errmsg": "",
+    "code": 0,
+    "Data": "client-task:7"
+}
+```
+
+## /api/v1/task/status [POST]
+
+```
+URI:/api/v1/task/status
+Method: POST
+Request Body: {
+  "task_id":string
+  }
+```
+
+Example 
+
+```
+curl -X POST -H "Content-Type:application/json" -d '{"task_id":"client-task:7"}' http://127.0.0.1:7788/api/v1/task/status
+{
+    "errmsg": "",
+    "code": 0,
+    "Data": "done"
+}
+```
 ## /order/packages [GET]
 
 returns all packages

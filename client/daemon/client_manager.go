@@ -197,6 +197,33 @@ func (c *ClientManager) Shutdown() {
 	<-c.done
 }
 
+func map2Req(taskInfo TaskInfo) (TaskInfo, error) {
+	var req interface{}
+	switch taskInfo.Task.Type {
+	case common.TaskUploadFileType:
+		req = &common.UploadReq{}
+	case common.TaskUploadDirType:
+		req = &common.UploadDirReq{}
+	default:
+		return taskInfo, errors.New("unknown task type")
+	}
+	data, err := json.Marshal(taskInfo.Task.Payload)
+	if err != nil {
+		return taskInfo, err
+	}
+	err = json.Unmarshal(data, req)
+	if err != nil {
+		return taskInfo, err
+	}
+	switch taskInfo.Task.Type {
+	case common.TaskUploadFileType:
+		taskInfo.Task.Payload = *req.(*common.UploadReq)
+	case common.TaskUploadDirType:
+		taskInfo.Task.Payload = *req.(*common.UploadDirReq)
+	}
+	return taskInfo, nil
+}
+
 // ExecuteTask start handle task
 func (c *ClientManager) ExecuteTask() error {
 	log := c.Log
@@ -211,25 +238,13 @@ func (c *ClientManager) ExecuteTask() error {
 	}
 	log.Infof("Unhandle task number %d", len(unhandleTasks))
 	for _, taskInfo := range unhandleTasks {
-		switch taskInfo.Task.Type {
-		case common.TaskUploadFileType:
-			req := &common.UploadReq{}
-			data, err := json.Marshal(taskInfo.Task.Payload)
-			if err != nil {
-				log.WithError(err).Error("marshal payload")
-				continue
-			}
-			err = json.Unmarshal(data, req)
-			if err != nil {
-				log.WithError(err).Error("unmarshal data")
-				continue
-			}
-			taskInfo.Task.Payload = *req
+		log := log.WithField("taskkey", taskInfo.Key)
+		taskInfo, err = map2Req(taskInfo)
+		if err != nil {
+			log.WithError(err).Error("task cannot deserialization")
+			continue
 		}
-		req := taskInfo.Task.Payload.(common.UploadReq)
-		if req.Filename != "" && req.Dest != "" {
-			c.TaskChan <- taskInfo
-		}
+		c.TaskChan <- taskInfo
 	}
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -255,6 +270,8 @@ func (c *ClientManager) ExecuteTask() error {
 					req := task.Payload.(common.UploadReq)
 					err = c.UploadFile(req.Filename, req.Dest, req.Interactive, req.NewVersion, req.IsEncrypt, req.Sno)
 				case common.TaskUploadDirType:
+					req := task.Payload.(common.UploadDirReq)
+					err = c.UploadDir(req.Parent, req.Dest, req.Interactive, req.NewVersion, req.IsEncrypt, req.Sno)
 				default:
 					err = errors.New("unknown")
 				}
@@ -1531,4 +1548,16 @@ func (c *ClientManager) ExportConfig(fileName string) error {
 // ExportFile export config file
 func (c *ClientManager) ExportFile() string {
 	return c.cfg.SelfFileName
+}
+
+// TaskStatus get task status
+func (c *ClientManager) TaskStatus(taskID string) (string, error) {
+	taskInfo, err := c.store.GetTask(taskID)
+	if err != nil {
+		return "", err
+	}
+	if taskInfo.Err != "" {
+		return "", errors.New(taskInfo.Err)
+	}
+	return taskInfo.Status.String(), nil
 }

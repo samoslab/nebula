@@ -22,6 +22,16 @@ type UploadReq struct {
 	IsEncrypt   bool   `json:"is_encrypt"`
 }
 
+// UploadDirReq request struct for upload directory
+type UploadDirReq struct {
+	Parent      string `json:"parent"`
+	Dest        string `json:"dest_dir"`
+	Interactive bool   `json:"interactive"`
+	NewVersion  bool   `json:"newversion"`
+	Sno         uint32 `json:"space_no"`
+	IsEncrypt   bool   `json:"is_encrypt"`
+}
+
 // UnifiedResponse for all reponse format
 type UnifiedResponse struct {
 	Errmsg string `json:"errmsg"`
