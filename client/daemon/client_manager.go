@@ -215,12 +215,7 @@ func map2Req(taskInfo TaskInfo) (TaskInfo, error) {
 	if err != nil {
 		return taskInfo, err
 	}
-	switch taskInfo.Task.Type {
-	case common.TaskUploadFileType:
-		taskInfo.Task.Payload = *req.(*common.UploadReq)
-	case common.TaskUploadDirType:
-		taskInfo.Task.Payload = *req.(*common.UploadDirReq)
-	}
+	taskInfo.Task.Payload = req
 	return taskInfo, nil
 }
 
@@ -267,10 +262,10 @@ func (c *ClientManager) ExecuteTask() error {
 				log.Infof("Handle task %+v", taskInfo)
 				switch task.Type {
 				case common.TaskUploadFileType:
-					req := task.Payload.(common.UploadReq)
+					req := task.Payload.(*common.UploadReq)
 					err = c.UploadFile(req.Filename, req.Dest, req.Interactive, req.NewVersion, req.IsEncrypt, req.Sno)
 				case common.TaskUploadDirType:
-					req := task.Payload.(common.UploadDirReq)
+					req := task.Payload.(*common.UploadDirReq)
 					err = c.UploadDir(req.Parent, req.Dest, req.Interactive, req.NewVersion, req.IsEncrypt, req.Sno)
 				default:
 					err = errors.New("unknown")

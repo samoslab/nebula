@@ -1029,7 +1029,7 @@ func TaskUploadHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		log.Infof("Upload files %+v", req.Filename)
-		result, err := s.cm.AddTask(common.TaskUploadFileType, *req)
+		result, err := s.cm.AddTask(common.TaskUploadFileType, req)
 		code, errmsg := 0, ""
 		if err != nil {
 			log.Errorf("Upload %+v error %v", req, err)
