@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rsa"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -94,7 +95,6 @@ type ClientManager struct {
 	PubkeyHash    []byte
 	webcfg        config.Config
 	FileTypeMap   filetype.SupportType
-	TM            *TaskManager
 	TaskChan      chan TaskInfo
 	done          chan struct{}
 	quit          chan struct{}
@@ -165,7 +165,6 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 		PubkeyHash:    pubkeyHash,
 		webcfg:        webcfg,
 		FileTypeMap:   filetype.SupportTypes(),
-		TM:            NewTaskManager(),
 		done:          make(chan struct{}),
 		quit:          make(chan struct{}),
 		store:         store,
@@ -210,7 +209,27 @@ func (c *ClientManager) ExecuteTask() error {
 		return err
 	}
 	for _, taskInfo := range unconfirmTasks {
-		c.TaskChan <- taskInfo
+		fmt.Printf("task %+v\n", taskInfo)
+		switch taskInfo.Task.Type {
+		case common.TaskUploadFileType:
+			req := common.UploadReq{}
+			data, err := json.Marshal(taskInfo.Task.Payload)
+			if err != nil {
+				log.WithError(err).Error("marshal payload")
+				continue
+			}
+			err = json.Unmarshal(data, req)
+			if err != nil {
+				log.WithError(err).Error("unmarshal data")
+				continue
+			}
+			fmt.Printf("task %+v\n", req)
+			taskInfo.Task.Payload = req
+		}
+		req := taskInfo.Task.Payload.(common.UploadReq)
+		if req.Filename != "" && req.Dest != "" {
+			c.TaskChan <- taskInfo
+		}
 	}
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -233,6 +252,7 @@ func (c *ClientManager) ExecuteTask() error {
 				log.Infof("Handle task %+v", taskInfo)
 				switch task.Type {
 				case common.TaskUploadFileType:
+					fmt.Printf("task payload %+v\n", task.Payload)
 					req := task.Payload.(common.UploadReq)
 					err = c.UploadFile(req.Filename, req.Dest, req.Interactive, req.NewVersion, req.IsEncrypt, req.Sno)
 				case common.TaskUploadDirType:
