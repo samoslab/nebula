@@ -202,17 +202,18 @@ func (c *ClientManager) ExecuteTask() error {
 	log := c.Log
 	log.Info("Start task goroutine, handle unfinished task first")
 	// unfinished task
-	unconfirmTasks, err := c.store.GetTaskArray(func(rwd TaskInfo) bool {
+	unhandleTasks, err := c.store.GetTaskArray(func(rwd TaskInfo) bool {
 		return rwd.Status == StatusGotTask
 	})
 	if err != nil {
+		log.WithError(err).Error("Get unhandle task failed")
 		return err
 	}
-	for _, taskInfo := range unconfirmTasks {
-		fmt.Printf("task %+v\n", taskInfo)
+	log.Infof("Unhandle task number %d", len(unhandleTasks))
+	for _, taskInfo := range unhandleTasks {
 		switch taskInfo.Task.Type {
 		case common.TaskUploadFileType:
-			req := common.UploadReq{}
+			req := &common.UploadReq{}
 			data, err := json.Marshal(taskInfo.Task.Payload)
 			if err != nil {
 				log.WithError(err).Error("marshal payload")
@@ -223,8 +224,7 @@ func (c *ClientManager) ExecuteTask() error {
 				log.WithError(err).Error("unmarshal data")
 				continue
 			}
-			fmt.Printf("task %+v\n", req)
-			taskInfo.Task.Payload = req
+			taskInfo.Task.Payload = *req
 		}
 		req := taskInfo.Task.Payload.(common.UploadReq)
 		if req.Filename != "" && req.Dest != "" {
@@ -252,22 +252,23 @@ func (c *ClientManager) ExecuteTask() error {
 				log.Infof("Handle task %+v", taskInfo)
 				switch task.Type {
 				case common.TaskUploadFileType:
-					fmt.Printf("task payload %+v\n", task.Payload)
 					req := task.Payload.(common.UploadReq)
 					err = c.UploadFile(req.Filename, req.Dest, req.Interactive, req.NewVersion, req.IsEncrypt, req.Sno)
 				case common.TaskUploadDirType:
 				default:
 					err = errors.New("unknown")
 				}
+				errStr := ""
 				if err != nil {
 					log.WithError(err).Error("task failed")
+					errStr = err.Error()
 				} else {
 					log.Infof("execute task success")
 				}
 				taskInfo, err = c.store.UpdateTaskInfo(taskInfo.Key, func(rs TaskInfo) TaskInfo {
 					rs.Status = StatusDone
 					rs.UpdatedAt = common.Now()
-					rs.Err = err
+					rs.Err = errStr
 					return rs
 				})
 				if err != nil {

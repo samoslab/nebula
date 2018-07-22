@@ -76,7 +76,7 @@ type TaskInfo struct {
 	Task      Task
 	UpdatedAt uint64
 	Seq       uint64
-	Err       error
+	Err       string
 }
 
 //StoreTask save affiliate task into db
