@@ -775,7 +775,7 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 
 func (c *ClientManager) uploadFileToReplicaProvider(pro *mpb.ReplicaProvider, uploadPara *common.UploadParameter) ([]byte, error) {
 	fileInfo := uploadPara.HF
-	log := c.Log.WithField("filename", fileInfo.FileName)
+	log := c.Log.WithField("uploading", fileInfo.FileName)
 	server := fmt.Sprintf("%s:%d", pro.GetServer(), pro.GetPort())
 	conn, err := grpc.Dial(server, grpc.WithInsecure())
 	if err != nil {
@@ -859,9 +859,9 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 		return nil, err
 	}
 	if fileName == originFileName {
-		c.PM.SetProgress(fileName, 0, uint64(len(providers))*req.FileSize)
+		c.PM.SetProgress(originFileName, 0, uint64(len(providers))*req.FileSize)
 	} else {
-		c.PM.SetProgress(fileName, 0, uint64(int64(len(providers))*fileSize))
+		c.PM.SetProgress(originFileName, 0, uint64(int64(len(providers))*fileSize))
 	}
 
 	for _, pro := range providers {
