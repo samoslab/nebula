@@ -429,7 +429,6 @@ $("#rename-cfm").click(function(){
 //上传文件
 $("#upLoadFileBtn").click(function(){
     $("#upLoadFileIpt").unbind().change(function(){
-        let localPath = document.getElementById("upLoadFileIpt").files[0].path;
         let space_no = '';
         let hashPath = method.getParamsUrl().path;
         let a = hashPath.split(":")[0];
@@ -443,28 +442,67 @@ $("#upLoadFileBtn").click(function(){
         if(b ==0){
             hashPath = "/";
         }
-
-        console.log(localPath+";"+hashPath);
-
-        $.ajax({
-            url:"/api/v1/store/upload",
-            method:"POST",
-            contentType: "application/json",
-            data:JSON.stringify({
-                "filename":localPath,
-                "dest_dir": hashPath,
-                "interactive":true,
-                "newversion" :false,
-                "space_no":space_no,
-                "is_encrypt":true
-            }),
-            success:function(res){
-                console.log(res);
-                if((res.code==0)&&(res.Data=='ok')){
-                    method.firstInit();
+        //选择的文件
+        let local = document.getElementById("upLoadFileIpt").files;
+        for(let i=0;i<local.length;i++){
+            //每个选择文件的路
+            let localPath = local[i].path;
+            $.ajax({
+                url:"/api/v1/store/upload",
+                method:"POST",
+                contentType: "application/json",
+                data:JSON.stringify({
+                    "filename":localPath,
+                    "dest_dir": hashPath,
+                    "interactive":true,
+                    "newversion" :false,
+                    "space_no":space_no,
+                    "is_encrypt":true
+                }),
+                success:function(res){
+                    console.log(res);
+                    if((res.code==0)&&(res.Data=='ok')){
+                        method.firstInit();
+                    }
                 }
-            }
-        });
+            });
+        }
+        
+        // let space_no = '';
+        // let hashPath = method.getParamsUrl().path;
+        // let a = hashPath.split(":")[0];
+        // let b = hashPath.split(":")[1];   
+        // if(a == "myspace"){
+        //     space_no = 0;
+        // }else if(a == "privite"){
+        //     space_no = 1;
+        // }
+        // hashPath = b;
+        // if(b ==0){
+        //     hashPath = "/";
+        // }
+
+        // console.log(localPath+";"+hashPath);
+
+        // $.ajax({
+        //     url:"/api/v1/store/upload",
+        //     method:"POST",
+        //     contentType: "application/json",
+        //     data:JSON.stringify({
+        //         "filename":localPath,
+        //         "dest_dir": hashPath,
+        //         "interactive":true,
+        //         "newversion" :false,
+        //         "space_no":space_no,
+        //         "is_encrypt":true
+        //     }),
+        //     success:function(res){
+        //         console.log(res);
+        //         if((res.code==0)&&(res.Data=='ok')){
+        //             method.firstInit();
+        //         }
+        //     }
+        // });
     });
 });
 
@@ -806,6 +844,12 @@ var public = {
             return Math.round(result*100/1024*1024)/100+'T';
         }
 
+    },
+    //求窗口尺寸大小
+    wh:function(){
+        let fmh = $(".frame-main").height();
+        $("#listBox").css('height',(fmh-100)+'px');
+        $("#tsMenu").css('height',(fmh-100)+'px');
     }
 };
 
@@ -867,8 +911,11 @@ function pay(orderId){
             "order_id":orderId
         }),
         success:function(res){
-            if(res.code==0){
+            console.log(res);
+            if((res.code==0)&&(res.Data.code==0)){
                 alert('Payment success!');
+            }else if((res.code==0)&&(res.Data.code!=0)){
+                alert(res.Data.errMsg);
             }else{
                 alert('Payment failed, Please try again!');
             }

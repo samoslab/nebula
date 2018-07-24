@@ -22,6 +22,32 @@ type UploadReq struct {
 	IsEncrypt   bool   `json:"is_encrypt"`
 }
 
+// UploadDirReq request struct for upload directory
+type UploadDirReq struct {
+	Parent      string `json:"parent"`
+	Dest        string `json:"dest_dir"`
+	Interactive bool   `json:"interactive"`
+	NewVersion  bool   `json:"newversion"`
+	Sno         uint32 `json:"space_no"`
+	IsEncrypt   bool   `json:"is_encrypt"`
+}
+
+// DownloadReq request struct for download file
+type DownloadReq struct {
+	FileHash string `json:"filehash"`
+	FileSize uint64 `json:"filesize"`
+	FileName string `json:"filename"`
+	Dest     string `json:"dest_dir"`
+	Sno      uint32 `json:"space_no"`
+}
+
+// DownloadDirReq request struct for download directory
+type DownloadDirReq struct {
+	Parent string `json:"parent"`
+	Dest   string `json:"dest_dir"`
+	Sno    uint32 `json:"space_no"`
+}
+
 // UnifiedResponse for all reponse format
 type UnifiedResponse struct {
 	Errmsg string `json:"errmsg"`

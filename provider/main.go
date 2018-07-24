@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"os/user"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -37,21 +38,29 @@ import (
 const home_config_folder = ".samos-nebula-provider"
 
 func main() {
+	var defaultConfigDirFlag string
 	usr, err := user.Current()
 	if err != nil {
 		fmt.Println("Get OS current user failed: ", err.Error())
-		os.Exit(100)
+		fmt.Println("Be sure to use the -configDir parameter because of this system limitations.")
+		defaultConfigDirFlag, err = filepath.Abs(filepath.Dir(os.Args[0]))
+		if err != nil {
+			fmt.Printf("Get path of %s error: %s\n", os.Args[0], err)
+			os.Exit(100)
+		}
+	} else {
+		defaultConfigDirFlag = usr.HomeDir + string(os.PathSeparator) + home_config_folder
 	}
 
 	daemonCommand := flag.NewFlagSet("daemon", flag.ExitOnError)
-	daemonConfigDirFlag := daemonCommand.String("configDir", usr.HomeDir+string(os.PathSeparator)+home_config_folder, "config director")
+	daemonConfigDirFlag := daemonCommand.String("configDir", defaultConfigDirFlag, "config director")
 	daemonTrackerServerFlag := daemonCommand.String("trackerServer", "tracker.store.samos.io:6677", "tracker server address, eg: tracker.store.samos.io:6677")
 	daemonCollectorServerFlag := daemonCommand.String("collectorServer", "collector.store.samos.io:6688", "collector server address, eg: collector.store.samos.io:6688")
 	listenFlag := daemonCommand.String("listen", ":6666", "listen address and port, eg: 111.111.111.111:6666 or :6666")
 	disableAutoRefreshIpFlag := daemonCommand.Bool("disableAutoRefreshIp", false, "disable auto refresh provider ip or enable auto refresh provider ip")
 
 	registerCommand := flag.NewFlagSet("register", flag.ExitOnError)
-	registerConfigDirFlag := registerCommand.String("configDir", usr.HomeDir+string(os.PathSeparator)+home_config_folder, "config director")
+	registerConfigDirFlag := registerCommand.String("configDir", defaultConfigDirFlag, "config director")
 	registerTrackerServerFlag := registerCommand.String("trackerServer", "tracker.store.samos.io:6677", "tracker server address, eg: tracker.store.samos.io:6677")
 	registerListenFlag := registerCommand.String("listen", ":6666", "listen address and port, eg: 111.111.111.111:6666 or :6666")
 	walletAddressFlag := registerCommand.String("walletAddress", "", "Samos wallet address to accept earnings")
@@ -67,16 +76,16 @@ func main() {
 	dynamicDomainFlag := registerCommand.String("dynamicDomain", "", "dynamic domain for client to connect, eg: mydomain.xicp.net")
 
 	verifyEmailCommand := flag.NewFlagSet("verifyEmail", flag.ExitOnError)
-	verifyEmailConfigDirFlag := verifyEmailCommand.String("configDir", usr.HomeDir+string(os.PathSeparator)+home_config_folder, "config director")
+	verifyEmailConfigDirFlag := verifyEmailCommand.String("configDir", defaultConfigDirFlag, "config director")
 	verifyEmailTrackerServerFlag := verifyEmailCommand.String("trackerServer", "tracker.store.samos.io:6677", "tracker server address, eg: tracker.store.samos.io:6677")
 	verifyCodeFlag := verifyEmailCommand.String("verifyCode", "", "verify code from verify email")
 
 	resendVerifyCodeCommand := flag.NewFlagSet("resendVerifyCode", flag.ExitOnError)
-	resendVerifyCodeConfigDirFlag := resendVerifyCodeCommand.String("configDir", usr.HomeDir+string(os.PathSeparator)+home_config_folder, "config director")
+	resendVerifyCodeConfigDirFlag := resendVerifyCodeCommand.String("configDir", defaultConfigDirFlag, "config director")
 	resendVerifyCodeTrackerServerFlag := resendVerifyCodeCommand.String("trackerServer", "tracker.store.samos.io:6677", "tracker server address, eg: tracker.store.samos.io:6677")
 
 	addStorageCommand := flag.NewFlagSet("addStorage", flag.ExitOnError)
-	addStorageConfigDirFlag := addStorageCommand.String("configDir", usr.HomeDir+string(os.PathSeparator)+home_config_folder, "config director")
+	addStorageConfigDirFlag := addStorageCommand.String("configDir", defaultConfigDirFlag, "config director")
 	addStorageTrackerServerFlag := addStorageCommand.String("trackerServer", "tracker.store.samos.io:6677", "tracker server address, eg: tracker.store.samos.io:6677")
 	pathFlag := addStorageCommand.String("path", "", "add storage path")
 	volumeFlag := addStorageCommand.String("volume", "", "add storage volume size, unit TB or GB, eg: 2TB or 500GB")
