@@ -451,6 +451,7 @@ $(function(){
             location.hash = 'myspace:';
             method.init('myspace:');  
         }
+        public.wh();        //确定内容区高度
     },false);
 
     //页面路径发生变化时初始化页面；
@@ -458,6 +459,10 @@ $(function(){
          if(method.getParamsUrl().path){
             method.firstInit();
         }
+    },false);
+
+    window.addEventListener('resize',function(){
+       public.wh(); //确定内容区高度
     },false);
 
    if(!$.cookie("privitePsd")){  
