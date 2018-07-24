@@ -17,7 +17,7 @@ func main() {
 		return
 	}
 	timeout := 10
-	if len(os.Args) == 3 {
+	if len(os.Args) == 4 {
 		var err error
 		timeout, err = strconv.Atoi(os.Args[3])
 		if err != nil {
@@ -37,7 +37,7 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	} else {
-		fmt.Printf("Ping success. cost: %dns\n", time.Now().UnixNano()-start)
+		fmt.Printf("Ping success. cost: %dms\n", (time.Now().UnixNano()-start)/1000000)
 	}
 }
 
