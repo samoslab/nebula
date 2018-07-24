@@ -624,6 +624,11 @@ func newProviderConfig(no *node.Node, walletAddress string, billEmail string,
 }
 
 func portMapping(port int) {
+	defer func() {
+		if er := recover(); er != nil {
+			fmt.Printf("use upnp port mapping failed: %s\n", er)
+		}
+	}()
 	upnpMan := new(upnp.Upnp)
 	if err := upnpMan.AddPortMapping(port, port, "TCP"); err != nil {
 		fmt.Println("use upnp port mapping failed: " + err.Error())
@@ -632,10 +637,15 @@ func portMapping(port int) {
 	}
 }
 
-func externalIpAddr() (string, error) {
+func externalIpAddr() (outIp string, err error) {
+	defer func() {
+		if er := recover(); err != nil {
+			err = fmt.Errorf("use upnp get external ip address failed: %s", er)
+		}
+	}()
 	upnpMan := new(upnp.Upnp)
-	if err := upnpMan.ExternalIPAddr(); err != nil {
-		return "", err
+	if err = upnpMan.ExternalIPAddr(); err != nil {
+		return
 	}
 	return upnpMan.GatewayOutsideIP, nil
 }
