@@ -943,6 +943,20 @@ Args:
 
 ```
 
+# websocket interface
+
+port: 7799
+uri: /message
+
+消息格式：
+
+```
+1. {"type":"UploadFile","source":"/root/testmul.txt","code":0,"error":""}
+2. {"type":"UploadDir","source":"/root/test","code":0,"error":""}
+3. {"type":"DownloadFile","source":"/root/testmul.txt","code":0,"error":""}
+4. {"type":"DownloadDir","source":"/root/test","code":0,"error":""}
+```
+
 # specification
 
 ```
@@ -957,3 +971,4 @@ Args:
 纠删码上传
 纠删码下载
 ```
+
