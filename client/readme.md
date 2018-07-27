@@ -296,6 +296,7 @@ Method: POST
 Request Body: {
    src:string
    dest:string
+   ispath:bool
    space_no:uint32
    }
 ```
@@ -303,7 +304,7 @@ Request Body: {
 Exmaple 
 
 ```
-curl -X POST -H "Content-Type:application/json" -d '{"src":"62633239633363392d373462332d343961632d396633312d363731336331376433633334",  "dest":"newfile.txt", "space_no": 0}' http://127.0.0.1:7788/api/v1/store/rename
+curl -X POST -H "Content-Type:application/json" -d '{"src":"62633239633363392d373462332d343961632d396633312d363731336331376433633334",  "dest":"newfile.txt", "is_path": false, space_no": 0}' http://127.0.0.1:7788/api/v1/store/rename
 {
     "errmsg": "",
     "code": 0,

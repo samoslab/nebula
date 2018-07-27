@@ -14,7 +14,7 @@ import (
 	"path/filepath"
 
 	"github.com/samoslab/nebula/provider/node"
-	util_file "github.com/samoslab/nebula/util/file"
+	"github.com/samoslab/nebula/util/file"
 )
 
 var (
@@ -47,7 +47,7 @@ type ClientConfig struct {
 
 // LoadConfig load config from config file
 func LoadConfig(configDirPath string) (*ClientConfig, error) {
-	if !util_file.Exists(configDirPath) {
+	if !file.Exists(configDirPath) {
 		return nil, ErrNoConf
 	}
 	cc, err := readConfig(configDirPath)
@@ -93,7 +93,7 @@ func GetNodeFromConfig(conf *ClientConfig) *node.Node {
 // SaveClientConfig create client config save to disk
 func SaveClientConfig(configDirFile string, cc *ClientConfig) error {
 	configDir, _ := filepath.Split(configDirFile)
-	if !util_file.Exists(configDir) {
+	if !file.Exists(configDir) {
 		if err := os.MkdirAll(configDir, 0700); err != nil {
 			return fmt.Errorf("mkdir config folder %s failed:%s", configDir, err)
 		}
@@ -145,4 +145,11 @@ func sha1Sum(content []byte) []byte {
 	h := sha1.New()
 	h.Write(content)
 	return h.Sum(nil)
+}
+
+// GetConfigFile get config file
+func GetConfigFile() (string, string) {
+	defaultConfig := filepath.Join(file.UserHome(), DefaultConfigDir, DefaultConfig)
+	defaultAppDir, _ := filepath.Split(defaultConfig)
+	return defaultAppDir, defaultConfig
 }

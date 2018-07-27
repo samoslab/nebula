@@ -96,6 +96,8 @@ type ClientManager struct {
 	webcfg        config.Config
 	FileTypeMap   filetype.SupportType
 	TaskChan      chan TaskInfo
+	MsgChan       chan string
+	MsgCount      uint32
 	done          chan struct{}
 	quit          chan struct{}
 	store         *store
@@ -155,20 +157,21 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 		serverConn:    conn,
 		Log:           log,
 		cfg:           cfg,
-		TempDir:       os.TempDir(),
-		NodeId:        cfg.Node.NodeId,
-		PM:            progress.NewProgressManager(),
-		mclient:       mpb.NewMatadataServiceClient(conn),
 		OM:            om,
+		store:         store,
 		SpaceM:        spaceM,
+		webcfg:        webcfg,
 		TrackerPubkey: rsaPubkey,
 		PubkeyHash:    pubkeyHash,
-		webcfg:        webcfg,
+		TempDir:       os.TempDir(),
+		NodeId:        cfg.Node.NodeId,
 		FileTypeMap:   filetype.SupportTypes(),
+		PM:            progress.NewProgressManager(),
+		mclient:       mpb.NewMatadataServiceClient(conn),
 		done:          make(chan struct{}),
 		quit:          make(chan struct{}),
-		store:         store,
-		TaskChan:      make(chan TaskInfo, 1000),
+		MsgChan:       make(chan string, common.MsgQueueLen),
+		TaskChan:      make(chan TaskInfo, common.TaskQuqueLen),
 	}
 
 	collectClient.NodePtr = cfg.Node
@@ -186,6 +189,14 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 	go c.ExecuteTask()
 
 	return c, nil
+}
+
+func (c *ClientManager) GetMsgCount() uint32 {
+	return c.MsgCount
+}
+
+func (c *ClientManager) GetMsgChan() <-chan string {
+	return c.MsgChan
 }
 
 // Shutdown shutdown tracker connection
@@ -264,19 +275,24 @@ func (c *ClientManager) ExecuteTask() error {
 				task := taskInfo.Task
 				log := log.WithField("task key", taskInfo.Key)
 				log.Infof("Handle task %+v", taskInfo)
+				doneMsg := common.MakeSuccDoneMsg(task.Type, "")
 				switch task.Type {
 				case common.TaskUploadFileType:
 					req := task.Payload.(*common.UploadReq)
 					err = c.UploadFile(req.Filename, req.Dest, req.Interactive, req.NewVersion, req.IsEncrypt, req.Sno)
+					doneMsg.Source = req.Filename
 				case common.TaskUploadDirType:
 					req := task.Payload.(*common.UploadDirReq)
 					err = c.UploadDir(req.Parent, req.Dest, req.Interactive, req.NewVersion, req.IsEncrypt, req.Sno)
+					doneMsg.Source = req.Parent
 				case common.TaskDownloadFileType:
 					req := task.Payload.(*common.DownloadReq)
 					err = c.DownloadFile(req.FileName, req.Dest, req.FileHash, req.FileSize, req.Sno)
+					doneMsg.Source = req.FileName
 				case common.TaskDownloadDirType:
 					req := task.Payload.(*common.DownloadDirReq)
 					err = c.DownloadDir(req.Parent, req.Dest, req.Sno)
+					doneMsg.Source = req.Parent
 				default:
 					err = errors.New("unknown")
 				}
@@ -284,9 +300,12 @@ func (c *ClientManager) ExecuteTask() error {
 				if err != nil {
 					log.WithError(err).Error("task failed")
 					errStr = err.Error()
+					doneMsg.SetError(1, err)
 				} else {
 					log.Infof("execute task success")
 				}
+				c.MsgChan <- doneMsg.Serialize()
+				c.MsgCount++
 				taskInfo, err = c.store.UpdateTaskInfo(taskInfo.Key, func(rs TaskInfo) TaskInfo {
 					rs.Status = StatusDone
 					rs.UpdatedAt = common.Now()
@@ -430,10 +449,15 @@ func (c *ClientManager) UploadDir(parent, dest string, interactive, newVersion, 
 			}
 		} else {
 			log.Debugf("Upload file %+v", dpair)
+			doneMsg := common.MakeSuccDoneMsg(common.TaskUploadFileType, dpair.Name)
 			err := c.UploadFile(dpair.Name, dpair.Parent, interactive, newVersion, isEncrypt, sno)
 			if err != nil {
-				return err
+				doneMsg.SetError(1, err)
 			}
+
+			c.MsgChan <- doneMsg.Serialize()
+			c.MsgCount++
+			return err
 		}
 	}
 	return nil
@@ -1049,6 +1073,7 @@ func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitio
 	if ufdrsp.GetCode() != 0 {
 		return fmt.Errorf("%s", ufdrsp.GetErrMsg())
 	}
+
 	return nil
 }
 
@@ -1477,22 +1502,26 @@ func (c *ClientManager) RemoveFile(target string, recursive bool, isPath bool, s
 }
 
 // MoveFile move file
-func (c *ClientManager) MoveFile(source, dest string, sno uint32) error {
+func (c *ClientManager) MoveFile(source, dest string, isPath bool, sno uint32) error {
 	log := c.Log.WithField("move source", source)
 	req := &mpb.MoveReq{
 		Version:   common.Version,
 		NodeId:    c.NodeId,
 		Timestamp: common.Now(),
+		Dest:      dest,
 	}
-	id, err := hex.DecodeString(source)
-	if err != nil {
-		return err
+	if isPath {
+		req.Source = &mpb.FilePath{OneOfPath: &mpb.FilePath_Path{source}, SpaceNo: sno}
+	} else {
+		id, err := hex.DecodeString(source)
+		if err != nil {
+			return err
+		}
+		log.Infof("move file binary id %s", id)
+		req.Source = &mpb.FilePath{OneOfPath: &mpb.FilePath_Id{id}, SpaceNo: sno}
 	}
-	log.Infof("Move file binary id %s", id)
-	req.Source = &mpb.FilePath{OneOfPath: &mpb.FilePath_Id{id}, SpaceNo: sno}
-	req.Dest = dest
 
-	err = req.SignReq(c.cfg.Node.PriKey)
+	err := req.SignReq(c.cfg.Node.PriKey)
 	if err != nil {
 		return err
 	}

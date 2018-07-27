@@ -8,4 +8,7 @@ var (
 	TaskUploadDirType    = "UploadDir"
 	TaskDownloadFileType = "DownloadFile"
 	TaskDownloadDirType  = "DownloadDir"
+
+	MsgQueueLen  = 1000
+	TaskQuqueLen = 1000
 )

@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/samoslab/nebula/client/config"
-	"github.com/samoslab/nebula/client/daemon"
 	"github.com/samoslab/nebula/client/service"
+	"github.com/samoslab/nebula/client/wsservice"
 	"github.com/samoslab/nebula/util/browser"
 	"github.com/samoslab/nebula/util/file"
 	"github.com/samoslab/nebula/util/logger"
@@ -18,12 +18,13 @@ import (
 func main() {
 	configFile := pflag.StringP("conf", "c", "config.json", "config file")
 	serverAddr := pflag.StringP("server", "s", "127.0.0.1:7788", "listen address ip:port")
+	wsAddr := pflag.StringP("wsaddr", "w", "127.0.0.1:7799", "websocket listen address ip:port")
 	collectAddr := pflag.StringP("collect", "", "", "collect server format is ip:port")
 	trackerAddr := pflag.StringP("tracker", "", "", "tracker server format is ip:port")
 	webDir := pflag.StringP("webdir", "d", "./web/build", "web static directory")
 	launchBrowser := pflag.BoolP("launch-browser", "l", false, "launch system default webbrowser at client startup")
 	pflag.Parse()
-	defaultAppDir, _ := daemon.GetConfigFile()
+	defaultAppDir, _ := config.GetConfigFile()
 	if _, err := os.Stat(defaultAppDir); os.IsNotExist(err) {
 		//create the dir.
 		if err := os.MkdirAll(defaultAppDir, 0744); err != nil {
@@ -44,6 +45,9 @@ func main() {
 	}
 	if *serverAddr != "" {
 		webcfg.HTTPAddr = *serverAddr
+	}
+	if *wsAddr != "" {
+		webcfg.WSAddr = *wsAddr
 	}
 
 	if *webDir != "" {
@@ -68,6 +72,18 @@ func main() {
 		defer wg.Done()
 		server.Run()
 	}()
+
+	ws := wsservice.NewWSController(log, server.GetClientManager())
+	defer ws.Shutdown()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		fmt.Printf("start websocket listen at %s\n", webcfg.WSAddr)
+		if err := ws.Run(webcfg.WSAddr); err != nil {
+			fmt.Printf("websocket run failed\n")
+		}
+	}()
+
 	if *launchBrowser {
 		wg.Add(1)
 		go func() {
@@ -84,5 +100,6 @@ func main() {
 			}
 		}()
 	}
+
 	wg.Wait()
 }

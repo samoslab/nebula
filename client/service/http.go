@@ -58,7 +58,7 @@ type HTTPServer struct {
 
 // InitClientManager init client manager
 func InitClientManager(log logrus.FieldLogger, webcfg config.Config) (*daemon.ClientManager, error) {
-	_, defaultConfig := daemon.GetConfigFile()
+	_, defaultConfig := config.GetConfigFile()
 	clientConfig, err := config.LoadConfig(defaultConfig)
 	if err != nil {
 		if err == config.ErrNoConf {
@@ -91,6 +91,9 @@ func NewHTTPServer(log logrus.FieldLogger, cfg config.Config) *HTTPServer {
 	}
 }
 
+func (s *HTTPServer) GetClientManager() **daemon.ClientManager {
+	return &s.cm
+}
 func (s *HTTPServer) CanBeWork() bool {
 	if s.cm != nil {
 		return true
@@ -366,6 +369,7 @@ type MkfolderReq struct {
 type RenameReq struct {
 	Source string `json:"src"`
 	Dest   string `json:"dest"`
+	IsPath bool   `json:"ispath"`
 	Sno    uint32 `json:"space_no"`
 }
 
@@ -1452,7 +1456,7 @@ func RenameHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		log.Infof("Move request %+v", req)
-		err := s.cm.MoveFile(req.Source, req.Dest, req.Sno)
+		err := s.cm.MoveFile(req.Source, req.Dest, req.IsPath, req.Sno)
 		result, code, errmsg := "ok", 0, ""
 		if err != nil {
 			log.Errorf("Move file %+v error %v", req, err)

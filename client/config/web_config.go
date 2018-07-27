@@ -26,6 +26,8 @@ const (
 
 	// DefaultWebDir default web dir
 	DefaultWebDir = "./web/build"
+
+	DefaultWSServer = "127.0.0.1:7799"
 )
 
 // Config config for web
@@ -36,6 +38,7 @@ type Config struct {
 	ConfigFile       string        `json:"config_file"`
 	HTTPAddr         string        `json:"http_addr"`
 	HTTPPort         uint32        `json:"http_port"`
+	WSAddr           string        `json:"ws_addr"`
 	HTTPSAddr        string        `json:"https_addr"`
 	StaticDir        string        `json:"static_dir"`
 	AutoTLSHost      string        `json:"auto_tls_host"`
@@ -63,6 +66,9 @@ func (cfg *Config) SetDefault() {
 	}
 	if cfg.HTTPAddr == "" {
 		cfg.HTTPAddr = DefaultServer
+	}
+	if cfg.WSAddr == "" {
+		cfg.WSAddr = DefaultWSServer
 	}
 
 	if cfg.StaticDir == "" {

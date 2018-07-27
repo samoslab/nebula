@@ -4,20 +4,9 @@ import (
 	"io"
 	"math"
 	"os"
-	"path/filepath"
 	"runtime"
 	"strings"
-
-	"github.com/samoslab/nebula/client/config"
-	"github.com/samoslab/nebula/util/file"
 )
-
-// GetConfigFile get config file
-func GetConfigFile() (string, string) {
-	defaultConfig := filepath.Join(file.UserHome(), config.DefaultConfigDir, config.DefaultConfig)
-	defaultAppDir, _ := filepath.Split(defaultConfig)
-	return defaultAppDir, defaultConfig
-}
 
 // GetFileModTime get file modify time
 func GetFileModTime(filename string) (int64, error) {
