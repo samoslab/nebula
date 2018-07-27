@@ -87,3 +87,38 @@ func (pm *ProgressManager) GetProgress(files []string) (map[string]float64, erro
 	}
 	return a, nil
 }
+
+// GetProgress return progress data
+func (pm *ProgressManager) GetProgressingMsg(files []string) ([]string, error) {
+	result := []string{}
+	mp := map[string]struct{}{}
+	for _, file := range files {
+		mp[file] = struct{}{}
+	}
+	a := map[string]float64{}
+	for k, v := range pm.Progress {
+		fmt.Printf("get %s, %+v\n", k, v)
+		if !match(mp, k) {
+			continue
+		}
+		if v.Total != 0 {
+			rate := fmt.Sprintf("%0.2f", float64(v.Current)/float64(v.Total))
+			x, err := strconv.ParseFloat(rate, 10)
+			if err != nil {
+				return result, err
+			}
+			// skip finished time bigger than 60s
+			if int(x) == 1 && (common.Now()-v.Time) > 60 {
+				continue
+			}
+			a[k] = x
+		} else {
+			a[k] = 0.0
+		}
+	}
+	for k, v := range a {
+		msg := common.MakeSuccProgressMsg(common.TaskUploadProgressType, k, v)
+		result = append(result, msg.Serialize())
+	}
+	return result, nil
+}

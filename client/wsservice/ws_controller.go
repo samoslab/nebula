@@ -1,9 +1,9 @@
 package wsservice
 
 import (
-	"fmt"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -57,9 +57,12 @@ func (c *WSController) SetClientManager(m **daemon.ClientManager) {
 }
 
 func (c *WSController) Shutdown() {
+	close(c.quit)
+	<-c.done
 }
 
 func (c *WSController) answerWriter(ws *websocket.Conn, msgType string) {
+	log := c.log
 	pingTicker := time.NewTicker(pingPeriod)
 	defer func() {
 		pingTicker.Stop()
@@ -67,12 +70,17 @@ func (c *WSController) answerWriter(ws *websocket.Conn, msgType string) {
 	}()
 	for {
 		select {
+		case <-c.quit:
+			log.Info("shutdown answer writter")
+			return
+
 		case <-pingTicker.C:
 			ws.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := ws.WriteMessage(websocket.PingMessage, []byte{}); err != nil {
 				return
 			}
 		case msg := <-(*c.cm).GetMsgChan():
+			(*c.cm).DecreaseMsgCount()
 			ws.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := ws.WriteMessage(websocket.TextMessage, []byte(msg)); err != nil {
 				return
@@ -96,20 +104,25 @@ func (c *WSController) ServeWs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (c *WSController) Consume() {
+	log := c.log
 	fileTicker := time.NewTicker(filePeriod)
 	defer func() {
 		fileTicker.Stop()
+		close(c.done)
 	}()
-	fmt.Printf("consume 1\n")
 	for {
 		select {
+		case <-c.quit:
+			log.Info("Shutdown message consumer")
+			return
 		case <-fileTicker.C:
 			cnt := (*c.cm).GetMsgCount()
 			if cnt > uint32(common.MsgQueueLen-998) {
 				for i := 0; i < int(cnt); i++ {
 					select {
 					case msg := <-(*c.cm).GetMsgChan():
-						fmt.Printf("active consume msg %+v\n", msg)
+						log.Infof("active consume msg %+v", msg)
+						(*c.cm).DecreaseMsgCount()
 					}
 				}
 			}
@@ -119,11 +132,29 @@ func (c *WSController) Consume() {
 
 func (c *WSController) Run(addr string) error {
 	http.HandleFunc("/message", c.ServeWs)
+	var wg sync.WaitGroup
+	errC := make(chan error)
 	go c.Consume()
-	if err := http.ListenAndServe(addr, nil); err != nil {
-		fmt.Println(err)
-		return err
-	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := http.ListenAndServe(addr, nil); err != nil {
+			errC <- err
+			return
+		}
+	}()
 
-	return nil
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	select {
+	case err := <-errC:
+		return err
+	case <-c.quit:
+		return nil
+	case <-done:
+		return nil
+	}
 }

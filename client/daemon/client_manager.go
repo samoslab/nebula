@@ -187,12 +187,17 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 	collectClient.Start(webcfg.CollectServer)
 
 	go c.ExecuteTask()
+	go c.SendProgressMsg()
 
 	return c, nil
 }
 
 func (c *ClientManager) GetMsgCount() uint32 {
 	return c.MsgCount
+}
+
+func (c *ClientManager) DecreaseMsgCount() {
+	c.MsgCount--
 }
 
 func (c *ClientManager) GetMsgChan() <-chan string {
@@ -204,8 +209,10 @@ func (c *ClientManager) Shutdown() {
 	c.serverConn.Close()
 	collectClient.Stop()
 	close(c.quit)
-	close(c.TaskChan)
 	<-c.done
+	close(c.TaskChan)
+	close(c.MsgChan)
+	fmt.Printf("client manager shutdown")
 }
 
 func map2Req(taskInfo TaskInfo) (TaskInfo, error) {
@@ -273,6 +280,9 @@ func (c *ClientManager) ExecuteTask() error {
 			case taskInfo := <-c.TaskChan:
 				var err error
 				task := taskInfo.Task
+				if taskInfo.Key == "" {
+					continue
+				}
 				log := log.WithField("task key", taskInfo.Key)
 				log.Infof("Handle task %+v", taskInfo)
 				doneMsg := common.MakeSuccDoneMsg(task.Type, "")
@@ -317,6 +327,38 @@ func (c *ClientManager) ExecuteTask() error {
 				} else {
 					log.Infof("update task success")
 				}
+			}
+		}
+	}()
+	wg.Wait()
+	return nil
+}
+
+// SendProgressMsg send message for websocket
+func (c *ClientManager) SendProgressMsg() error {
+	log := c.Log
+	log.Info("Start send progress")
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer func() {
+			wg.Done()
+			log.Infof("Shutdown progress goroutine")
+		}()
+		for {
+			select {
+			case <-c.quit:
+				return
+			case <-time.After(2 * time.Second):
+				msgList, err := c.PM.GetProgressingMsg([]string{})
+				if err != nil {
+					log.WithError(err).Error("Get progress message failed")
+					continue
+				}
+				for _, msg := range msgList {
+					c.MsgChan <- msg
+				}
+
 			}
 		}
 	}()

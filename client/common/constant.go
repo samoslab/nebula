@@ -9,6 +9,9 @@ var (
 	TaskDownloadFileType = "DownloadFile"
 	TaskDownloadDirType  = "DownloadDir"
 
+	TaskUploadProgressType   = "UploadProgress"
+	TaskDownloadProgressType = "DownloadProgress"
+
 	MsgQueueLen  = 1000
 	TaskQuqueLen = 1000
 )
