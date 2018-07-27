@@ -17,7 +17,7 @@ func main() {
 		return
 	}
 	timeout := 10
-	if len(os.Args) == 3 {
+	if len(os.Args) == 4 {
 		var err error
 		timeout, err = strconv.Atoi(os.Args[3])
 		if err != nil {
@@ -25,6 +25,7 @@ func main() {
 			return
 		}
 	}
+	start := time.Now().UnixNano()
 	conn, err := grpc.Dial(os.Args[1]+":"+os.Args[2], grpc.WithInsecure())
 	if err != nil {
 		fmt.Printf("RPC Dial failed: %s\n", err.Error())
@@ -36,7 +37,7 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	} else {
-		fmt.Println("Ping success.")
+		fmt.Printf("Ping success. cost: %dms\n", (time.Now().UnixNano()-start)/1000000)
 	}
 }
 
