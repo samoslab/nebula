@@ -11,34 +11,29 @@ import (
 	"github.com/yanzay/log"
 )
 
-func chooseBackupProvicer(current int, backupMap map[int][]int, usedBackupMap map[int]struct{}) int {
-	if arr, ok := backupMap[current]; ok {
-		for _, i := range arr {
-			if _, ok := usedBackupMap[i]; !ok {
-				usedBackupMap[i] = struct{}{}
-				return i
+func chooseBackupProvicer(hash []byte, backProMap map[string][]*SortablePro) *SortablePro {
+	hashKey := string(hash)
+	if sortPros, ok := backProMap[hashKey]; ok {
+		for i, _ := range sortPros {
+			if !sortPros[i].Used && sortPros[i].Delay <= common.MaxInvalidDelay {
+				sortPros[i].Used = true
+				backProMap[hashKey] = sortPros
+				return sortPros[i]
 			}
 		}
 	}
-	return -1
+	return nil
 }
 
-func createBackupProvicer(workedNum, backupNum int) map[int][]int {
-	backupMap := map[int][]int{}
-	if workedNum != 40 || backupNum != 10 {
-		return backupMap
-	}
-	// workedNum = 40 , backupNum = 10
-	// span = 40 /10 * 2 = 8 nextGroup = 10 /2 = 5
-	// 0-7 --> [0, 5] ; 8-15 --> [1, 6] ; 16-23 --> [2, 7] ; 24-31 -->[3, 8]; 32-39 --> [4, 9]
-	span := (workedNum / backupNum) * 2
-	nextGroup := backupNum / 2
-	for i := 0; i < workedNum; i++ {
-		backupMap[i] = append(backupMap[i], i/span)
-		backupMap[i] = append(backupMap[i], i/span+nextGroup)
+func createBackupProvicer(backupPros []*SortablePro) map[string][]*SortablePro {
+	backProMap := map[string][]*SortablePro{}
+	for _, sortPro := range backupPros {
+		for _, pha := range sortPro.Pro.HashAuth {
+			backProMap[string(pha.Hash)] = append(backProMap[string(pha.Hash)], sortPro)
+		}
 	}
 
-	return backupMap
+	return backProMap
 }
 
 func GetBestReplicaProvider(pros []*mpb.ReplicaProvider, needNum int) ([]*mpb.ReplicaProvider, error) {
@@ -81,15 +76,16 @@ func GetBestReplicaProvider(pros []*mpb.ReplicaProvider, needNum int) ([]*mpb.Re
 	return wellPros[0:needNum], nil
 }
 
+type SortablePro struct {
+	Pro         *mpb.BlockProviderAuth
+	Delay       int
+	OriginIndex int
+	Used        bool
+}
+
 // UsingBestProvider ping provider
 func UsingBestProvider(pros []*mpb.BlockProviderAuth) ([]*mpb.BlockProviderAuth, error) {
-	type SortablePro struct {
-		Pro         *mpb.BlockProviderAuth
-		Delay       int
-		OriginIndex int
-	}
-
-	sortPros := []SortablePro{}
+	sortPros := []*SortablePro{}
 	pingResultMap := map[int]int{}
 	var pingResultMutex sync.Mutex
 
@@ -108,11 +104,15 @@ func UsingBestProvider(pros []*mpb.BlockProviderAuth) ([]*mpb.BlockProviderAuth,
 	wg.Wait()
 	for i, bpa := range pros {
 		pingTime, _ := pingResultMap[i]
-		sortPros = append(sortPros, SortablePro{Pro: bpa, Delay: pingTime, OriginIndex: i})
+		sortPros = append(sortPros, &SortablePro{Pro: bpa, Delay: pingTime, OriginIndex: i})
 	}
 
-	workPros := []SortablePro{}
-	backupPros := []SortablePro{}
+	return generateAvaliablePro(sortPros)
+}
+
+func generateAvaliablePro(sortPros []*SortablePro) ([]*mpb.BlockProviderAuth, error) {
+	workPros := []*SortablePro{}
+	backupPros := []*SortablePro{}
 	for _, proInfo := range sortPros {
 		if !proInfo.Pro.GetSpare() {
 			workPros = append(workPros, proInfo)
@@ -121,27 +121,19 @@ func UsingBestProvider(pros []*mpb.BlockProviderAuth) ([]*mpb.BlockProviderAuth,
 		}
 	}
 
-	workedNum := len(workPros)
-	backupNum := len(backupPros)
-
-	backupMap := createBackupProvicer(workedNum, backupNum)
+	backupProMap := createBackupProvicer(backupPros)
 
 	availablePros := []*mpb.BlockProviderAuth{}
-	usedBackProMap := map[int]struct{}{}
 	for _, proInfo := range workPros {
-		if proInfo.Delay == common.NetworkUnreachable {
+		if proInfo.Delay == common.NetworkUnreachable || proInfo.Delay > common.MaxInvalidDelay {
 			// provider cannot connect , choose one from backup
 			log.Errorf("Provider %+v cannot connected", proInfo.Pro)
-			if backupNum == 0 {
-				log.Errorf("No backup provider for provider %d", proInfo.OriginIndex)
-				return nil, fmt.Errorf("one of provider cannot connected and no backup provider")
-			}
-			choosed := chooseBackupProvicer(proInfo.OriginIndex, backupMap, usedBackProMap)
-			if choosed == -1 {
+			replacePro := chooseBackupProvicer(proInfo.Pro.HashAuth[0].Hash, backupProMap)
+			if replacePro == nil {
 				log.Errorf("No availbe provider for provider %d", proInfo.OriginIndex)
 				return nil, fmt.Errorf("no more backup provider can be choosed")
 			}
-			availablePros = append(availablePros, backupPros[choosed].Pro)
+			availablePros = append(availablePros, replacePro.Pro)
 		} else {
 			availablePros = append(availablePros, proInfo.Pro)
 		}
