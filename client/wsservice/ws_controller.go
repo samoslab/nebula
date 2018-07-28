@@ -117,7 +117,7 @@ func (c *WSController) Consume() {
 			return
 		case <-fileTicker.C:
 			cnt := (*c.cm).GetMsgCount()
-			if cnt > uint32(common.MsgQueueLen-998) {
+			if cnt > uint32(common.MsgQueueLen-common.MsgQueueLen+3) {
 				for i := 0; i < int(cnt); i++ {
 					select {
 					case msg := <-(*c.cm).GetMsgChan():

@@ -641,7 +641,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 			c.PM.SetPartitionMap(fname, fileName)
 		}
 
-		c.PM.SetProgress(fileName, 0, uint64(realSizeAfterRS))
+		c.PM.SetProgress(common.TaskUploadFileType, fileName, 0, uint64(realSizeAfterRS))
 
 		// delete temporary file
 		defer func() {
@@ -1041,9 +1041,9 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 		return nil, err
 	}
 	if fileName == originFileName {
-		c.PM.SetProgress(originFileName, 0, uint64(len(providers))*req.FileSize)
+		c.PM.SetProgress(common.TaskUploadFileType, originFileName, 0, uint64(len(providers))*req.FileSize)
 	} else {
-		c.PM.SetProgress(originFileName, 0, uint64(int64(len(providers))*fileSize))
+		c.PM.SetProgress(common.TaskUploadFileType, originFileName, 0, uint64(int64(len(providers))*fileSize))
 	}
 
 	for _, pro := range providers {
@@ -1281,7 +1281,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 	}
 	_, fileName := filepath.Split(downFileName)
 	downFileName = filepath.Join(destDir, fileName)
-	c.PM.SetProgress(downFileName, 0, req.FileSize)
+	c.PM.SetProgress(common.TaskDownloadFileType, downFileName, 0, req.FileSize)
 
 	ctx := context.Background()
 	log.Infof("Download request file hash %x, size %d", fileHash, fileSize)
@@ -1311,7 +1311,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 			}
 		}
 		SaveFile(downFileName, filedata)
-		c.PM.SetProgress(downFileName, req.FileSize, req.FileSize)
+		c.PM.SetProgress(common.TaskDownloadFileType, downFileName, req.FileSize, req.FileSize)
 		log.Info("Download tiny file")
 		return nil
 	}
@@ -1353,7 +1353,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 			log.Infof("Partition %d block %d hash %x size %d checksum %v seq %d", i, j, block.Hash, block.Size, block.Checksum, block.BlockSeq)
 		}
 	}
-	c.PM.SetProgress(downFileName, 0, realSizeAfterRS)
+	c.PM.SetProgress(common.TaskDownloadFileType, downFileName, 0, realSizeAfterRS)
 
 	if len(partitions) == 1 {
 		partition := partitions[0]
