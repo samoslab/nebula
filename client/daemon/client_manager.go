@@ -204,6 +204,11 @@ func (c *ClientManager) GetMsgChan() <-chan string {
 	return c.MsgChan
 }
 
+func (c *ClientManager) AddDoneMsg(msg string) {
+	c.MsgChan <- msg
+	c.MsgCount++
+}
+
 // Shutdown shutdown tracker connection
 func (c *ClientManager) Shutdown() {
 	c.serverConn.Close()
@@ -307,15 +312,14 @@ func (c *ClientManager) ExecuteTask() error {
 				}
 				errStr := ""
 				if err != nil {
-					log.WithError(err).Error("task failed")
 					errStr = err.Error()
 					doneMsg.SetError(1, err)
+					log.WithError(err).Error("execute task failed")
 				} else {
 					log.Infof("execute task success")
 				}
-				c.MsgChan <- doneMsg.Serialize()
-				c.MsgCount++
-				taskInfo, err = c.store.UpdateTaskInfo(taskInfo.Key, func(rs TaskInfo) TaskInfo {
+				c.AddDoneMsg(doneMsg.Serialize())
+				_, err = c.store.UpdateTaskInfo(taskInfo.Key, func(rs TaskInfo) TaskInfo {
 					rs.Status = StatusDone
 					rs.UpdatedAt = common.Now()
 					rs.Err = errStr
@@ -355,8 +359,7 @@ func (c *ClientManager) SendProgressMsg() error {
 					continue
 				}
 				for _, msg := range msgList {
-					c.MsgChan <- msg
-					c.MsgCount++
+					c.AddDoneMsg(msg)
 				}
 
 			}
@@ -497,8 +500,7 @@ func (c *ClientManager) UploadDir(parent, dest string, interactive, newVersion, 
 				doneMsg.SetError(1, err)
 			}
 
-			c.MsgChan <- doneMsg.Serialize()
-			c.MsgCount++
+			c.AddDoneMsg(doneMsg.Serialize())
 			if err != nil {
 				return err
 			}
@@ -643,7 +645,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 			c.PM.SetPartitionMap(fname, fileName)
 		}
 
-		c.PM.SetProgress(common.TaskUploadFileType, fileName, 0, uint64(realSizeAfterRS))
+		c.PM.SetProgress(common.TaskUploadProgressType, fileName, 0, uint64(realSizeAfterRS))
 
 		// delete temporary file
 		defer func() {
@@ -787,7 +789,7 @@ func (c *ClientManager) CheckFileExists(fileName, dest string, interactive, newV
 			}
 		}
 		req.FileData = fileData
-		c.PM.SetProgress(common.TaskUploadFileType, fileName, 0, uint64(len(req.FileData)))
+		c.PM.SetProgress(common.TaskUploadProgressType, fileName, 0, uint64(len(req.FileData)))
 		c.PM.SetPartitionMap(fileName, fileName)
 		c.PM.SetIncrement(fileName, uint64(len(req.FileData)))
 		fmt.Printf("Origin filesize %d, encrypted size %d\n", req.FileSize, len(req.FileData))
@@ -1046,9 +1048,9 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 		return nil, err
 	}
 	if fileName == originFileName {
-		c.PM.SetProgress(common.TaskUploadFileType, originFileName, 0, uint64(len(providers))*req.FileSize)
+		c.PM.SetProgress(common.TaskUploadProgressType, originFileName, 0, uint64(len(providers))*req.FileSize)
 	} else {
-		c.PM.SetProgress(common.TaskUploadFileType, originFileName, 0, uint64(int64(len(providers))*fileSize))
+		c.PM.SetProgress(common.TaskUploadProgressType, originFileName, 0, uint64(int64(len(providers))*fileSize))
 	}
 
 	for _, pro := range providers {
@@ -1242,7 +1244,13 @@ func (c *ClientManager) startDownloadDir(path, destDir string, sno uint32) error
 					log.Infof("Only create %s because file size is 0", fileInfo.FileName)
 					SaveFile(destFile, []byte{})
 				} else {
+					doneMsg := common.MakeSuccDoneMsg(common.TaskDownloadFileType, currentFile)
 					err = c.DownloadFile(currentFile, destDir, fileInfo.FileHash, fileInfo.FileSize, sno)
+					if err != nil {
+						doneMsg.SetError(1, err)
+					}
+
+					c.AddDoneMsg(doneMsg.Serialize())
 					if err != nil {
 						log.Errorf("Download file %s error %v", currentFile, err)
 						errResult = append(errResult, fmt.Errorf("%s %v", currentFile, common.StatusErrFromError(err)))
@@ -1287,7 +1295,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 	}
 	_, fileName := filepath.Split(downFileName)
 	downFileName = filepath.Join(destDir, fileName)
-	c.PM.SetProgress(common.TaskDownloadFileType, downFileName, 0, req.FileSize)
+	c.PM.SetProgress(common.TaskDownloadProgressType, downFileName, 0, req.FileSize)
 
 	ctx := context.Background()
 	log.Infof("Download request file hash %x, size %d", fileHash, fileSize)
@@ -1317,7 +1325,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 			}
 		}
 		SaveFile(downFileName, filedata)
-		c.PM.SetProgress(common.TaskDownloadFileType, downFileName, req.FileSize, req.FileSize)
+		c.PM.SetProgress(common.TaskDownloadProgressType, downFileName, req.FileSize, req.FileSize)
 		log.Info("Download tiny file")
 		return nil
 	}
@@ -1359,7 +1367,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 			log.Infof("Partition %d block %d hash %x size %d checksum %v seq %d", i, j, block.Hash, block.Size, block.Checksum, block.BlockSeq)
 		}
 	}
-	c.PM.SetProgress(common.TaskDownloadFileType, downFileName, 0, realSizeAfterRS)
+	c.PM.SetProgress(common.TaskDownloadProgressType, downFileName, 0, realSizeAfterRS)
 
 	if len(partitions) == 1 {
 		partition := partitions[0]

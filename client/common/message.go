@@ -53,19 +53,19 @@ type DoneMsg struct {
 	Err    string `json:"error"`
 }
 
-func (m DoneMsg) SetError(code uint32, err error) DoneMsg {
+func (m *DoneMsg) SetError(code uint32, err error) *DoneMsg {
 	m.Code = code
 	m.Err = err.Error()
 	return m
 }
 
-func (m DoneMsg) Serialize() string {
+func (m *DoneMsg) Serialize() string {
 	data, _ := json.Marshal(m)
 	return string(data)
 }
 
-func MakeSuccDoneMsg(tp string, fileName string) DoneMsg {
-	return DoneMsg{
+func MakeSuccDoneMsg(tp string, fileName string) *DoneMsg {
+	return &DoneMsg{
 		Type:   tp,
 		Source: fileName,
 		Code:   0,
@@ -81,19 +81,19 @@ type ProgressMsg struct {
 	Err      string  `json:"error"`
 }
 
-func (m ProgressMsg) SetError(code uint32, err error) ProgressMsg {
+func (m *ProgressMsg) SetError(code uint32, err error) *ProgressMsg {
 	m.Code = code
 	m.Err = err.Error()
 	return m
 }
 
-func (m ProgressMsg) Serialize() string {
+func (m *ProgressMsg) Serialize() string {
 	data, _ := json.Marshal(m)
 	return string(data)
 }
 
-func MakeSuccProgressMsg(tp, fileName string, progress float64) ProgressMsg {
-	return ProgressMsg{
+func MakeSuccProgressMsg(tp, fileName string, progress float64) *ProgressMsg {
+	return &ProgressMsg{
 		Type:     tp,
 		FileName: fileName,
 		Progress: progress,

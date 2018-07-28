@@ -10,12 +10,13 @@ import (
 
 // ProgressCell for progress bar
 type ProgressCell struct {
-	Sended  bool
-	Type    string
-	Total   uint64
-	Current uint64
-	Time    uint64
-	Rate    float64
+	Sended     bool
+	Type       string
+	Total      uint64
+	Current    uint64
+	Time       uint64
+	Rate       float64
+	LastReaded bool
 }
 
 // ProgressManager progress stats
@@ -57,6 +58,7 @@ func (pm *ProgressManager) SetIncrement(fileName string, increment uint64) error
 			if err != nil {
 				cell.Rate = 0.0
 			}
+			cell.LastReaded = false
 		}
 		pm.Progress[fileName] = cell
 		return nil
@@ -100,14 +102,16 @@ func (pm *ProgressManager) GetProgressingMsg(files []string) ([]string, error) {
 			continue
 		}
 		// skip already sended
-		if !v.Sended {
-			fmt.Printf("send %s, %+v\n", k, v)
+		if !v.Sended && !v.LastReaded {
 			msg := common.MakeSuccProgressMsg(v.Type, k, v.Rate)
 			result = append(result, msg.Serialize())
+			v.LastReaded = true
 			if int(v.Rate) == 1 {
 				v.Sended = true
-				pm.Progress[k] = v
 			}
+			pm.Mutex.Lock()
+			pm.Progress[k] = v
+			pm.Mutex.Unlock()
 		}
 	}
 	return result, nil

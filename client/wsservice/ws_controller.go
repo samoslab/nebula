@@ -1,7 +1,6 @@
 package wsservice
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -23,8 +22,8 @@ const (
 	// Send pings to client with this period. Must be less than pongWait.
 	pingPeriod = (pongWait * 9) / 10
 
-	// Poll file for changes with this period.
-	filePeriod = 10 * time.Second
+	// consume with this period.
+	ConsumePeriod = 30 * time.Second
 )
 
 var (
@@ -69,7 +68,6 @@ func (c *WSController) answerWriter(ws *websocket.Conn, msgType string) {
 		pingTicker.Stop()
 		ws.Close()
 	}()
-	fmt.Printf(" client connect --------------\n")
 	for {
 		select {
 		case <-c.quit:
@@ -107,7 +105,7 @@ func (c *WSController) ServeWs(w http.ResponseWriter, r *http.Request) {
 
 func (c *WSController) Consume() {
 	log := c.log
-	fileTicker := time.NewTicker(filePeriod)
+	fileTicker := time.NewTicker(ConsumePeriod)
 	defer func() {
 		fileTicker.Stop()
 		close(c.done)
@@ -119,7 +117,7 @@ func (c *WSController) Consume() {
 			return
 		case <-fileTicker.C:
 			cnt := (*c.cm).GetMsgCount()
-			if cnt > uint32(common.MsgQueueLen-common.MsgQueueLen+0) {
+			if cnt > uint32(common.MsgQueueLen-common.MsgQueueLen+5) {
 				for i := 0; i < int(cnt); i++ {
 					select {
 					case msg := <-(*c.cm).GetMsgChan():

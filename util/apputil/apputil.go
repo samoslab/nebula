@@ -13,7 +13,7 @@ import (
 // so that shutdown hangs can be diagnosed.
 func CatchInterrupt(quit chan<- struct{}) {
 	sigchan := make(chan os.Signal, 1)
-	signal.Notify(sigchan, os.Interrupt)
+	signal.Notify(sigchan, os.Interrupt, syscall.SIGTERM)
 	<-sigchan
 	signal.Stop(sigchan)
 	close(quit)
