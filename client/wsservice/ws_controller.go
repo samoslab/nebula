@@ -35,10 +35,10 @@ var (
 )
 
 type WSController struct {
-	log  logrus.FieldLogger
-	cm   **daemon.ClientManager
 	quit chan struct{}
 	done chan struct{}
+	log  logrus.FieldLogger
+	cm   **daemon.ClientManager
 }
 
 func NewWSController(log logrus.FieldLogger, m **daemon.ClientManager) *WSController {

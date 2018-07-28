@@ -10,19 +10,19 @@ import (
 
 // ProgressCell for progress bar
 type ProgressCell struct {
+	Sended  bool
 	Type    string
 	Total   uint64
 	Current uint64
-	Rate    float64
 	Time    uint64
-	Sended  bool
+	Rate    float64
 }
 
 // ProgressManager progress stats
 type ProgressManager struct {
-	Progress             map[string]ProgressCell
-	PartitionToOriginMap map[string]string // a.txt.1 -> a.txt ; a.txt.2 -> a.txt for progress
 	Mutex                sync.Mutex
+	PartitionToOriginMap map[string]string // a.txt.1 -> a.txt ; a.txt.2 -> a.txt for progress
+	Progress             map[string]ProgressCell
 }
 
 // NewProgressManager create progress status manager

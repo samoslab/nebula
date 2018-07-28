@@ -16,10 +16,10 @@ import (
 
 // OrderManager order manager
 type OrderManager struct {
-	orderClient pb.OrderServiceClient
-	Log         logrus.FieldLogger
-	privateKey  *rsa.PrivateKey
 	NodeId      []byte
+	privateKey  *rsa.PrivateKey
+	Log         logrus.FieldLogger
+	orderClient pb.OrderServiceClient
 }
 
 // Package descript package, cannot using int64 because js int max is 2^53-1
@@ -27,12 +27,12 @@ type Package struct {
 	Id          string `json:"id,omitempty"`
 	Name        string `json:"name,omitempty"`
 	Price       uint64 `json:"price,omitempty"`
+	Remark      string `json:"remark,omitempty"`
 	Volume      uint32 `json:"volume,omitempty"`
 	Netflow     uint32 `json:"netflow,omitempty"`
 	UpNetflow   uint32 `json:"upNetflow,omitempty"`
-	DownNetflow uint32 `json:"downNetflow,omitempty"`
 	ValidDays   uint32 `json:"validDays,omitempty"`
-	Remark      string `json:"remark,omitempty"`
+	DownNetflow uint32 `json:"downNetflow,omitempty"`
 }
 
 // Order order infos that return to front-end
@@ -59,38 +59,38 @@ type Order struct {
 
 func newPackageFromPbPackage(p *pb.Package) *Package {
 	return &Package{
-		Id:          strconv.FormatUint(uint64(p.Id), 10),
 		Name:        p.Name,
 		Price:       p.Price,
 		Volume:      p.Volume,
 		Netflow:     p.Netflow,
+		ValidDays:   p.ValidDays,
 		UpNetflow:   p.UpNetflow,
 		DownNetflow: p.DownNetflow,
-		ValidDays:   p.ValidDays,
+		Id:          strconv.FormatUint(uint64(p.Id), 10),
 	}
 }
 
 // NewOrderFromPbOrder create Order from protobuf Order, diff is Id
 func NewOrderFromPbOrder(o *pb.Order) *Order {
 	return &Order{
-		Id:          hex.EncodeToString(o.Id),
+		Paid:        o.Paid,
+		Volume:      o.Volume,
+		Remark:      o.Remark,
+		EndTime:     o.EndTime,
+		Netflow:     o.Netflow,
+		PayTime:     o.PayTime,
 		Creation:    o.Creation,
-		PackageId:   strconv.FormatUint(uint64(o.PackageId), 10),
-		Package:     newPackageFromPbPackage(o.Package),
 		Quanlity:    o.Quanlity,
-		TotalAmount: o.TotalAmount,
 		Upgraded:    o.Upgraded,
 		Discount:    o.Discount,
-		Volume:      o.Volume,
-		Netflow:     o.Netflow,
 		UpNetflow:   o.UpNetflow,
-		DownNetflow: o.DownNetflow,
 		ValidDays:   o.ValidDays,
 		StartTime:   o.StartTime,
-		EndTime:     o.EndTime,
-		Paid:        o.Paid,
-		PayTime:     o.PayTime,
-		Remark:      o.Remark,
+		TotalAmount: o.TotalAmount,
+		DownNetflow: o.DownNetflow,
+		Id:          hex.EncodeToString(o.Id),
+		Package:     newPackageFromPbPackage(o.Package),
+		PackageId:   strconv.FormatUint(uint64(o.PackageId), 10),
 	}
 }
 
@@ -105,8 +105,8 @@ func NewOrderManager(trackerServer string, log logrus.FieldLogger, privateKey *r
 	return &OrderManager{
 		orderClient: oc,
 		Log:         log,
-		privateKey:  privateKey,
 		NodeId:      nodeId,
+		privateKey:  privateKey,
 	}
 }
 
@@ -136,8 +136,8 @@ func (om *OrderManager) GetPackageInfo(pid string) (*Package, error) {
 		return nil, err
 	}
 	req := &pb.PackageInfoReq{
-		Version:   common.Version,
 		PackageId: int64(id),
+		Version:   common.Version,
 	}
 	rsp, err := om.orderClient.PackageInfo(context.Background(), req)
 	if err != nil {
@@ -155,12 +155,12 @@ func (om *OrderManager) BuyPackage(pid string, canceled bool, quanlity uint32) (
 		return nil, err
 	}
 	req := &pb.BuyPackageReq{
-		Version:      common.Version,
-		NodeId:       om.NodeId,
-		Timestamp:    common.Now(),
-		PackageId:    int64(id),
 		Quanlity:     quanlity,
 		CancelUnpaid: canceled,
+		NodeId:       om.NodeId,
+		PackageId:    int64(id),
+		Timestamp:    common.Now(),
+		Version:      common.Version,
 	}
 	err = req.SignReq(om.privateKey)
 	if err != nil {
@@ -185,8 +185,8 @@ func (om *OrderManager) DiscountPackage(pid string) (map[uint32]string, error) {
 		return nil, err
 	}
 	req := &pb.PackageDiscountReq{
-		Version:   common.Version,
 		PackageId: int64(id),
+		Version:   common.Version,
 	}
 	rsp, err := om.orderClient.PackageDiscount(context.Background(), req)
 	if err != nil {
@@ -200,10 +200,10 @@ func (om *OrderManager) DiscountPackage(pid string) (map[uint32]string, error) {
 func (om *OrderManager) MyAllOrders(expired bool) ([]*Order, error) {
 	log := om.Log
 	req := &pb.MyAllOrderReq{
-		Version:        common.Version,
+		OnlyNotExpired: expired,
 		NodeId:         om.NodeId,
 		Timestamp:      common.Now(),
-		OnlyNotExpired: expired,
+		Version:        common.Version,
 	}
 	err := req.SignReq(om.privateKey)
 	if err != nil {
@@ -229,10 +229,10 @@ func (om *OrderManager) GetOrderInfo(orderId string) (*Order, error) {
 		return nil, err
 	}
 	req := &pb.OrderInfoReq{
-		Version:   common.Version,
+		OrderId:   orderid,
 		NodeId:    om.NodeId,
 		Timestamp: common.Now(),
-		OrderId:   orderid,
+		Version:   common.Version,
 	}
 	err = req.SignReq(om.privateKey)
 	if err != nil {
@@ -258,9 +258,9 @@ type AddressBalance struct {
 func (om *OrderManager) RechargeAddress() (*AddressBalance, error) {
 	log := om.Log
 	req := &pb.RechargeAddressReq{
-		Version:   common.Version,
 		NodeId:    om.NodeId,
 		Timestamp: common.Now(),
+		Version:   common.Version,
 	}
 	err := req.SignReq(om.privateKey)
 	if err != nil {
@@ -295,10 +295,10 @@ func (om *OrderManager) PayOrdor(orderId string) (*pb.PayOrderResp, error) {
 		return nil, err
 	}
 	req := &pb.PayOrderReq{
-		Version:   common.Version,
+		OrderId:   orderid,
 		NodeId:    om.NodeId,
 		Timestamp: common.Now(),
-		OrderId:   orderid,
+		Version:   common.Version,
 	}
 	err = req.SignReq(om.privateKey)
 	if err != nil {
@@ -315,31 +315,31 @@ func (om *OrderManager) PayOrdor(orderId string) (*pb.PayOrderResp, error) {
 
 // UsageAmount usage amount data store
 type UsageAmount struct {
-	PackageId        int64  `json:"packageId,omitempty"`
-	Volume           uint32 `json:"volume,omitempty"`
-	Netflow          uint32 `json:"netflow,omitempty"`
-	UpNetflow        uint32 `json:"upNetflow,omitempty"`
-	DownNetflow      uint32 `json:"downNetflow,omitempty"`
 	UsageVolume      uint32 `json:"usageVolume"`
 	UsageNetflow     uint32 `json:"usageNetflow"`
 	UsageUpNetflow   uint32 `json:"usageUpNetflow"`
 	UsageDownNetflow uint32 `json:"usageDownNetflow"`
+	Volume           uint32 `json:"volume,omitempty"`
+	Netflow          uint32 `json:"netflow,omitempty"`
 	EndTime          uint64 `json:"endTime,omitempty"`
+	UpNetflow        uint32 `json:"upNetflow,omitempty"`
+	PackageId        int64  `json:"packageId,omitempty"`
+	DownNetflow      uint32 `json:"downNetflow,omitempty"`
 }
 
 // NewUsageAmount new usage amount
 func NewUsageAmount(rsp *pb.UsageAmountResp) *UsageAmount {
 	return &UsageAmount{
-		PackageId:        rsp.PackageId,
 		Volume:           rsp.Volume,
+		EndTime:          rsp.EndTime,
 		Netflow:          rsp.Netflow,
 		UpNetflow:        rsp.UpNetflow,
+		PackageId:        rsp.PackageId,
 		DownNetflow:      rsp.DownNetflow,
 		UsageVolume:      rsp.UsageVolume,
 		UsageNetflow:     rsp.UsageNetflow,
 		UsageUpNetflow:   rsp.UsageUpNetflow,
 		UsageDownNetflow: rsp.UsageDownNetflow,
-		EndTime:          rsp.EndTime,
 	}
 }
 

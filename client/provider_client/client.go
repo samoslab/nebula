@@ -36,23 +36,27 @@ func SetActionLog(err error, al *tcppb.ActionLog) {
 }
 
 func newActionLogFromStoreReq(req *pb.StoreReq) *tcppb.ActionLog {
-	return &tcppb.ActionLog{Type: 1,
+	return &tcppb.ActionLog{
+		Type:      1,
+		BeginTime: now(),
 		Ticket:    req.Ticket,
 		FileHash:  req.FileKey,
 		FileSize:  req.FileSize,
 		BlockHash: req.BlockKey,
 		BlockSize: req.BlockSize,
-		BeginTime: now()}
+	}
 }
 
 func newActionLogFromRetrieveReq(req *pb.RetrieveReq) *tcppb.ActionLog {
-	return &tcppb.ActionLog{Type: 2,
+	return &tcppb.ActionLog{
+		Type:      2,
+		BeginTime: now(),
 		Ticket:    req.Ticket,
 		FileHash:  req.FileKey,
 		FileSize:  req.FileSize,
 		BlockHash: req.BlockKey,
 		BlockSize: req.BlockSize,
-		BeginTime: now()}
+	}
 }
 
 func GetPingTime(ip string, port uint32) int {
@@ -93,13 +97,14 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadP
 		log.Errorf("file %s not in reverse partition map", filePath)
 	}
 	req := &pb.StoreReq{
-		Ticket:    ticket,
-		Auth:      auth,
 		Timestamp: tm,
+		Auth:      auth,
+		Ticket:    ticket,
+		BlockSize: fileSize,
+		BlockKey:  fileInfo.FileHash,
 		FileKey:   uploadPara.OriginFileHash,
 		FileSize:  uploadPara.OriginFileSize,
-		BlockKey:  fileInfo.FileHash,
-		BlockSize: fileSize}
+	}
 	al := newActionLogFromStoreReq(req)
 	defer collectClient.Collect(al)
 	if fileSize < smallFileSize {
@@ -223,13 +228,14 @@ func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath 
 		log.Errorf("file %s not in reverse partition map", fileHashString)
 	}
 	req := &pb.RetrieveReq{
+		Timestamp: tm,
+		Auth:      auth,
 		Ticket:    ticket,
 		FileKey:   fileKey,
-		Auth:      auth,
 		FileSize:  fileSize,
-		Timestamp: tm,
 		BlockKey:  blockKey,
-		BlockSize: blockSize}
+		BlockSize: blockSize,
+	}
 	al := newActionLogFromRetrieveReq(req)
 	defer collectClient.Collect(al)
 	if fileSize < smallFileSize {

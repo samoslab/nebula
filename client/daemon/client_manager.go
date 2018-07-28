@@ -499,7 +499,9 @@ func (c *ClientManager) UploadDir(parent, dest string, interactive, newVersion, 
 
 			c.MsgChan <- doneMsg.Serialize()
 			c.MsgCount++
-			return err
+			if err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -828,12 +830,12 @@ func (c *ClientManager) MkFolder(filepath string, folders []string, interactive 
 	log := c.Log.WithField("folder parent", filepath)
 	ctx := context.Background()
 	req := &mpb.MkFolderReq{
-		Version:     common.Version,
-		Parent:      &mpb.FilePath{OneOfPath: &mpb.FilePath_Path{filepath}, SpaceNo: sno},
 		Folder:      folders,
 		NodeId:      c.NodeId,
 		Interactive: interactive,
 		Timestamp:   common.Now(),
+		Version:     common.Version,
+		Parent:      &mpb.FilePath{OneOfPath: &mpb.FilePath_Path{filepath}, SpaceNo: sno},
 	}
 	err := req.SignReq(c.cfg.Node.PriKey)
 	if err != nil {
@@ -903,10 +905,10 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 		wg.Add(1)
 		checksum := i >= dataShards
 		uploadParas := &common.UploadParameter{
+			Checksum:       checksum,
+			HF:             partFile.Pieces[i],
 			OriginFileHash: partFile.OriginFileHash,
 			OriginFileSize: partFile.OriginFileSize,
-			HF:             partFile.Pieces[i],
-			Checksum:       checksum,
 		}
 		go func(pro *mpb.BlockProviderAuth, tm uint64, uploadPara *common.UploadParameter) {
 			defer wg.Done()
@@ -947,11 +949,11 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 		return nil, err
 	}
 	block := &mpb.StoreBlock{
+		StoreNodeId: [][]byte{},
+		Checksum:    uploadPara.Checksum,
 		Hash:        uploadPara.HF.FileHash,
 		Size:        uint64(uploadPara.HF.FileSize),
 		BlockSeq:    uint32(uploadPara.HF.SliceIndex),
-		Checksum:    uploadPara.Checksum,
-		StoreNodeId: [][]byte{},
 	}
 	block.StoreNodeId = append(block.StoreNodeId, []byte(pro.GetNodeId()))
 
@@ -994,10 +996,10 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 	}
 	fileSlices := []common.HashFile{
 		common.HashFile{
+			SliceIndex: 0,
+			FileHash:   hash,
 			FileSize:   fileSize,
 			FileName:   fileName,
-			FileHash:   hash,
-			SliceIndex: 0,
 		},
 	}
 	fileInfos := []common.PartitionFile{
@@ -1029,11 +1031,11 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 	}
 
 	block := &mpb.StoreBlock{
+		Checksum:    false,
+		StoreNodeId: [][]byte{},
 		Hash:        fileSlices[0].FileHash,
 		Size:        uint64(fileSlices[0].FileSize),
 		BlockSeq:    uint32(fileSlices[0].SliceIndex),
-		Checksum:    false,
-		StoreNodeId: [][]byte{},
 	}
 
 	log.Infof("curr %s origin %s", fileName, originFileName)
@@ -1065,8 +1067,12 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 
 func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitions []*mpb.StorePartition, encryptKey []byte) error {
 	req := &mpb.UploadFileDoneReq{
-		Version:       common.Version,
 		NodeId:        c.NodeId,
+		Partition:     partitions,
+		EncryptKey:    encryptKey,
+		Timestamp:     common.Now(),
+		PublicKeyHash: c.PubkeyHash,
+		Version:       common.Version,
 		FileHash:      reqCheck.GetFileHash(),
 		FileSize:      reqCheck.GetFileSize(),
 		FileName:      reqCheck.GetFileName(),
@@ -1075,10 +1081,6 @@ func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitio
 		Parent:        reqCheck.GetParent(),
 		Interactive:   reqCheck.GetInteractive(),
 		NewVersion:    reqCheck.GetNewVersion(),
-		Timestamp:     common.Now(),
-		Partition:     partitions,
-		EncryptKey:    encryptKey,
-		PublicKeyHash: c.PubkeyHash,
 	}
 	err := req.SignReq(c.cfg.Node.PriKey)
 	if err != nil {
@@ -1127,11 +1129,11 @@ func (c *ClientManager) ListFiles(path string, pageSize, pageNum uint32, sortTyp
 	log := c.Log.WithField("list path", path)
 	log.Infof("Parameter size %d, num %d, sortype %s, asc %v", pageSize, pageNum, sortType, ascOrder)
 	req := &mpb.ListFilesReq{
-		Version:   common.Version,
-		Timestamp: common.Now(),
+		PageNum:   pageNum,
 		NodeId:    c.NodeId,
 		PageSize:  pageSize,
-		PageNum:   pageNum,
+		Timestamp: common.Now(),
+		Version:   common.Version,
 	}
 	switch sortType {
 	case "name":
@@ -1143,8 +1145,8 @@ func (c *ClientManager) ListFiles(path string, pageSize, pageNum uint32, sortTyp
 	default:
 		req.SortType = mpb.SortType_Name
 	}
-	req.Parent = &mpb.FilePath{OneOfPath: &mpb.FilePath_Path{path}, SpaceNo: sno}
 	req.AscOrder = ascOrder
+	req.Parent = &mpb.FilePath{OneOfPath: &mpb.FilePath_Path{path}, SpaceNo: sno}
 	err := req.SignReq(c.cfg.Node.PriKey)
 	if err != nil {
 		return nil, err
@@ -1169,18 +1171,19 @@ func (c *ClientManager) ListFiles(path string, pageSize, pageNum uint32, sortTyp
 		df := &DownFile{
 			ID:        id,
 			FileHash:  hash,
+			FileType:  fileType,
+			Extension: extension,
 			FileName:  info.GetName(),
 			Folder:    info.GetFolder(),
 			ModTime:   info.GetModTime(),
-			FileType:  fileType,
-			Extension: extension,
-			FileSize:  info.GetFileSize()}
+			FileSize:  info.GetFileSize(),
+		}
 		fileLists = append(fileLists, df)
 	}
 
 	return &FilePages{
-		Total: rsp.GetTotalRecord(),
 		Files: fileLists,
+		Total: rsp.GetTotalRecord(),
 	}, nil
 }
 
@@ -1271,12 +1274,12 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 		return err
 	}
 	req := &mpb.RetrieveFileReq{
-		Version:   common.Version,
+		SpaceNo:   sno,
 		NodeId:    c.NodeId,
-		Timestamp: common.Now(),
 		FileHash:  fileHash,
 		FileSize:  fileSize,
-		SpaceNo:   sno,
+		Timestamp: common.Now(),
+		Version:   common.Version,
 	}
 	err = req.SignReq(c.cfg.Node.PriKey)
 	if err != nil {
@@ -1512,10 +1515,10 @@ func (c *ClientManager) saveFileByPartition(fileName string, partition *mpb.Retr
 func (c *ClientManager) RemoveFile(target string, recursive bool, isPath bool, sno uint32) error {
 	log := c.Log.WithField("target", target)
 	req := &mpb.RemoveReq{
-		Version:   common.Version,
 		NodeId:    c.NodeId,
-		Timestamp: common.Now(),
 		Recursive: recursive,
+		Timestamp: common.Now(),
+		Version:   common.Version,
 	}
 	if isPath {
 		req.Target = &mpb.FilePath{OneOfPath: &mpb.FilePath_Path{target}, SpaceNo: sno}
@@ -1550,10 +1553,10 @@ func (c *ClientManager) RemoveFile(target string, recursive bool, isPath bool, s
 func (c *ClientManager) MoveFile(source, dest string, isPath bool, sno uint32) error {
 	log := c.Log.WithField("move source", source)
 	req := &mpb.MoveReq{
-		Version:   common.Version,
+		Dest:      dest,
 		NodeId:    c.NodeId,
 		Timestamp: common.Now(),
-		Dest:      dest,
+		Version:   common.Version,
 	}
 	if isPath {
 		req.Source = &mpb.FilePath{OneOfPath: &mpb.FilePath_Path{source}, SpaceNo: sno}
@@ -1588,10 +1591,10 @@ func (c *ClientManager) MoveFile(source, dest string, isPath bool, sno uint32) e
 func (c *ClientManager) GetSpaceSysFileData(sno uint32) ([]byte, error) {
 	log := c.Log
 	req := &mpb.SpaceSysFileReq{
-		Version:   common.Version,
+		SpaceNo:   sno,
 		NodeId:    c.NodeId,
 		Timestamp: common.Now(),
-		SpaceNo:   sno,
+		Version:   common.Version,
 	}
 	err := req.SignReq(c.cfg.Node.PriKey)
 	if err != nil {
