@@ -1,6 +1,7 @@
 package wsservice
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"sync"
@@ -68,6 +69,7 @@ func (c *WSController) answerWriter(ws *websocket.Conn, msgType string) {
 		pingTicker.Stop()
 		ws.Close()
 	}()
+	fmt.Printf(" client connect --------------\n")
 	for {
 		select {
 		case <-c.quit:
@@ -117,7 +119,7 @@ func (c *WSController) Consume() {
 			return
 		case <-fileTicker.C:
 			cnt := (*c.cm).GetMsgCount()
-			if cnt > uint32(common.MsgQueueLen-common.MsgQueueLen+3) {
+			if cnt > uint32(common.MsgQueueLen-common.MsgQueueLen+0) {
 				for i := 0; i < int(cnt); i++ {
 					select {
 					case msg := <-(*c.cm).GetMsgChan():

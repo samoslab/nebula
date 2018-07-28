@@ -15,6 +15,7 @@ type ProgressCell struct {
 	Current uint64
 	Rate    float64
 	Time    uint64
+	Sended  bool
 }
 
 // ProgressManager progress stats
@@ -98,12 +99,16 @@ func (pm *ProgressManager) GetProgressingMsg(files []string) ([]string, error) {
 		if !match(mp, k) {
 			continue
 		}
-		// skip finished time bigger than 60s
-		if int(v.Rate) == 1 && (common.Now()-v.Time) > 60 {
-			continue
+		// skip already sended
+		if !v.Sended {
+			fmt.Printf("send %s, %+v\n", k, v)
+			msg := common.MakeSuccProgressMsg(v.Type, k, v.Rate)
+			result = append(result, msg.Serialize())
+			if int(v.Rate) == 1 {
+				v.Sended = true
+				pm.Progress[k] = v
+			}
 		}
-		msg := common.MakeSuccProgressMsg(v.Type, k, v.Rate)
-		result = append(result, msg.Serialize())
 	}
 	return result, nil
 }

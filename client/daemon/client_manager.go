@@ -81,26 +81,26 @@ type FilePages struct {
 
 // ClientManager client manager
 type ClientManager struct {
-	mclient       mpb.MatadataServiceClient
 	NodeId        []byte
+	store         *store
 	TempDir       string
-	Log           logrus.FieldLogger
-	cfg           *config.ClientConfig
-	serverConn    *grpc.ClientConn
-	PM            *progress.ProgressManager
-	OM            *order.OrderManager
-	Root          string
-	SpaceM        *SpaceManager
-	TrackerPubkey *rsa.PublicKey
 	PubkeyHash    []byte
-	webcfg        config.Config
-	FileTypeMap   filetype.SupportType
-	TaskChan      chan TaskInfo
-	MsgChan       chan string
+	Root          string
 	MsgCount      uint32
+	MsgChan       chan string
 	done          chan struct{}
 	quit          chan struct{}
-	store         *store
+	TaskChan      chan TaskInfo
+	SpaceM        *SpaceManager
+	webcfg        config.Config
+	TrackerPubkey *rsa.PublicKey
+	serverConn    *grpc.ClientConn
+	Log           logrus.FieldLogger
+	OM            *order.OrderManager
+	FileTypeMap   filetype.SupportType
+	cfg           *config.ClientConfig
+	PM            *progress.ProgressManager
+	mclient       mpb.MatadataServiceClient
 }
 
 // NewClientManager create manager
@@ -154,10 +154,10 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 	}
 
 	c := &ClientManager{
-		serverConn:    conn,
+		OM:            om,
 		Log:           log,
 		cfg:           cfg,
-		OM:            om,
+		serverConn:    conn,
 		store:         store,
 		SpaceM:        spaceM,
 		webcfg:        webcfg,
@@ -165,11 +165,11 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 		PubkeyHash:    pubkeyHash,
 		TempDir:       os.TempDir(),
 		NodeId:        cfg.Node.NodeId,
+		done:          make(chan struct{}),
+		quit:          make(chan struct{}),
 		FileTypeMap:   filetype.SupportTypes(),
 		PM:            progress.NewProgressManager(),
 		mclient:       mpb.NewMatadataServiceClient(conn),
-		done:          make(chan struct{}),
-		quit:          make(chan struct{}),
 		MsgChan:       make(chan string, common.MsgQueueLen),
 		TaskChan:      make(chan TaskInfo, common.TaskQuqueLen),
 	}
@@ -212,7 +212,6 @@ func (c *ClientManager) Shutdown() {
 	<-c.done
 	close(c.TaskChan)
 	close(c.MsgChan)
-	fmt.Printf("client manager shutdown")
 }
 
 func map2Req(taskInfo TaskInfo) (TaskInfo, error) {
@@ -357,6 +356,7 @@ func (c *ClientManager) SendProgressMsg() error {
 				}
 				for _, msg := range msgList {
 					c.MsgChan <- msg
+					c.MsgCount++
 				}
 
 			}
@@ -753,18 +753,18 @@ func (c *ClientManager) CheckFileExists(fileName, dest string, interactive, newV
 	_, fname := filepath.Split(fileName)
 	ctx := context.Background()
 	req := &mpb.CheckFileExistReq{
-		Version:       common.Version,
-		FileSize:      uint64(fileSize),
-		Interactive:   interactive,
-		NewVersion:    newVersion,
-		Parent:        &mpb.FilePath{OneOfPath: &mpb.FilePath_Path{dest}, SpaceNo: sno},
 		FileHash:      hash,
-		NodeId:        c.NodeId,
 		FileName:      fname,
+		NodeId:        c.NodeId,
+		EncryptKey:    encryptKey,
+		NewVersion:    newVersion,
+		Interactive:   interactive,
+		PublicKeyHash: c.PubkeyHash,
 		Timestamp:     common.Now(),
 		FileType:      fileType.Value,
-		EncryptKey:    encryptKey,
-		PublicKeyHash: c.PubkeyHash,
+		Version:       common.Version,
+		FileSize:      uint64(fileSize),
+		Parent:        &mpb.FilePath{OneOfPath: &mpb.FilePath_Path{dest}, SpaceNo: sno},
 	}
 	mtime, err := GetFileModTime(fileName)
 	if err != nil {
@@ -785,6 +785,9 @@ func (c *ClientManager) CheckFileExists(fileName, dest string, interactive, newV
 			}
 		}
 		req.FileData = fileData
+		c.PM.SetProgress(common.TaskUploadFileType, fileName, 0, uint64(len(req.FileData)))
+		c.PM.SetPartitionMap(fileName, fileName)
+		c.PM.SetIncrement(fileName, uint64(len(req.FileData)))
 		fmt.Printf("Origin filesize %d, encrypted size %d\n", req.FileSize, len(req.FileData))
 	}
 	err = req.SignReq(c.cfg.Node.PriKey)
