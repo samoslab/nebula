@@ -485,6 +485,10 @@ func (c *ClientManager) UploadDir(parent, dest string, interactive, newVersion, 
 	log.Debugf("Upload dirs %+v", dirs)
 	newDirs := dirAdjust(dirs, parent, dest, runtime.GOOS)
 	log.Debugf("New upload dirs %+v", newDirs)
+	errArr := []error{}
+	var mutex sync.Mutex
+	var wg sync.WaitGroup
+	UploadChan := make(chan struct{}, common.CCUploadFileNum)
 	for _, dpair := range newDirs {
 		if dpair.Folder {
 			log.Debugf("Mkfolder %+v", dpair)
@@ -494,18 +498,29 @@ func (c *ClientManager) UploadDir(parent, dest string, interactive, newVersion, 
 			}
 		} else {
 			log.Debugf("Upload file %+v", dpair)
-			doneMsg := common.MakeSuccDoneMsg(common.TaskUploadFileType, dpair.Name)
-			err := c.UploadFile(dpair.Name, dpair.Parent, interactive, newVersion, isEncrypt, sno)
-			if err != nil {
-				doneMsg.SetError(1, err)
-			}
+			wg.Add(1)
+			UploadChan <- struct{}{}
+			go func(dpair DirPair) {
+				defer func() {
+					<-UploadChan
+					wg.Done()
+				}()
+				doneMsg := common.MakeSuccDoneMsg(common.TaskUploadFileType, dpair.Name)
+				err := c.UploadFile(dpair.Name, dpair.Parent, interactive, newVersion, isEncrypt, sno)
+				if err != nil {
+					doneMsg.SetError(1, err)
+				}
 
-			c.AddDoneMsg(doneMsg.Serialize())
-			if err != nil {
-				return err
-			}
+				c.AddDoneMsg(doneMsg.Serialize())
+				if err != nil {
+					mutex.Lock()
+					errArr = append(errArr, err)
+					mutex.Unlock()
+				}
+			}(dpair)
 		}
 	}
+	wg.Wait()
 	return nil
 }
 
@@ -901,10 +916,10 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 	}
 
 	var errResult []error
-	wg := sync.WaitGroup{}
 	var mutex sync.Mutex
+	UploadChan := make(chan struct{}, common.CCUploadGoNum)
+	wg := sync.WaitGroup{}
 	for i, pro := range providers {
-		wg.Add(1)
 		checksum := i >= dataShards
 		uploadParas := &common.UploadParameter{
 			Checksum:       checksum,
@@ -912,8 +927,13 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 			OriginFileHash: partFile.OriginFileHash,
 			OriginFileSize: partFile.OriginFileSize,
 		}
+		wg.Add(1)
+		UploadChan <- struct{}{}
 		go func(pro *mpb.BlockProviderAuth, tm uint64, uploadPara *common.UploadParameter) {
-			defer wg.Done()
+			defer func() {
+				<-UploadChan
+				wg.Done()
+			}()
 			server := fmt.Sprintf("%s:%d", pro.GetServer(), pro.GetPort())
 			block, err := c.uploadFileToErasureProvider(pro, tm, uploadParas)
 			mutex.Lock()
@@ -1472,45 +1492,66 @@ func (c *ClientManager) saveFileByPartition(fileName string, partition *mpb.Retr
 	failedCount := 0
 	middleFiles := []string{}
 	errArray := []string{}
+	var mutex sync.Mutex
+	var wg sync.WaitGroup
+	BatchDownloadChan := make(chan struct{}, common.CCDownloadGoNum)
+
 	for _, block := range partition.GetBlock() {
 		if block.GetChecksum() {
 			parityShards++
 		} else {
 			dataShards++
 		}
-		node := BestRetrieveNode(block.GetStoreNode())
-		server := fmt.Sprintf("%s:%d", node.GetServer(), node.GetPort())
-		tempFileName := fileName
-		if !multiReplica {
-			_, onlyFileName := filepath.Split(fileName)
-			tempFileName = filepath.Join(c.TempDir, fmt.Sprintf("%s.%d", onlyFileName, block.GetBlockSeq()))
-		}
-		log = log.WithField("part file", tempFileName)
-		log.Infof("Hash %x retrieve from %s", block.GetHash(), server)
-		conn, err := grpc.Dial(server, grpc.WithInsecure(), grpc.WithTimeout(3*time.Second), grpc.WithBlock())
-		if err != nil {
-			log.Errorf("Rpc dial %s failed, error %v", server, err)
-			log.Error("Retrieve failed")
-			errArray = append(errArray, err.Error())
-			middleFiles = append(middleFiles, tempFileName)
-			failedCount++
-			continue
-		}
-		pclient := pb.NewProviderServiceClient(conn)
 
-		err = client.Retrieve(log, pclient, tempFileName, node.GetAuth(), node.GetTicket(), tm, fileHash, block.GetHash(), fileSize, block.GetSize(), c.PM)
-		if err != nil {
-			failedCount++
-			errArray = append(errArray, err.Error())
-			conn.Close()
-			log.Error("Retrieve failed")
+		wg.Add(1)
+		BatchDownloadChan <- struct{}{}
+		go func(log logrus.FieldLogger, block *mpb.RetrieveBlock, fileName string) {
+			defer func() {
+				<-BatchDownloadChan
+				wg.Done()
+			}()
+			node := BestRetrieveNode(block.GetStoreNode())
+			server := fmt.Sprintf("%s:%d", node.GetServer(), node.GetPort())
+			tempFileName := fileName
+			if !multiReplica {
+				_, onlyFileName := filepath.Split(fileName)
+				tempFileName = filepath.Join(c.TempDir, fmt.Sprintf("%s.%d", onlyFileName, block.GetBlockSeq()))
+			}
+			log = log.WithField("part file", tempFileName)
+			log.Infof("Hash %x retrieve from %s", block.GetHash(), server)
+			conn, err := grpc.Dial(server, grpc.WithInsecure(), grpc.WithTimeout(3*time.Second), grpc.WithBlock())
+			if err != nil {
+				log.Errorf("Rpc dial %s failed, error %v", server, err)
+				log.Error("Retrieve failed")
+				mutex.Lock()
+				middleFiles = append(middleFiles, tempFileName)
+				failedCount++
+				errArray = append(errArray, err.Error())
+				mutex.Unlock()
+				return
+			}
+			pclient := pb.NewProviderServiceClient(conn)
+
+			err = client.Retrieve(log, pclient, tempFileName, node.GetAuth(), node.GetTicket(), tm, fileHash, block.GetHash(), fileSize, block.GetSize(), c.PM)
+			if err != nil {
+				conn.Close()
+				log.Error("Retrieve failed")
+				mutex.Lock()
+				failedCount++
+				middleFiles = append(middleFiles, tempFileName)
+				errArray = append(errArray, err.Error())
+				mutex.Unlock()
+				return
+			}
+			log.Info("Retrieve success")
+			mutex.Lock()
 			middleFiles = append(middleFiles, tempFileName)
-			continue
-		}
-		log.Info("Retrieve success")
-		middleFiles = append(middleFiles, tempFileName)
-		conn.Close()
+			mutex.Unlock()
+			conn.Close()
+		}(log, block, fileName)
 	}
+
+	wg.Wait()
 
 	if len(errArray) > 0 {
 		errRtn := fmt.Errorf("%s", strings.Join(errArray, "\n"))
