@@ -521,6 +521,9 @@ func (c *ClientManager) UploadDir(parent, dest string, interactive, newVersion, 
 		}
 	}
 	wg.Wait()
+	if len(errArr) > 0 {
+		return errArr[0]
+	}
 	return nil
 }
 
@@ -1073,12 +1076,33 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 		c.PM.SetProgress(common.TaskUploadProgressType, originFileName, 0, uint64(int64(len(providers))*fileSize))
 	}
 
+	errArr := []error{}
+	var wg sync.WaitGroup
+	var mutex sync.Mutex
+	UploadChan := make(chan struct{}, common.CCUploadFileNum)
 	for _, pro := range providers {
-		proID, err := c.uploadFileToReplicaProvider(pro, uploadPara)
-		if err != nil {
-			return nil, err
-		}
-		block.StoreNodeId = append(block.StoreNodeId, proID)
+		wg.Add(1)
+		UploadChan <- struct{}{}
+		go func(pro *mpb.ReplicaProvider) {
+			defer func() {
+				<-UploadChan
+				wg.Done()
+			}()
+			proID, err := c.uploadFileToReplicaProvider(pro, uploadPara)
+			if err != nil {
+				mutex.Lock()
+				errArr = append(errArr, err)
+				mutex.Unlock()
+			}
+			mutex.Lock()
+			block.StoreNodeId = append(block.StoreNodeId, proID)
+			mutex.Unlock()
+		}(pro)
+	}
+
+	wg.Done()
+	if len(errArr) > 0 {
+		return nil, errArr[0]
 	}
 
 	partition := &mpb.StorePartition{}
