@@ -321,9 +321,9 @@ func (c *ClientManager) ExecuteTask() error {
 					if err != nil {
 						errStr = err.Error()
 						doneMsg.SetError(1, err)
-						log.WithError(err).Error("execute task failed")
+						log.WithError(err).Error("Execute task failed")
 					} else {
-						log.Infof("execute task success")
+						log.Infof("Execute task success")
 					}
 					c.AddDoneMsg(doneMsg.Serialize())
 					_, err = c.store.UpdateTaskInfo(taskInfo.Key, func(rs TaskInfo) TaskInfo {
@@ -333,9 +333,9 @@ func (c *ClientManager) ExecuteTask() error {
 						return rs
 					})
 					if err != nil {
-						log.WithError(err).Error("update task failed")
+						log.WithError(err).Error("Update task failed")
 					} else {
-						log.Infof("update task success")
+						log.Infof("Update task success")
 					}
 				}(taskInfo)
 				wg1.Wait()
@@ -1007,15 +1007,15 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 
 func (c *ClientManager) uploadFileToReplicaProvider(conn *grpc.ClientConn, pro *mpb.ReplicaProvider, uploadPara *common.UploadParameter) ([]byte, error) {
 	fileInfo := uploadPara.HF
-	log := c.Log.WithField("uploading", fileInfo.FileName)
 	server := fmt.Sprintf("%s:%d", pro.GetServer(), pro.GetPort())
+	log := c.Log.WithField("uploading", fileInfo.FileName).WithField("provider", server)
 	uploadPara.Provider = server
 	pclient := pb.NewProviderServiceClient(conn)
-	log.Debugf("Upload file hash %x size %d to %s", fileInfo.FileHash, fileInfo.FileSize, server)
+	log.Debugf("Upload file hash %x size %d", fileInfo.FileHash, fileInfo.FileSize)
 
 	err := client.StorePiece(log, pclient, uploadPara, pro.Auth, pro.Ticket, pro.Timestamp, c.PM)
 	if err != nil {
-		log.Errorf("Upload error %v", err)
+		log.WithError(err).Error("Upload error")
 		return nil, err
 	}
 
@@ -1056,7 +1056,8 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 	}
 
 	ctx := context.Background()
-	log.Infof("Send prepare request for %s", req.GetFileName())
+	log = log.WithField("filename", req.GetFileName())
+	log.Infof("Send prepare request")
 	ufprsp, err := c.mclient.UploadFilePrepare(ctx, ufpr)
 	if err != nil {
 		log.Errorf("UploadFilePrepare error %v", err)
@@ -1078,7 +1079,6 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 		BlockSeq:    uint32(fileSlices[0].SliceIndex),
 	}
 
-	log.Infof("curr %s origin %s", fileName, originFileName)
 	c.PM.SetPartitionMap(fileName, originFileName)
 
 	providers, err := GetBestReplicaProvider(ufprsp.GetProvider(), ReplicaNum)
