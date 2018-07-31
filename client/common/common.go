@@ -124,6 +124,7 @@ type UploadParameter struct {
 	OriginFileSize uint64
 	HF             HashFile
 	Checksum       bool
+	Provider       string
 }
 
 // HashFile file info for reedsolomon

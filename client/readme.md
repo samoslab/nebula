@@ -955,6 +955,8 @@ uri: /message
 2. {"type":"UploadDir","source":"/root/test","code":0,"error":""}
 3. {"type":"DownloadFile","source":"/root/testmul.txt","code":0,"error":""}
 4. {"type":"DownloadDir","source":"/root/test","code":0,"error":""}
+5. {"type":"UploadProgress","filename":"/root/test124/CMakeLists.txt","progress":1,"code":0,"error":""}
+6. {"type":"DownloadProgress","filename":"/root/test124/CMakeLists.txt","progress":1,"code":0,"error":""}
 ```
 
 # specification

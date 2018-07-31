@@ -36,23 +36,27 @@ func SetActionLog(err error, al *tcppb.ActionLog) {
 }
 
 func newActionLogFromStoreReq(req *pb.StoreReq) *tcppb.ActionLog {
-	return &tcppb.ActionLog{Type: 1,
+	return &tcppb.ActionLog{
+		Type:      1,
+		BeginTime: now(),
 		Ticket:    req.Ticket,
 		FileHash:  req.FileKey,
 		FileSize:  req.FileSize,
 		BlockHash: req.BlockKey,
 		BlockSize: req.BlockSize,
-		BeginTime: now()}
+	}
 }
 
 func newActionLogFromRetrieveReq(req *pb.RetrieveReq) *tcppb.ActionLog {
-	return &tcppb.ActionLog{Type: 2,
+	return &tcppb.ActionLog{
+		Type:      2,
+		BeginTime: now(),
 		Ticket:    req.Ticket,
 		FileHash:  req.FileKey,
 		FileSize:  req.FileSize,
 		BlockHash: req.BlockKey,
 		BlockSize: req.BlockSize,
-		BeginTime: now()}
+	}
 }
 
 func GetPingTime(ip string, port uint32) int {
@@ -83,6 +87,7 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadP
 	filePath := fileInfo.FileName
 	fileSize := uint64(fileInfo.FileSize)
 	file, err := os.Open(filePath)
+	log = log.WithField("uploading", filePath).WithField("provider", uploadPara.Provider)
 	if err != nil {
 		log.Errorf("open file failed: %s", err.Error())
 		return err
@@ -93,13 +98,14 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadP
 		log.Errorf("file %s not in reverse partition map", filePath)
 	}
 	req := &pb.StoreReq{
-		Ticket:    ticket,
-		Auth:      auth,
 		Timestamp: tm,
+		Auth:      auth,
+		Ticket:    ticket,
+		BlockSize: fileSize,
+		BlockKey:  fileInfo.FileHash,
 		FileKey:   uploadPara.OriginFileHash,
 		FileSize:  uploadPara.OriginFileSize,
-		BlockKey:  fileInfo.FileHash,
-		BlockSize: fileSize}
+	}
 	al := newActionLogFromStoreReq(req)
 	defer collectClient.Collect(al)
 	if fileSize < smallFileSize {
@@ -119,9 +125,9 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadP
 			return err
 		}
 		if !resp.Success {
-			log.Errorf("RPC return false")
+			log.Errorf("Rpc return false")
 			SetActionLog(err, al)
-			return errors.New("RPC return false")
+			return errors.New("Rpc return false")
 		}
 		// for progress
 		if realfile != "" {
@@ -135,13 +141,14 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadP
 
 	stream, err := client.Store(context.Background())
 	if err != nil {
-		log.Errorf("RPC Store failed: %s", err.Error())
+		log.Errorf("Rpc Store failed: %s", err.Error())
 		SetActionLog(err, al)
 		return err
 	}
 	defer stream.CloseSend()
 	buf := make([]byte, streamDataSize)
 	first := true
+	sendBytes := 0
 	for {
 		bytesRead, err := file.Read(buf)
 		if err != nil {
@@ -156,22 +163,25 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadP
 			first = false
 			req.Data = buf[:bytesRead]
 			if err := stream.Send(req); err != nil {
-				log.Errorf("RPC First Send StoreReq failed: %s", err.Error())
+				log.Errorf("Rpc First Send StoreReq failed: %s", err.Error())
 				if err == io.EOF {
 					break
 				}
 				SetActionLog(err, al)
 				return err
 			}
-			log.Infof("RPC First Send StoreReq SUCCESS")
+			sendBytes += bytesRead
+			log.Infof("Rpc first send store req success")
 		} else {
 			if err := stream.Send(&pb.StoreReq{Data: buf[:bytesRead]}); err != nil {
-				log.Errorf("RPC Send non-first StoreReq failed: %s", err.Error())
+				log.Errorf("Rpc Send non-first StoreReq failed: %s", err.Error())
 				if err == io.EOF {
 					break
 				}
 				return err
 			}
+			sendBytes += bytesRead
+			log.Debugf("Already send %d, total %d bytes", sendBytes, fileSize)
 		}
 		// for progress
 		if realfile != "" {
@@ -185,7 +195,7 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadP
 	}
 	storeResp, err := stream.CloseAndRecv()
 	if err != nil {
-		log.Errorf("RPC CloseAndRecv failed: %s", err.Error())
+		log.Errorf("Rpc CloseAndRecv failed: %s", err.Error())
 		st, ok := status.FromError(err)
 		if !ok {
 			return err
@@ -199,20 +209,18 @@ func StorePiece(log logrus.FieldLogger, client pb.ProviderServiceClient, uploadP
 		return err
 	}
 	if !storeResp.Success {
-		log.Error("RPC return false")
+		log.Error("Rpc return false")
 		SetActionLog(err, al)
-		return errors.New("RPC return false")
+		return errors.New("Rpc return false")
 	}
 	al.Success, al.EndTime = true, now()
 	return nil
 }
 
 // Retrieve download file from provider piece by piece
-func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, tm uint64, fileKey, blockKey []byte, fileSize, blockSize uint64, pm *progress.ProgressManager) error {
+func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath string, auth []byte, ticket string, tm uint64, fileKey, blockKey []byte, fileSize, blockSize uint64, pm *progress.ProgressManager, server string) error {
 	fileHashString := hex.EncodeToString(blockKey)
-	file, err := os.OpenFile(filePath,
-		os.O_WRONLY|os.O_TRUNC|os.O_CREATE,
-		0666)
+	file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0666)
 	if err != nil {
 		log.Errorf("open file failed: %s", err.Error())
 		return err
@@ -222,14 +230,16 @@ func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath 
 	if !ok {
 		log.Errorf("file %s not in reverse partition map", fileHashString)
 	}
+	log = log.WithField("downloading", realfile).WithField("provider", server)
 	req := &pb.RetrieveReq{
+		Timestamp: tm,
+		Auth:      auth,
 		Ticket:    ticket,
 		FileKey:   fileKey,
-		Auth:      auth,
 		FileSize:  fileSize,
-		Timestamp: tm,
 		BlockKey:  blockKey,
-		BlockSize: blockSize}
+		BlockSize: blockSize,
+	}
 	al := newActionLogFromRetrieveReq(req)
 	defer collectClient.Collect(al)
 	if fileSize < smallFileSize {
@@ -240,24 +250,25 @@ func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath 
 		}
 		if _, err = file.Write(resp.Data); err != nil {
 			SetActionLog(err, al)
-			log.Errorf("write file %d bytes failed : %s", len(resp.Data), err.Error())
+			log.Errorf("Write file %d bytes failed : %s", len(resp.Data), err.Error())
 			return err
 		}
 		if realfile != "" {
 			if err := pm.SetIncrement(realfile, uint64(len(resp.Data))); err != nil {
-				log.Errorf("file %s not in progress map", realfile)
+				log.Errorf("File %s not in progress map", realfile)
 			}
 		}
 		return nil
 	}
 	stream, err := client.Retrieve(context.Background(), req)
+	recvBytes := 0
 	for {
 		resp, err := stream.Recv()
 		if err == io.EOF {
 			break
 		}
 		if err != nil {
-			log.Errorf("RPC Recv failed: %s", err.Error())
+			log.Errorf("Rpc Recv failed: %s", err.Error())
 			SetActionLog(err, al)
 			return err
 		}
@@ -266,13 +277,15 @@ func Retrieve(log logrus.FieldLogger, client pb.ProviderServiceClient, filePath 
 		}
 		if realfile != "" {
 			if err := pm.SetIncrement(realfile, uint64(len(resp.Data))); err != nil {
-				log.Errorf("file %s not in progress map", realfile)
+				log.Errorf("File %s not in progress map", realfile)
 			}
 		}
 		if _, err = file.Write(resp.Data); err != nil {
-			log.Errorf("write file %d bytes failed : %s", len(resp.Data), err.Error())
+			log.Errorf("Write file %d bytes failed : %s", len(resp.Data), err.Error())
 			return err
 		}
+		recvBytes += len(resp.Data)
+		log.Debugf("Retrieve %d, total %d bytes", recvBytes, fileSize)
 	}
 	al.Success, al.EndTime, al.TransportSize = true, now(), uint64(fileSize)
 	return nil

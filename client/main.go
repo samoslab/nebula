@@ -9,6 +9,7 @@ import (
 	"github.com/samoslab/nebula/client/config"
 	"github.com/samoslab/nebula/client/service"
 	"github.com/samoslab/nebula/client/wsservice"
+	"github.com/samoslab/nebula/util/apputil"
 	"github.com/samoslab/nebula/util/browser"
 	"github.com/samoslab/nebula/util/file"
 	"github.com/samoslab/nebula/util/logger"
@@ -38,8 +39,7 @@ func main() {
 	fmt.Printf("configFile %s\n", *configFile)
 	webcfg, err := config.LoadWebConfig(*configFile)
 	if err != nil {
-		fmt.Printf("load config error  %v\n", err)
-		// set default webcfg avoid crash
+		log.Errorf("load config error  %v\n", err)
 		webcfg = &config.Config{}
 		webcfg.SetDefault()
 	}
@@ -61,11 +61,14 @@ func main() {
 		webcfg.TrackerServer = *trackerAddr
 	}
 
-	fmt.Printf("webcfg %+v\n", webcfg)
+	quit := make(chan struct{})
+	go apputil.CatchInterrupt(quit)
+	go apputil.CatchDebug()
+
+	log.Infof("webcfg %+v", webcfg)
 	server := service.NewHTTPServer(log, *webcfg)
 
-	defer server.Shutdown()
-	fmt.Printf("start http listen on %s\n", webcfg.HTTPAddr)
+	log.Infof("start http listen on %s", webcfg.HTTPAddr)
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -74,13 +77,12 @@ func main() {
 	}()
 
 	ws := wsservice.NewWSController(log, server.GetClientManager())
-	defer ws.Shutdown()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		fmt.Printf("start websocket listen at %s\n", webcfg.WSAddr)
+		log.Infof("start websocket listen at %s", webcfg.WSAddr)
 		if err := ws.Run(webcfg.WSAddr); err != nil {
-			fmt.Printf("websocket run failed\n")
+			log.Error("websocket run failed")
 		}
 	}()
 
@@ -93,13 +95,19 @@ func main() {
 			time.Sleep(time.Millisecond * 100)
 
 			fullAddress := "http://" + *serverAddr + "/index.html"
-			fmt.Printf("Launching System Browser with %s\n", fullAddress)
+			log.Infof("Launching System Browser with %s\n", fullAddress)
 			if err := browser.Open(fullAddress); err != nil {
-				fmt.Printf("%v", err)
+				log.Errorf("%v", err)
 				return
 			}
 		}()
 	}
 
+	select {
+	case <-quit:
+		log.Info("Get quit signal, exit")
+	}
+	server.Shutdown()
+	ws.Shutdown()
 	wg.Wait()
 }
