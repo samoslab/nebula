@@ -119,26 +119,19 @@ func Discover() (*IGD, error) {
 		if len(ipclients) > 0 {
 			return &IGD{ipclients[0]}, nil
 		}
-		// select {
-		// case <-ctx.Done():
-		// 	return nil, context.Canceled
-		// case <-time.After(sleepTime):
-		// }
-		// sleepTime *= 2
-	}
-	for try := 0; try < maxTries; try++ {
-		pppclients, _, _ := internetgateway2.NewWANPPPConnection1Clients()
-		if len(pppclients) > 0 {
-			return &IGD{pppclients[0]}, nil
-		}
-		ipclients, _, _ := internetgateway2.NewWANIPConnection1Clients()
-		if len(ipclients) > 0 {
-			return &IGD{ipclients[0]}, nil
+		ppp2clients, _, _ := internetgateway2.NewWANPPPConnection1Clients()
+		if len(ppp2clients) > 0 {
+			return &IGD{ppp2clients[0]}, nil
 		}
 		ipclientsArr, _, _ := internetgateway2.NewWANIPConnection2Clients()
 		if len(ipclientsArr) > 0 {
 			return &IGD{ipclientsArr[0]}, nil
 		}
+		ip2clients, _, _ := internetgateway2.NewWANIPConnection1Clients()
+		if len(ip2clients) > 0 {
+			return &IGD{ip2clients[0]}, nil
+		}
+
 		// select {
 		// case <-ctx.Done():
 		// 	return nil, context.Canceled

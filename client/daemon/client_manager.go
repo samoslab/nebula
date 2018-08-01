@@ -270,24 +270,32 @@ func (c *ClientManager) ExecuteTask() error {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
+		TaskControlChan := make(chan struct{}, common.CCTaskHandleNum)
 		defer func() {
 			wg.Done()
+			close(TaskControlChan)
 			close(c.done)
 			log.Infof("Shutdown task goroutine")
 		}()
-		TaskControlChan := make(chan struct{}, common.CCTaskHandleNum)
-		var wg1 sync.WaitGroup
 		for {
 			select {
 			case <-c.quit:
 				return
 			case taskInfo := <-c.TaskChan:
 				TaskControlChan <- struct{}{}
-				wg1.Add(1)
 				go func(taskInfo TaskInfo) {
+					done := make(chan struct{})
+					go func() {
+						select {
+						case <-c.quit:
+							<-TaskControlChan
+						case <-done:
+							return
+						}
+					}()
 					defer func() {
+						close(done)
 						<-TaskControlChan
-						wg1.Done()
 					}()
 					var err error
 					task := taskInfo.Task
@@ -338,7 +346,6 @@ func (c *ClientManager) ExecuteTask() error {
 						log.Infof("Update task success")
 					}
 				}(taskInfo)
-				wg1.Wait()
 			}
 		}
 	}()
@@ -361,7 +368,7 @@ func (c *ClientManager) SendProgressMsg() error {
 			select {
 			case <-c.quit:
 				return
-			case <-time.After(2 * time.Second):
+			case <-time.After(1 * time.Second):
 				msgList, err := c.PM.GetProgressingMsg([]string{})
 				if err != nil {
 					log.WithError(err).Error("Get progress message failed")
@@ -496,8 +503,7 @@ func (c *ClientManager) UploadDir(parent, dest string, interactive, newVersion, 
 	log.Debugf("New upload dirs %+v", newDirs)
 	errArr := []error{}
 	var mutex sync.Mutex
-	var wg sync.WaitGroup
-	UploadChan := make(chan struct{}, common.CCUploadFileNum)
+	ccControl := NewCCController(common.CCUploadFileNum)
 	for _, dpair := range newDirs {
 		if dpair.Folder {
 			log.Debugf("Mkfolder %+v", dpair)
@@ -507,12 +513,13 @@ func (c *ClientManager) UploadDir(parent, dest string, interactive, newVersion, 
 			}
 		} else {
 			log.Debugf("Upload file %+v", dpair)
-			wg.Add(1)
-			UploadChan <- struct{}{}
+			ccControl.Add()
 			go func(dpair DirPair) {
+				done := make(chan struct{})
+				go HandleQuit(c.quit, done, ccControl)
 				defer func() {
-					<-UploadChan
-					wg.Done()
+					close(done)
+					ccControl.Done()
 				}()
 				doneMsg := common.MakeSuccDoneMsg(common.TaskUploadFileType, dpair.Name)
 				err := c.UploadFile(dpair.Name, dpair.Parent, interactive, newVersion, isEncrypt, sno)
@@ -529,7 +536,7 @@ func (c *ClientManager) UploadDir(parent, dest string, interactive, newVersion, 
 			}(dpair)
 		}
 	}
-	wg.Wait()
+	ccControl.Wait()
 	if len(errArr) > 0 {
 		return errArr[0]
 	}
@@ -929,8 +936,7 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 
 	var errResult []error
 	var mutex sync.Mutex
-	wg := sync.WaitGroup{}
-	UploadChan := make(chan struct{}, common.CCUploadGoNum)
+	ccControl := NewCCController(common.CCUploadGoNum)
 	for i, pro := range providers {
 		checksum := i >= dataShards
 		uploadParas := &common.UploadParameter{
@@ -939,23 +945,13 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 			OriginFileHash: partFile.OriginFileHash,
 			OriginFileSize: partFile.OriginFileSize,
 		}
-		wg.Add(1)
-		UploadChan <- struct{}{}
+		ccControl.Add()
 		go func(pro *mpb.BlockProviderAuth, tm uint64, uploadPara *common.UploadParameter) {
 			done := make(chan struct{})
-			go func() {
-				select {
-				case <-c.quit:
-					<-UploadChan
-					wg.Done()
-				case <-done:
-					return
-				}
-			}()
+			go HandleQuit(c.quit, done, ccControl)
 			defer func() {
-				<-UploadChan
-				wg.Done()
 				close(done)
+				ccControl.Done()
 			}()
 			block, err := c.uploadFileToErasureProvider(pro, tm, uploadParas)
 			mutex.Lock()
@@ -968,7 +964,7 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 			partition.Block = append(partition.Block, block)
 		}(pro, rspPartition.GetTimestamp(), uploadParas)
 	}
-	wg.Wait()
+	ccControl.Wait()
 	if len(errResult) != 0 {
 		return partition, errResult[0]
 	}
@@ -1092,12 +1088,10 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 	}
 
 	errArr := []error{}
-	var wg sync.WaitGroup
 	var mutex sync.Mutex
-	UploadChan := make(chan struct{}, common.CCUploadFileNum)
+	ccControl := NewCCController(common.CCUploadFileNum)
 	for _, pro := range providers {
-		wg.Add(1)
-		UploadChan <- struct{}{}
+		ccControl.Add()
 		go func(pro *mpb.ReplicaProvider) {
 			server := fmt.Sprintf("%s:%d", pro.Server, pro.Port)
 			conn, err := grpc.Dial(server, grpc.WithInsecure())
@@ -1109,21 +1103,11 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 				return
 			}
 			done := make(chan struct{})
-			go func() {
-				select {
-				case <-c.quit:
-					<-UploadChan
-					wg.Done()
-					conn.Close()
-				case <-done:
-					return
-				}
-			}()
+			go HandleQuit(c.quit, done, ccControl, func() { conn.Close() })
 			defer func() {
-				<-UploadChan
-				wg.Done()
 				conn.Close()
 				close(done)
+				ccControl.Done()
 			}()
 			proID, err := c.uploadFileToReplicaProvider(conn, pro, uploadPara)
 			if err != nil {
@@ -1137,7 +1121,7 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 		}(pro)
 	}
 
-	wg.Wait()
+	ccControl.Wait()
 	if len(errArr) > 0 {
 		return nil, errArr[0]
 	}
@@ -1554,8 +1538,7 @@ func (c *ClientManager) saveFileByPartition(fileName string, partition *mpb.Retr
 	middleFiles := []string{}
 	errArray := []string{}
 	var mutex sync.Mutex
-	var wg sync.WaitGroup
-	BatchDownloadChan := make(chan struct{}, common.CCDownloadGoNum)
+	ccControl := NewCCController(common.CCDownloadGoNum)
 
 	for _, block := range partition.GetBlock() {
 		if block.GetChecksum() {
@@ -1564,8 +1547,7 @@ func (c *ClientManager) saveFileByPartition(fileName string, partition *mpb.Retr
 			dataShards++
 		}
 
-		wg.Add(1)
-		BatchDownloadChan <- struct{}{}
+		ccControl.Add()
 		go func(log logrus.FieldLogger, block *mpb.RetrieveBlock, fileName string) {
 			node := BestRetrieveNode(block.GetStoreNode())
 			server := fmt.Sprintf("%s:%d", node.GetServer(), node.GetPort())
@@ -1579,20 +1561,10 @@ func (c *ClientManager) saveFileByPartition(fileName string, partition *mpb.Retr
 				return
 			}
 			done := make(chan struct{})
-			go func() {
-				select {
-				case <-c.quit:
-					<-BatchDownloadChan
-					wg.Done()
-					conn.Close()
-				case <-done:
-					return
-				}
-			}()
+			go HandleQuit(c.quit, done, ccControl, func() { conn.Close() })
 			defer func() {
-				<-BatchDownloadChan
-				wg.Done()
 				close(done)
+				ccControl.Done()
 			}()
 			tempFileName := fileName
 			if !multiReplica {
@@ -1622,7 +1594,7 @@ func (c *ClientManager) saveFileByPartition(fileName string, partition *mpb.Retr
 		}(log, block, fileName)
 	}
 
-	wg.Wait()
+	ccControl.Wait()
 
 	if len(errArray) > 0 {
 		errRtn := fmt.Errorf("%s", strings.Join(errArray, "\n"))
