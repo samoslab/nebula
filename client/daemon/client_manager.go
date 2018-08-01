@@ -516,14 +516,7 @@ func (c *ClientManager) UploadDir(parent, dest string, interactive, newVersion, 
 			ccControl.Add()
 			go func(dpair DirPair) {
 				done := make(chan struct{})
-				go func() {
-					select {
-					case <-c.quit:
-						ccControl.Done()
-					case <-done:
-						return
-					}
-				}()
+				go HandleQuit(c.quit, done, ccControl)
 				defer func() {
 					close(done)
 					ccControl.Done()
@@ -955,14 +948,7 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 		ccControl.Add()
 		go func(pro *mpb.BlockProviderAuth, tm uint64, uploadPara *common.UploadParameter) {
 			done := make(chan struct{})
-			go func() {
-				select {
-				case <-c.quit:
-					ccControl.Done()
-				case <-done:
-					return
-				}
-			}()
+			go HandleQuit(c.quit, done, ccControl)
 			defer func() {
 				close(done)
 				ccControl.Done()
@@ -1117,15 +1103,7 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 				return
 			}
 			done := make(chan struct{})
-			go func() {
-				select {
-				case <-c.quit:
-					conn.Close()
-					ccControl.Done()
-				case <-done:
-					return
-				}
-			}()
+			go HandleQuit(c.quit, done, ccControl, func() { conn.Close() })
 			defer func() {
 				conn.Close()
 				close(done)
@@ -1583,15 +1561,7 @@ func (c *ClientManager) saveFileByPartition(fileName string, partition *mpb.Retr
 				return
 			}
 			done := make(chan struct{})
-			go func() {
-				select {
-				case <-c.quit:
-					conn.Close()
-					ccControl.Done()
-				case <-done:
-					return
-				}
-			}()
+			go HandleQuit(c.quit, done, ccControl, func() { conn.Close() })
 			defer func() {
 				close(done)
 				ccControl.Done()
