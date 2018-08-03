@@ -649,7 +649,7 @@ func refreshIp(trackerServer string, providerPort int, exitOnError bool) (ip str
 			fmt.Printf("RPC Dial failed: %s\n", err.Error())
 			os.Exit(61)
 		} else {
-			log.Errorf("RPC Dial failed when refresh ip, error info: %s", err)
+			log.Warningf("RPC Dial failed when refresh ip, info: %s", err)
 			return
 		}
 	}
@@ -661,7 +661,7 @@ func refreshIp(trackerServer string, providerPort int, exitOnError bool) (ip str
 			fmt.Printf("refresh ip failed: %s\n", err.Error())
 			os.Exit(62)
 		} else {
-			log.Errorf("refresh ip failed, error info: %s", err)
+			log.Warningf("refresh ip failed, info: %s", err)
 			return
 		}
 	}
