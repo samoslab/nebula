@@ -58,7 +58,8 @@ var (
 	DefaultTempDir = "/tmp/nebula_client"
 
 	// ReplicaNum number of muliti-replication
-	ReplicaNum = 5
+	ReplicaNum    = 5
+	MinReplicaNum = 3
 )
 
 // DownFile list files format, used when download file

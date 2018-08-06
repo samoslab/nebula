@@ -139,3 +139,10 @@ type HashFile struct {
 func Now() uint64 {
 	return uint64(time.Now().UTC().Unix())
 }
+
+func Min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
