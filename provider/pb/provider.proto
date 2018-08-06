@@ -63,6 +63,7 @@ message PingReq {
 }
 
 message PingResp{
+	bytes nodeIdHash=1;
 }
 
 message StoreReq {
