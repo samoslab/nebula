@@ -493,6 +493,11 @@ func doRegister(configDir string, trackerServer string, listen string, walletAdd
 			os.Exit(55)
 		}
 		if code != 0 {
+			if code == 300 {
+				fmt.Println(errMsg)
+				fmt.Println("Retrying...")
+				continue
+			}
 			if code == 500 {
 				pubKeyBytes, publicKeyHash, _, err = client.GetPublicKey(prsc)
 				if err != nil {
