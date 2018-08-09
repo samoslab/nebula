@@ -43,7 +43,7 @@ var method = {
             }),
             success:function(res){
                 console.log(res);
-                if((res.code==0)&&(res.Data=="ok")){
+                if(res.code==0){
                     $.cookie("privitePsd", 1, { expires: 365,path: '/' });
                     $("#priviteCondition").hide();
                     $("#diskDivAll").show();
@@ -154,29 +154,42 @@ var method = {
         $("#PackageDiv").show();
         //调用套餐初始的方法们；
         packageMethod.packageInit();
+    },
+    //增加文件夹确定事件
+    addFolderCf:function(initPath,path,space_no){
+        let name = $(".zJMtAEb dd:eq(0) .renameInput").val();
+        let html = ``;
+
+        $.ajax({
+            url:"/api/v1/store/folder/add",
+            method:'POST',
+            contentType:'application/json',
+            //创建目录  在 根目录下创建     abc  和 tmp 两个子目录
+            data:JSON.stringify({
+                "parent":path,
+                "space_no":space_no,
+                "folders":[name],
+                "interactive":true
+            }),
+            success:function(res){
+                if(res.Data == true){
+                    $(".zJMtAEb dd:eq(0) .appendFileName").html(name).attr('href',`${'#'+initPath+'/'+name}`);
+                    $(".zJMtAEb dd:eq(0) .oprate").attr('style','');
+                    $(".renameSpan").hide();
+                    $(".zJMtAEb dd:eq(0) .s-select-check").attr({
+                        "data-path":`${path}${path=='/'?'':'/'}${name}`,
+                        "data-name":name
+                    });
+                    $("#addFolderBtn").attr("onclick",'trigger()');
+                }else{
+                    alert('Please rename the folder!');
+                }
+            }
+        });
     }
 
 };
 
-
-//  导出配置文件
-//  $("#exportConfig").click(function(){
-    // let filename = '';
-    // $.ajax({
-    //     url:"/api/v1/config/export",
-    //     contentType:"application/json",
-    //     method:'POST',
-    //     data:JSON.stringify({'filename':'C:\\samos_disk/config.json'}),
-    //     success:function(res){
-    //         if(res.code==0){
-    //             alert("The configuration file is saved and the save path is 'C:\\samos_disk/config.json'.");
-    //         }else{
-    //             alert("Export failed, please restart.");
-    //         }
-    //        // console.log(res);
-    //     }
-    // });
-// });
 
 //查所有文件类型
 // $.ajax({
@@ -207,7 +220,7 @@ function list(path,space_no,pagesize,pagenum,sorttype,ascorder){
         }),
         success:function(res){
             console.log(res);
-            if(res.code!=0)return;
+            if(res.code!=0) {alert(res.errmsg);return;}
             //插入列表内容；
             append(res,path,space_no);
             //插入面包屑导航内容；
@@ -252,17 +265,44 @@ function append(res,path,space_no){
         if(path=="/"){
             path="";
         }
-
+        // onclick="gBtnDownLoad('${obj.filehash}','${obj.filesize}','${obj.filename}','${space_no}','${obj.folder}')"
         html+=` <dd class="AuPKyz">
                     <div data-key="name" class="AuPKyz-li" style="width:44%;">
                         <input class="s-select-check" type="checkbox" name="fileSelect" data-name="${obj.filename}" data-id="${obj.id}" data-path="${path}${'/'+obj.filename}" data-hash="${obj.filehash}" data-size="${obj.filesize}" data-folder=${obj.folder} data-spaceNo="${space_no}">
                         <span class="file-icon my-file-${a}"></span>
                         <a class="file-name" title="${obj.filename}" href="${no}${path}${'/'+obj.filename}">${obj.filename}</a>
+                        <div class="oprate">
+                            <a class="g-button g-btn-download" href="javascript:;" title="DownLoad"  onclick="gBtnDownLoad('${obj.id}','${obj.filehash}','${obj.filesize}','${path}${'/'+obj.filename}','${space_no}','${obj.folder}')">
+                                <span>
+                                    <svg t="1529565144872" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="6402" xmlns:xlink="http://www.w3.org/1999/xlink" width="16" height="16">
+                                    <defs><style type="text/css"></style></defs><path d="M199.3216 552.704v284.3648h655.9232v-284.3648a31.3856 31.3856 0 0 1 62.8224 0v284.3648c0 34.6624-28.16 62.7712-62.8224 62.7712H199.3728c-34.7136 0-62.8224-28.1088-62.8224-62.7712v-284.3648a31.3856 31.3856 0 1 1 62.7712 0z" p-id="6403" fill="#3b8cff"></path><path d="M531.2 171.1104c17.408 0 31.4368 14.0288 31.4368 31.3856v487.2192H499.8144V202.496c0-17.3568 14.08-31.3856 31.3856-31.3856z" p-id="6404" fill="#3b8cff"></path><path d="M532.48 669.2352l128.3584-128.256a31.3856 31.3856 0 0 1 44.3904 44.3904L532.48 758.0672l-172.6976-172.6976a31.3856 31.3856 0 1 1 44.3904-44.3904l128.3072 128.256z" p-id="6405" fill="#3b8cff"></path>
+                                    </svg>
+                                </span>
+                                <form class="h5-uploader-form">
+                                    <input id="rowDownLoadIpt${obj.id}"  class="h5-uploader-form"  multiple="" webkitdirectory="" accept="*/*" type="file">
+                                </form>
+                            </a>
+                            <a class="g-button g-btn-delete" href="javascript:;" title="Delete" onclick = "gBtnDelete('${obj.id}','${path}${'/'+obj.filename}','${obj.folder}','${space_no}',true)">
+                                <span>
+                                    <svg t="1529565511794" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="7147" xmlns:xlink="http://www.w3.org/1999/xlink" width="16" height="16">
+                                        <defs><style type="text/css"></style></defs><path d="M677.35552 204.8l0-61.44c0-33.91488-29.61408-61.44-66.1504-61.44l-198.49216 0c-36.57728 0-66.19136 27.52512-66.19136 61.44l0 61.44-264.64256 0 0 61.44 99.24608 0 0 614.4c0 33.95584 29.65504 61.44 66.1504 61.44l529.32608 0c36.57728 0 66.19136-27.48416 66.19136-61.44l0-614.4 99.24608 0 0-61.44L677.35552 204.8 677.35552 204.8zM412.71296 143.36l198.49216 0 0 61.44-198.49216 0L412.71296 143.36 412.71296 143.36zM776.6016 880.64 247.27552 880.64l0-614.4 529.32608 0L776.6016 880.64 776.6016 880.64zM346.5216 358.4l66.19136 0 0 430.08-66.19136 0L346.5216 358.4 346.5216 358.4zM478.86336 358.4l66.1504 0 0 430.08-66.1504 0L478.86336 358.4 478.86336 358.4zM611.20512 358.4l66.1504 0 0 430.08-66.1504 0L611.20512 358.4 611.20512 358.4zM611.20512 358.4" p-id="7148" fill="#3b8cff"></path>
+                                    </svg>
+                                </span>
+                              
+                            </a>
+                            <a class="g-button g-btn-rename" href="javascript:;" title="Rename">
+                                <span>
+                                    <svg t="1529565661279" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="7381" xmlns:xlink="http://www.w3.org/1999/xlink" width="16" height="16">
+                                        <defs><style type="text/css"></style></defs><path d="M949.2 63.44c-33.696-32.4-70.88-48.832-110.576-48.832-62.064 0-107.344 40.224-119.728 52.56C701.488 84.48 106.832 681.488 106.832 681.488c-3.888 3.92-6.72 8.8-8.176 14.176-13.424 49.728-80.592 270.416-81.264 272.624-3.456 11.296-0.384 23.616 7.92 31.936 5.984 5.952 13.936 9.168 22.08 9.168 3.2 0 6.432-0.496 9.6-1.52 2.288-0.752 229.248-74.384 266.608-85.568 4.912-1.472 9.424-4.16 13.072-7.792 23.6-23.408 578.224-573.824 615.04-611.968 38.08-39.392 56.992-80.384 56.256-121.872C1007.248 139.712 987.472 100.272 949.2 63.44zM285.472 744.288c-32.368-32.736-65.296-51.216-90.688-61.616 109.2-109.632 394.464-396 514.272-516.208 15.632 3.76 52.768 16.16 90.912 54.784 38.528 38.992 48.8 83.472 50.672 93.344-121.632 121.44-401.616 399.44-512 509.008C328.432 799.776 311.968 771.088 285.472 744.288zM152.736 735.104c16.96 4.512 52.272 17.6 88.32 54.08 27.76 28.096 40.8 58.992 46.656 77.856-43.008 13.872-137.152 46.48-196.976 65.84C108.48 874.336 138.4 783.2 152.736 735.104zM906.832 258.16c-1.264 1.312-3.36 3.424-5.856 5.968-9.776-25.28-26.928-57.728-56.624-87.792-30.336-30.704-61.12-48.8-85.792-59.52 2.096-2.096 3.728-3.728 4.368-4.368 3.536-3.504 35.664-34.32 75.696-34.32 23.056 0 45.68 10.544 67.296 31.344 25.632 24.672 38.848 49.024 39.28 72.368C945.616 205.696 932.72 231.36 906.832 258.16z" fill="#3b8cff" p-id="7382"></path>
+                                    </svg>
+                                </span>
+                            </a>
+                        </div>
                     </div>
                     <div data-key="size" class="AuPKyz-li" style="width:16%;">
                         <span class="text">${k}</span>
                     </div>
-                    <div data-key="size" class="AuPKyz-li" style="width:16%;">
+                    <div data-key="type" class="AuPKyz-li" style="width:16%;">
                         <span class="text">${(obj.filetype!='unknown')?obj.filetype:'folder'}</span>
                     </div>
                     <div data-key="time" class="AuPKyz-li" style="width:23%;">
@@ -273,11 +313,7 @@ function append(res,path,space_no){
     $('.zJMtAEb').html(html);
 
      // <!--单行选中增加类-->
-    rowSelected();
-    //点击文件名进入下一层
-    nextLayer(space_no);
-
-    
+    rowSelected(); 
 }
 
 
@@ -353,74 +389,91 @@ function btngroupshow(){
     return allFileHtml;
  }
 
- //点击文件名 进入下一层级
- function nextLayer(space_no){
-    $(".zJMtAEb .file-name").each(function(){
-        $(this).click(function(){
-            let value = $(this).prev().prev().attr("data-folder");
-            if(value=='false'){
-                return
+/*-------------------------------------------------重命名-----------------------------------------------------------------------------*/
+var rename = {
+    // <!--重命名-->
+    rename:function (){
+        let a = $(".zJMtAEb input[name='fileSelect']:checked").parent().parent().position().top;
+        $('#file-rename-box').show();
+        $('#file-rename-box').css('top',a);
+        // <!--非选中的input 和 全选按钮禁止点击-->
+        $(".zJMtAEb input[name='fileSelect']").not(':checked').attr('disabled','disabled');
+        $("#s-selectAll").attr("disabled","disabled");
+        // <!--要改的文件名字给input value-->
+        let name = $(".zJMtAEb input[name='fileSelect']:checked").attr("data-name");
+        $(".renameInput").val(name);
+    },
+    // <!--重命名div隐藏-->
+    renameDivHide:function (){
+        $(".renameInput").val('');
+        $(".zJMtAEb input[name='fileSelect']").not(':checked').attr('disabled',false);
+        $("#s-selectAll").attr("disabled",false);
+        $("#file-rename-box").hide();
+    },
+    //重命名确定
+    renameCf:function(){
+        let renameInputV= $(".renameInput").val();
+        $(".zJMtAEb input[name='fileSelect']:checked").next().next().html(renameInputV);
+        let dataId = $(".zJMtAEb input[name='fileSelect']:checked").attr("data-id");
+        let dataPath = $(".zJMtAEb input[name='fileSelect']:checked").attr("data-path");
+        let spaceNo =  Number($(".zJMtAEb input[name='fileSelect']:checked").attr("data-spaceno"));
+        // let json = {};
+
+        // if(dataId){
+        //     json.src = dataId;
+        //     json.ispath = false;
+        // }else{
+        //     json.target = dataPath;
+        //     json.ispath = true;
+        // }
+        // json['space_no']=parseInt(spaceNo);
+        // json.recursion = true;
+        $.ajax({
+            url:"/api/v1/store/rename",
+            method:"POST",
+            contentType: "application/json",
+            //data:JSON.stringify(json),
+            data:JSON.stringify({
+                "src":dataId,
+                "dest":renameInputV,
+                "space_no":spaceNo
+            }),
+            success:function(res){
+                console.log(res);
+                if(res.code==0){
+                    //重命名成功，隐藏重命名组件
+                    rename.renameDivHide();
+                }else if(res.code!=0){
+                    alert(res.errmsg);
+                }
+
             }
-            let path = $(this).prev().prev().attr("data-path");            
-            //请求列表
-             list(path,space_no,1000,1,'modtime',true);
-              
         });
-     });
- }
+    }
+};
 
-
-// <!--重命名-->
-function rename(){
-    let a = $(".zJMtAEb input[name='fileSelect']:checked").parent().parent().position().top;
-    $('#file-rename-box').show();
-    $('#file-rename-box').css('top',a);
-    // <!--非选中的input 和 全选按钮禁止点击-->
-    $(".zJMtAEb input[name='fileSelect']").not(':checked').attr('disabled','disabled');
-    $("#s-selectAll").attr("disabled","disabled");
-    // <!--要改的文件名字给input value-->
-    let name = $(".zJMtAEb input[name='fileSelect']:checked").attr("data-name");
-    $(".renameInput").val(name);
-}
-// <!--重命名div隐藏-->
-function renameDivHide(){
-    $(".renameInput").val('');
-    $(".zJMtAEb input[name='fileSelect']").not(':checked').attr('disabled',false);
-    $("#s-selectAll").attr("disabled",false);
-    $("#file-rename-box").hide();
-}
 // <!--重命名点击事件-->
 $("#renameBtn").click(function(){
     if($(".zJMtAEb input[name='fileSelect']:checked").size()==1){
-        rename();
+        rename.rename();
     }
-});
-// <!--重命名取消-->
-$("#rename-cancel").click(function(){
-    renameDivHide();
-});
-// <!--重命名确定-->
-$("#rename-cfm").click(function(){
-    let renameInputV= $(".renameInput").val();
-    $(".zJMtAEb input[name='fileSelect']:checked").next().next().html(renameInputV);
-    let dataId = $(".zJMtAEb input[name='fileSelect']:checked").attr("data-id");
-    $.ajax({
-        url:"/api/v1/store/rename",
-        method:"POST",
-        contentType: "application/json",
-        data:JSON.stringify({
-            "src":dataId,
-            "dest":renameInputV
-        }),
-        success:function(res){
-            console.log(res);
-            if(res.Data=="ok"){
-                //重命名成功，隐藏重命名组件
-                renameDivHide();
-            }
-        }
+    //<!--重命名取消-->
+    $("#rename-cancel").click(function(){
+        rename.renameDivHide();
     });
+    //<!--重命名确定-->
+    $("#rename-cfm").click(function(){
+        rename.renameCf();
+    });
+    //回车事件
+    $('.renameInput').keyup(function(event){
+        if(event.keyCode ==13){
+            rename.renameCf();
+        }
+   });
+
 });
+
 
 //-------------------------------------------------------------------------------------------------------------------------------------------------//
 
@@ -461,48 +514,12 @@ $("#upLoadFileBtn").click(function(){
                 }),
                 success:function(res){
                     console.log(res);
-                    if((res.code==0)&&(res.Data=='ok')){
+                    if(res.code==0){
                         method.firstInit();
                     }
                 }
             });
         }
-        
-        // let space_no = '';
-        // let hashPath = method.getParamsUrl().path;
-        // let a = hashPath.split(":")[0];
-        // let b = hashPath.split(":")[1];   
-        // if(a == "myspace"){
-        //     space_no = 0;
-        // }else if(a == "privite"){
-        //     space_no = 1;
-        // }
-        // hashPath = b;
-        // if(b ==0){
-        //     hashPath = "/";
-        // }
-
-        // console.log(localPath+";"+hashPath);
-
-        // $.ajax({
-        //     url:"/api/v1/store/upload",
-        //     method:"POST",
-        //     contentType: "application/json",
-        //     data:JSON.stringify({
-        //         "filename":localPath,
-        //         "dest_dir": hashPath,
-        //         "interactive":true,
-        //         "newversion" :false,
-        //         "space_no":space_no,
-        //         "is_encrypt":true
-        //     }),
-        //     success:function(res){
-        //         console.log(res);
-        //         if((res.code==0)&&(res.Data=='ok')){
-        //             method.firstInit();
-        //         }
-        //     }
-        // });
     });
 });
 
@@ -538,7 +555,7 @@ $("#upLoadFolderBtn").click(function(){
             }),
             success:function(res){
                 console.log(res);
-                if((res.code==0)&&(res.Data=='ok')){
+                if(res.code==0){
                     method.firstInit();
                 }
             }
@@ -547,8 +564,7 @@ $("#upLoadFolderBtn").click(function(){
     });
 });
 
-//点击下载文件
-
+//顶部点击下载文件
 //需要判断所有勾选的是文件还是文件夹，根据结果来执行哪个下载；
 $("#downLoadBtn").click(function(){
     $("#downLoadIpt").unbind().change(function(){
@@ -575,7 +591,7 @@ $("#downLoadBtn").click(function(){
                     }),
                     success:function(res){
                         console.log(res);
-                        if(res.code==0&&res.Data=='ok'){
+                        if(res.code==0){
                             alert('Download success!');
                         }else{
                             alert(res.errmsg);
@@ -594,7 +610,7 @@ $("#downLoadBtn").click(function(){
                     }),
                     success:function(res){
                         console.log(res);
-                        if(res.code==0&&res.Data=='ok'){
+                        if(res.code==0){
                             alert('Download success!');
                         }else{
                             alert(res.errmsg);
@@ -606,14 +622,68 @@ $("#downLoadBtn").click(function(){
     });
 });
 
+//// //单行下载按钮点击事件下载
+function gBtnDownLoad(id,filehash,filesize,filename,space_no,isFolder){
+    $("#rowDownLoadIpt"+id).change(function(){
+        console.log(id,filehash,filesize,filename,space_no,isFolder);
+        let size = Number(filesize);
+        let space = Number(space_no);
+        let newId = "rowDownLoadIpt"+id;
+        let localPath = document.getElementById(newId).files[0].path;
+        console.log(localPath);
+        if(isFolder=='false'){
+            $.ajax({
+                url:"/api/v1/store/download",
+                method:"POST",
+                contentType: "application/json",
+                data:JSON.stringify({
+                    "filehash":filehash,
+                    "filesize":size,
+                    "filename":filename,
+                    "space_no":space,
+                    "dest_dir":localPath
+                }),
+                success:function(res){
+                    console.log(res);
+                    if(res.code==0){
+                        alert('Download success!');
+                    }else{
+                        alert(res.errmsg);
+                    }
+                }
+            });
+        }else{
+            $.ajax({
+                url:"/api/v1/store/downloaddir",
+                method:"POST",
+                contentType: "application/json",
+                data:JSON.stringify({
+                    "parent":filename,
+                    "space_no":space,
+                    "dest_dir":localPath
+                }),
+                success:function(res){
+                    console.log(res);
+                    if(res.code==0){
+                        alert('Download success!');
+                    }else{
+                        alert(res.errmsg);
+                    }
+                }
+            });
+        }
+    
+    });
+}
 
-//删除
+
+//顶部删除按钮；
 $("#deleteBtn").click(function(){
     let inputArr = $(".zJMtAEb input[name='fileSelect']:checked");
     let arr=[];
     //let json = {};
     for(i=0;i<inputArr.length;i++){
-         let json = {};
+        let json = {};
         let id = $(inputArr[i]).attr("data-id");
         let path = $(inputArr[i]).attr("data-path");
         if(id){
@@ -638,24 +708,57 @@ $("#deleteBtn").click(function(){
             data:JSON.stringify(arr[i]),
             success:function(res){
                 console.log(res);
-                if((res.code==0)&&(res.Data=="ok")){
+                if(res.code==0){
                     method.firstInit();
-                }else if(res.code!=0){
+                    $("#file-rename-box").hide(); //重命名输入框显示时，又点击了删除按钮；
+                }else{
                     alert('Delete failed!');
                 }
             }
         });
-    }
-
-   
+    } 
 });
 
+// //单行删除按钮点击事件删除
+function gBtnDelete(id,path,ispath,space_no,recursion){
+    console.log(id+','+path+','+ispath+','+space_no+','+recursion);
+    let renameInputV = $(".renameInput").val();
+    console.log(path+renameInputV);
+    let json = {};
+    if(id){
+        json.target = id;
+        json.ispath = false;
+    }else{
+        json.target = path+renameInputV;
+        json.ispath = true;
+    }
+    json['space_no']=parseInt(space_no);
+    json.recursion = recursion;
+    console.log(json);
+    $.ajax({
+        url:"/api/v1/store/remove",
+        method:"POST",
+        contentType: "application/json",
+        data:JSON.stringify(json),
+        success:function(res){
+            console.log(res);
+            if(res.code==0){
+                method.firstInit();
+                $("#file-rename-box").hide(); //重命名输入框显示时，又点击了删除按钮；
+            }else{
+                alert('Delete failed!');
+            }
+        }
+    });
+
+}
 
 //addFolder
 function trigger(){
     let path = method.getParamsUrl().path;
+    let initPath = path;
     let space_no;
-    //console.log(path);
+    console.log(path);
     let a = path.split(":")[0];
     let b = path.split(":")[1];   
     if(a == "myspace"){
@@ -668,15 +771,14 @@ function trigger(){
         path = "/";
     }
     
-    //console.log(path);
     //nofile隐藏
     $(".no-file-ab").hide();
     //js选插入一行
     let row =` <dd class="AuPKyz">
-                    <div data-key="name" class="AuPKyz-li" style="width:60%;">
-                        <input class="s-select-check" type="checkbox" name="fileSelect" data-name="" data-id="" data-path="${path}/new folder" data-hash="" data-folder=true  data-spaceNo="${space_no}">
+                    <div data-key="name" class="AuPKyz-li" style="width:44%;">
+                        <input class="s-select-check" type="checkbox" name="fileSelect" data-name="" data-id="" data-path="${path}${path=='/'?'':'/'}new folder" data-hash="" data-folder=true  data-spaceNo="${space_no}">
                         <span class="file-icon "></span>
-                        <span class="file-name appendFileName" title=""></span>
+                        <a class="file-name appendFileName" title="" href=""></a>
                         <span class="renameSpan">
                             <input class="renameInput" type="text" value="new folder" autofocus>
                             <span  class="rename-icon rename-cfm">
@@ -686,9 +788,29 @@ function trigger(){
                                 <svg t="1529649149532" class="icon"  viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="5031" xmlns:xlink="http://www.w3.org/1999/xlink" width="23" height="23"><defs><style type="text/css"></style></defs><path d="M499.104 83.392c239.68 0 434.656 194.976 434.656 434.624 0 239.648-195.008 434.656-434.656 434.656S64.448 757.664 64.448 518.016 259.456 83.392 499.104 83.392m0 933.28c274.944 0 498.656-223.712 498.656-498.656S774.08 19.392 499.104 19.392C224.16 19.392 0.448 243.072 0.448 518.016s223.712 498.656 498.656 498.656" p-id="5032" fill="#3b8cff"></path><path d="M278.72 704.512h-0.032a31.968 31.968 0 1 0 45.248 45.28l186.496-186.56 186.528 186.56a31.968 31.968 0 1 0 45.248-45.248l-0.032-0.032-186.464-186.496 186.464-186.464 0.032-0.032a31.968 31.968 0 1 0-45.248-45.248l-186.528 186.496-186.496-186.496A31.968 31.968 0 1 0 278.72 331.52l186.464 186.464-186.464 186.496z" p-id="5033" fill="#3b8cff"></path></svg>
                             </span>
                         </span>
+                        <div class="oprate" style="display:none;">
+                            <a class="g-button g-btn-delete" href="javascript:;" title="Delete" onclick = "gBtnDelete('','${path}${path=='/'?'':'/'}',true,'${space_no}',true)">
+                                <span>
+                                    <svg t="1529565511794" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="7147" xmlns:xlink="http://www.w3.org/1999/xlink" width="16" height="16">
+                                        <defs><style type="text/css"></style></defs><path d="M677.35552 204.8l0-61.44c0-33.91488-29.61408-61.44-66.1504-61.44l-198.49216 0c-36.57728 0-66.19136 27.52512-66.19136 61.44l0 61.44-264.64256 0 0 61.44 99.24608 0 0 614.4c0 33.95584 29.65504 61.44 66.1504 61.44l529.32608 0c36.57728 0 66.19136-27.48416 66.19136-61.44l0-614.4 99.24608 0 0-61.44L677.35552 204.8 677.35552 204.8zM412.71296 143.36l198.49216 0 0 61.44-198.49216 0L412.71296 143.36 412.71296 143.36zM776.6016 880.64 247.27552 880.64l0-614.4 529.32608 0L776.6016 880.64 776.6016 880.64zM346.5216 358.4l66.19136 0 0 430.08-66.19136 0L346.5216 358.4 346.5216 358.4zM478.86336 358.4l66.1504 0 0 430.08-66.1504 0L478.86336 358.4 478.86336 358.4zM611.20512 358.4l66.1504 0 0 430.08-66.1504 0L611.20512 358.4 611.20512 358.4zM611.20512 358.4" p-id="7148" fill="#3b8cff"></path>
+                                    </svg>
+                                </span>
+                            </a>
+                            <a class="g-button g-btn-rename" href="javascript:;" title="Rename">
+                                <span>
+                                    <svg t="1529565661279" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="7381" xmlns:xlink="http://www.w3.org/1999/xlink" width="16" height="16">
+                                        <defs><style type="text/css"></style></defs><path d="M949.2 63.44c-33.696-32.4-70.88-48.832-110.576-48.832-62.064 0-107.344 40.224-119.728 52.56C701.488 84.48 106.832 681.488 106.832 681.488c-3.888 3.92-6.72 8.8-8.176 14.176-13.424 49.728-80.592 270.416-81.264 272.624-3.456 11.296-0.384 23.616 7.92 31.936 5.984 5.952 13.936 9.168 22.08 9.168 3.2 0 6.432-0.496 9.6-1.52 2.288-0.752 229.248-74.384 266.608-85.568 4.912-1.472 9.424-4.16 13.072-7.792 23.6-23.408 578.224-573.824 615.04-611.968 38.08-39.392 56.992-80.384 56.256-121.872C1007.248 139.712 987.472 100.272 949.2 63.44zM285.472 744.288c-32.368-32.736-65.296-51.216-90.688-61.616 109.2-109.632 394.464-396 514.272-516.208 15.632 3.76 52.768 16.16 90.912 54.784 38.528 38.992 48.8 83.472 50.672 93.344-121.632 121.44-401.616 399.44-512 509.008C328.432 799.776 311.968 771.088 285.472 744.288zM152.736 735.104c16.96 4.512 52.272 17.6 88.32 54.08 27.76 28.096 40.8 58.992 46.656 77.856-43.008 13.872-137.152 46.48-196.976 65.84C108.48 874.336 138.4 783.2 152.736 735.104zM906.832 258.16c-1.264 1.312-3.36 3.424-5.856 5.968-9.776-25.28-26.928-57.728-56.624-87.792-30.336-30.704-61.12-48.8-85.792-59.52 2.096-2.096 3.728-3.728 4.368-4.368 3.536-3.504 35.664-34.32 75.696-34.32 23.056 0 45.68 10.544 67.296 31.344 25.632 24.672 38.848 49.024 39.28 72.368C945.616 205.696 932.72 231.36 906.832 258.16z" fill="#3b8cff" p-id="7382"></path>
+                                    </svg>
+                                </span>
+                            </a>
+                        </div>
                     </div>
+
                     <div data-key="size" class="AuPKyz-li" style="width:16%;">
                         <span class="text">--</span>
+                    </div>
+                    <div data-key="type" class="AuPKyz-li" style="width:16%;">
+                        <span class="text">folder</span>
                     </div>
                     <div data-key="time" class="AuPKyz-li" style="width:23%;">
                         <span class="text">--</span>
@@ -704,35 +826,16 @@ function trigger(){
         $("#addFolderBtn").attr("onclick",'trigger()');
    });
    $(".rename-cfm").click(function(){
-       let name = $(".zJMtAEb dd:eq(0) .renameInput").val();
-       $.ajax({
-           url:"/api/v1/store/folder/add",
-           method:'POST',
-           contentType:'application/json',
-           //创建目录  在 根目录下创建     abc  和 tmp 两个子目录
-           data:JSON.stringify({
-               "parent":path,
-               "space_no":space_no,
-               "folders":[name],
-               "interactive":true
-           }),
-           success:function(res){
-               if(res.Data == true){
-                   $(".zJMtAEb dd:eq(0) .appendFileName").html(name);
-                   $(".renameSpan").hide();
-                   $(".zJMtAEb dd:eq(0) .s-select-check").attr("data-path",path+'/'+name);
-                   $("#addFolderBtn").attr("onclick",'trigger()');
-               }else{
-                   alert('Please rename the folder!');
-               }
-           }
-       });
+       method.addFolderCf(initPath,path,space_no);
    });
+   $('.renameInput').keyup(function(event){
+        if(event.keyCode ==13){
+            method.addFolderCf(initPath,path,space_no);
+        }
+    });
 
     // <!--单行选中增加类-->
     rowSelected();
-    //点击文件名进入下一层
-   // nextLayer(space_no);
 }
 
 
@@ -912,12 +1015,10 @@ function pay(orderId){
         }),
         success:function(res){
             console.log(res);
-            if((res.code==0)&&(res.Data.code==0)){
+            if(res.code==0){
                 alert('Payment success!');
-            }else if((res.code==0)&&(res.Data.code!=0)){
-                alert(res.Data.errMsg);
             }else{
-                alert('Payment failed, Please try again!');
+                alert(res.errMsg);
             }
         }
     });
