@@ -14,7 +14,7 @@ message CollectReq{
 message Batch{
     uint32 version =1;
     bytes nodeId=2;
-    uint64 timestamp=3;
+    uint64 timestamp=3;//unit: ns
     repeated ActionLog actionLog=4;
     bytes sign=5;
 }
@@ -25,7 +25,7 @@ message CollectResp{
 
 message ActionLog{
     uint32 type=1;// 1:Store, no need to collect action log for success store; 2:Retrieve
-    bytes oppositeNodeId=2;
+    bytes oppositeNodeId=2; // obsolete
     string ticket=3;
     bool success=4;
     bytes fileHash=5;
@@ -35,8 +35,8 @@ message ActionLog{
     uint32 blockSeq=9;
     bytes blockHash=10;
     uint64 blockSize=11;
-    uint64 beginTime=12;
-    uint64 endTime=13;
+    uint64 beginTime=12; //unit: ns
+    uint64 endTime=13; //unit: ns
     uint64 transportSize=14;
     string info=15;// error info
 }

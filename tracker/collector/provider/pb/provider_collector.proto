@@ -17,7 +17,7 @@ message CollectResp{
 message Batch{
     uint32 version =1;
     bytes nodeId=2;
-    uint64 timestamp=3;
+    uint64 timestamp=3; //unit: ns
     repeated ActionLog actionLog=4;
     bytes sign=5;
 }
@@ -30,8 +30,8 @@ message ActionLog{
     uint64 fileSize=5;
     bytes blockHash=6;
     uint64 blockSize=7;
-    uint64 beginTime=8;
-    uint64 endTime=9;
+    uint64 beginTime=8; //unit: ns
+    uint64 endTime=9; //unit: ns
     uint64 transportSize=10;
     string info=11;// error info
 }
