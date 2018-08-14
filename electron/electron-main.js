@@ -1,5 +1,7 @@
 'use strict'
 
+const devMod = (process.argv.indexOf("--dev")>=0)
+
 const { app, Menu, BrowserWindow, dialog } = require('electron');
 
 var log = require('electron-log');
@@ -19,18 +21,23 @@ require('electron-context-menu')({});
 
 global.eval = function() { throw new Error('bad!!'); }
 
-let port=7787;
-var portfinder = require('portfinder');
-portfinder.basePort=7788;
-portfinder.getPort(function (err, p) {
-  port = p;
-  defaultURL = 'http://127.0.0.1:'+port+'/';
-  filemanageURL = 'http://127.0.0.1:'+port+'/disk.html';
-});
+let port=7788;
+let defaultURL = 'http://127.0.0.1:'+port+'/';
+let filemanageURL = 'http://127.0.0.1:'+port+'/disk.html';
 
-let defaultURL;
+// let defaultURL;
+// let filemanageURL;
+// let port=7787;
+// var portfinder = require('portfinder');
+// portfinder.basePort=7788;
+// portfinder.getPort(function (err, p) {
+//   port = p;
+//   defaultURL = 'http://127.0.0.1:'+port+'/';
+//   filemanageURL = 'http://127.0.0.1:'+port+'/disk.html';
+// });
+
 let currentURL;
-let filemanageURL;
+
 
 // Force everything localhost, in case of a leak
 app.commandLine.appendSwitch('host-rules', 'MAP * 127.0.0.1, EXCLUDE *.store.samos.io, *.samos.io');
@@ -68,13 +75,29 @@ function startSamos() {
   case 'win32':
     // Use only the relative path on windows due to short path length
     // limits
-    return '../client/nebula-client.exe';
+    return './resources/app/nebula-client.exe';
   case 'linux':
-    return path.join(path.dirname(appPath), '../../../../client/nebula-client');
+    return path.join(path.dirname(appPath), './resources/app/nebula-client');
   default:
     return './resources/app/nebula-client';
   }
 })()
+if(devMod){
+  exe = (() => {
+    switch (process.platform) {
+      case 'darwin':
+      return path.join(appPath, '../../Resources/app/nebula-client');
+      case 'win32':
+      // Use only the relative path on windows due to short path length
+      // limits
+      return '../client/nebula-client.exe';
+      case 'linux':
+      return path.join(path.dirname(appPath), '../../../../client/nebula-client');
+      default:
+      return './resources/app/nebula-client';
+    }
+      })()
+}
 
   var args = [
     '--launch-browser=false',
