@@ -30,4 +30,6 @@ _testmain.go
 *.swp
 *.out
 electron/node_modules/
+electron/dist/
+client/dist/
 provider/dist/

@@ -24,7 +24,7 @@ message CollectResp{
 }
 
 message ActionLog{
-    uint32 type=1;// 1:Store, no need to collect action log for success store; 2:Retrieve
+    uint32 type=1;// 1:Store, 2:Retrieve
     bytes oppositeNodeId=2; // obsolete
     string ticket=3;
     bool success=4;
