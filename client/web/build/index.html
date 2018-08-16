@@ -114,7 +114,7 @@
                 $('#guide').show();
             }
         },
-        //页面跳转
+        //页面跳转（成功的，跳转内容页）
         render:function(){
             const {ipcRenderer} = require('electron')
             ipcRenderer.send('filemanage') 
@@ -186,6 +186,8 @@
                     if(res.code==0){
                         //alert("验证成功");
                         util.render();
+                    }else{
+                        alert(res.errmsg);
                     }
                     
                 }
