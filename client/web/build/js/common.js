@@ -222,6 +222,11 @@ function list(path,space_no,pagesize,pagenum,sorttype,ascorder){
         }),
         success:function(res){
             console.log(res);
+            if(res.code==400){
+                const {ipcRenderer} = require('electron'); 
+                      ipcRenderer.send('default');
+                      return;
+            }
             if(res.code!=0) {alert(res.errmsg);return;}
             //插入列表内容；
             append(res,path,space_no);
@@ -394,16 +399,16 @@ function btngroupshow(){
 /*-------------------------------------------------重命名-----------------------------------------------------------------------------*/
 var rename = {
     // <!--重命名-->
-    rename:function (){
-        let a = $(".zJMtAEb input[name='fileSelect']:checked").parent().parent().position().top;
-        $('#file-rename-box').show();
+    rename:function (a,name){
+        // let a = $(".zJMtAEb input[name='fileSelect']:checked").parent().parent().position().top;
         $('#file-rename-box').css('top',a);
+        $('#file-rename-box').show();
+         // <!--要改的文件名字给input value-->
+        // let name = $(".zJMtAEb input[name='fileSelect']:checked").attr("data-name");
+        $(".renameInput").val(name);
         // <!--非选中的input 和 全选按钮禁止点击-->
         $(".zJMtAEb input[name='fileSelect']").not(':checked').attr('disabled','disabled');
         $("#s-selectAll").attr("disabled","disabled");
-        // <!--要改的文件名字给input value-->
-        let name = $(".zJMtAEb input[name='fileSelect']:checked").attr("data-name");
-        $(".renameInput").val(name);
     },
     // <!--重命名div隐藏-->
     renameDivHide:function (){
@@ -457,7 +462,11 @@ var rename = {
 // <!--重命名点击事件-->
 $("#renameBtn").click(function(){
     if($(".zJMtAEb input[name='fileSelect']:checked").size()==1){
-        rename.rename();
+        //选中行到顶部的距离
+        let a = $(".zJMtAEb input[name='fileSelect']:checked").parent().parent().position().top;
+         // <!--要改的文件名字给input value-->
+        let name = $(".zJMtAEb input[name='fileSelect']:checked").attr("data-name");
+        rename.rename(a,name);
     }
     //<!--重命名取消-->
     $("#rename-cancel").click(function(){
@@ -487,17 +496,19 @@ function oprateHide(x){
     $(x).find("div:first-child .oprate").hide();
 }
 
-    //行内重命名点击事件
-    // rowRename:function(){
-    //     console.log(999);
-    //     let a = $(".zJMtAEb input[name='fileSelect']:checked").parent().parent().position().top;
-    //     $('#file-rename-box').show();
-    //     $('#file-rename-box').css('top',a);
-    // }
 function gBtnRename(x){
     let a = $(x).parent().parent().parent().position().top;
-    console.log(a);
+    // $('#file-rename-box').css('top',a);
+    // $('#file-rename-box').show();
+    // <!--要改的文件名字给input value-->
+    let name = $(x).parent().siblings(".s-select-check").attr("data-name");
+    // $(".renameInput").val(name);
+    // // <!--非选中的input 和 全选按钮禁止点击-->
+    // $(".zJMtAEb input[name='fileSelect']").not(':checked').attr('disabled','disabled');
+    // $("#s-selectAll").attr("disabled","disabled");
+    rename.rename(a,name);
 }
+
 
 //// //单行下载按钮点击事件下载
 function gBtnDownLoad(id,filehash,filesize,filename,space_no,isFolder){
@@ -990,7 +1001,6 @@ var public = {
 
  //购买 确认订单
 function addCar(id,no){
-    console.log('add');
     if(sessionStorage.getItem("noPaidOrder")){
         let r=confirm("You have an unpaid order and the submission will overwrite the order.");
         if (r==true){
