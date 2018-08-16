@@ -789,14 +789,17 @@ func RegisterHandler(s *HTTPServer) http.HandlerFunc {
 			code = 1
 			errmsg = err.Error()
 			result = ""
-		}
-		if !regReq.Resend {
-			cm, err := InitClientManager(log, s.cfg)
-			if err != nil {
-				code = 1
-				errmsg = err.Error()
-			} else {
-				s.cm = cm
+		} else {
+			if !regReq.Resend {
+				if s.cm == nil {
+					cm, err := InitClientManager(log, s.cfg)
+					if err != nil {
+						code = 1
+						errmsg = err.Error()
+					} else {
+						s.cm = cm
+					}
+				}
 			}
 		}
 
