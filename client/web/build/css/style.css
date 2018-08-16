@@ -737,6 +737,30 @@ body {
     display: inline-block;
     cursor:pointer;
 }
+.AuPKyz:hover>div:first-child .oprate{
+    display: block;
+}
+.AuPKyz>div:first-child{
+    position: relative;
+}
+.AuPKyz>div:first-child .oprate{
+    position: absolute;
+    right:0;
+    top:0;
+    height: 44px;
+    line-height: 44px;
+    display: none;
+}
+.AuPKyz>div:first-child .oprate .g-button{
+    /* width:16px;
+    height:16px;
+    overflow: hidden; */
+    position: relative;
+    margin: 0 10px;
+    border: 0;
+    display: inline-block;
+}
+
 .file-icon{
     cursor: default;
     display: inline-block;

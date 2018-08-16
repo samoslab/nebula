@@ -27,6 +27,7 @@ import (
 	pb "github.com/samoslab/nebula/provider/pb"
 	client "github.com/samoslab/nebula/provider/register_client"
 	trp_pb "github.com/samoslab/nebula/tracker/register/provider/pb"
+	util_hash "github.com/samoslab/nebula/util/hash"
 	util_rsa "github.com/samoslab/nebula/util/rsa"
 	upnp "github.com/samoslab/nebula/util/upnp"
 	"github.com/skycoin/skycoin/src/cipher"
@@ -458,7 +459,7 @@ func doRegister(configDir string, trackerServer string, listen string, walletAdd
 		}
 	}
 	grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(520 * 1024))
-	go startPingServer(listen, grpcServer)
+	go startPingServer(listen, grpcServer, util_hash.Sha1(no.NodeId))
 	defer grpcServer.GracefulStop()
 	time.Sleep(time.Duration(5) * time.Second) //for loadbalance health check
 	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
@@ -492,6 +493,11 @@ func doRegister(configDir string, trackerServer string, listen string, walletAdd
 			os.Exit(55)
 		}
 		if code != 0 {
+			if code == 300 {
+				fmt.Println(errMsg)
+				fmt.Println("Retrying...")
+				continue
+			}
 			if code == 500 {
 				pubKeyBytes, publicKeyHash, _, err = client.GetPublicKey(prsc)
 				if err != nil {
@@ -525,21 +531,22 @@ func doRegister(configDir string, trackerServer string, listen string, walletAdd
 	}
 }
 
-func startPingServer(listen string, grpcServer *grpc.Server) {
+func startPingServer(listen string, grpcServer *grpc.Server, nodeIdHash []byte) {
 	lis, err := net.Listen("tcp", listen)
 	if err != nil {
 		fmt.Printf("failed to listen: %s, error: %s\n", listen, err.Error())
 		os.Exit(57)
 	}
-	pb.RegisterProviderServiceServer(grpcServer, &pingProviderService{})
+	pb.RegisterProviderServiceServer(grpcServer, &pingProviderService{nodeIdHash: nodeIdHash})
 	grpcServer.Serve(lis)
 }
 
 type pingProviderService struct {
+	nodeIdHash []byte
 }
 
 func (self *pingProviderService) Ping(ctx context.Context, req *pb.PingReq) (*pb.PingResp, error) {
-	return &pb.PingResp{}, nil
+	return &pb.PingResp{NodeIdHash: self.nodeIdHash}, nil
 }
 func (self *pingProviderService) Store(stream pb.ProviderService_StoreServer) error {
 	return nil

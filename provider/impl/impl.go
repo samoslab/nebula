@@ -28,6 +28,7 @@ var skip_check_auth = false
 
 type ProviderService struct {
 	node       *node.Node
+	nodeIdHash []byte
 	providerDb *leveldb.DB
 }
 
@@ -37,6 +38,7 @@ func NewProviderService() *ProviderService {
 	}
 	ps := &ProviderService{}
 	ps.node = node.LoadFormConfig()
+	ps.nodeIdHash = util_hash.Sha1(ps.node.NodeId)
 	var err error
 	ps.providerDb, err = leveldb.OpenFile(config.ProviderDbPath(), nil)
 	if err != nil {
@@ -50,7 +52,7 @@ func (self *ProviderService) Close() {
 }
 
 func (self *ProviderService) Ping(ctx context.Context, req *pb.PingReq) (*pb.PingResp, error) {
-	return &pb.PingResp{}, nil
+	return &pb.PingResp{NodeIdHash: self.nodeIdHash}, nil
 }
 
 func now() uint64 {
