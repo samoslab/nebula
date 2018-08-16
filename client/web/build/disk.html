@@ -408,7 +408,7 @@
             <div class="modal-body">
                 <div class="payIllustrate" data-locale="wallet">
                     请打开钱包，往如下地址转账，
-                    <input id="samosWalletAddress" value="" /><input id="samosWalletCopyBtn" class="samosWalletCopyBtn" data-clipboard-text="ddd"  type="button" value="cppy"/>
+                    <input id="samosWalletAddress" value="" /><input id="samosWalletCopyBtn" class="samosWalletCopyBtn" data-clipboard-text="ddd"  type="button" value="copy"/>
                     <p class="qrcodeP">或打开钱包，扫描二维码：</p>
                     <div id="qrcode" class="qrcode"></div>
                 </div>
@@ -437,11 +437,9 @@
     //     $(this).addClass("vyQhNyb").siblings().removeClass("vyQhNyb");
     //     $("div.tabDiv").hide().eq($(this).index()-1).show();
     // });
-
-
 $(function(){
-    //第一步判断是否注册过；
-    //method.login();
+    //第一步判断是否注册过；未注册回登录页；
+    method.login();
 
     //页面刷新或第一次加载时初始化页面；
     window.addEventListener('load',function(){

@@ -2,13 +2,15 @@ var refreshTransportTimer = null;
 var method = {
      //判断是否注册过邮箱！
      login:function(){
+        const {ipcRenderer} = require('electron'); 
         $.ajax({
             url:"/api/v1/service/status",
             method:"GET",
             success:function(res){
-                if(res.status){
+                if(!res.status){
                    //没有注册过！跳到注册页
                    console.log(res);
+                   ipcRenderer.send('default');
                 }
             }
         })
@@ -220,6 +222,11 @@ function list(path,space_no,pagesize,pagenum,sorttype,ascorder){
         }),
         success:function(res){
             console.log(res);
+            if(res.code==400){
+                const {ipcRenderer} = require('electron'); 
+                      ipcRenderer.send('default');
+                      return;
+            }
             if(res.code!=0) {alert(res.errmsg);return;}
             //插入列表内容；
             append(res,path,space_no);
@@ -266,7 +273,7 @@ function append(res,path,space_no){
             path="";
         }
         // onclick="gBtnDownLoad('${obj.filehash}','${obj.filesize}','${obj.filename}','${space_no}','${obj.folder}')"
-        html+=` <dd class="AuPKyz">
+        html+=` <dd class="AuPKyz" onmouseenter = "oprateShow(this)" onmouseleave = "oprateHide(this)">
                     <div data-key="name" class="AuPKyz-li" style="width:44%;">
                         <input class="s-select-check" type="checkbox" name="fileSelect" data-name="${obj.filename}" data-id="${obj.id}" data-path="${path}${'/'+obj.filename}" data-hash="${obj.filehash}" data-size="${obj.filesize}" data-folder=${obj.folder} data-spaceNo="${space_no}">
                         <span class="file-icon my-file-${a}"></span>
@@ -290,7 +297,7 @@ function append(res,path,space_no){
                                 </span>
                               
                             </a>
-                            <a class="g-button g-btn-rename" href="javascript:;" title="Rename">
+                            <a class="g-button g-btn-rename" href="javascript:;" title="Rename" onclick = "gBtnRename(this)">
                                 <span>
                                     <svg t="1529565661279" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="7381" xmlns:xlink="http://www.w3.org/1999/xlink" width="16" height="16">
                                         <defs><style type="text/css"></style></defs><path d="M949.2 63.44c-33.696-32.4-70.88-48.832-110.576-48.832-62.064 0-107.344 40.224-119.728 52.56C701.488 84.48 106.832 681.488 106.832 681.488c-3.888 3.92-6.72 8.8-8.176 14.176-13.424 49.728-80.592 270.416-81.264 272.624-3.456 11.296-0.384 23.616 7.92 31.936 5.984 5.952 13.936 9.168 22.08 9.168 3.2 0 6.432-0.496 9.6-1.52 2.288-0.752 229.248-74.384 266.608-85.568 4.912-1.472 9.424-4.16 13.072-7.792 23.6-23.408 578.224-573.824 615.04-611.968 38.08-39.392 56.992-80.384 56.256-121.872C1007.248 139.712 987.472 100.272 949.2 63.44zM285.472 744.288c-32.368-32.736-65.296-51.216-90.688-61.616 109.2-109.632 394.464-396 514.272-516.208 15.632 3.76 52.768 16.16 90.912 54.784 38.528 38.992 48.8 83.472 50.672 93.344-121.632 121.44-401.616 399.44-512 509.008C328.432 799.776 311.968 771.088 285.472 744.288zM152.736 735.104c16.96 4.512 52.272 17.6 88.32 54.08 27.76 28.096 40.8 58.992 46.656 77.856-43.008 13.872-137.152 46.48-196.976 65.84C108.48 874.336 138.4 783.2 152.736 735.104zM906.832 258.16c-1.264 1.312-3.36 3.424-5.856 5.968-9.776-25.28-26.928-57.728-56.624-87.792-30.336-30.704-61.12-48.8-85.792-59.52 2.096-2.096 3.728-3.728 4.368-4.368 3.536-3.504 35.664-34.32 75.696-34.32 23.056 0 45.68 10.544 67.296 31.344 25.632 24.672 38.848 49.024 39.28 72.368C945.616 205.696 932.72 231.36 906.832 258.16z" fill="#3b8cff" p-id="7382"></path>
@@ -392,16 +399,16 @@ function btngroupshow(){
 /*-------------------------------------------------重命名-----------------------------------------------------------------------------*/
 var rename = {
     // <!--重命名-->
-    rename:function (){
-        let a = $(".zJMtAEb input[name='fileSelect']:checked").parent().parent().position().top;
-        $('#file-rename-box').show();
+    rename:function (a,name){
+        // let a = $(".zJMtAEb input[name='fileSelect']:checked").parent().parent().position().top;
         $('#file-rename-box').css('top',a);
+        $('#file-rename-box').show();
+         // <!--要改的文件名字给input value-->
+        // let name = $(".zJMtAEb input[name='fileSelect']:checked").attr("data-name");
+        $(".renameInput").val(name);
         // <!--非选中的input 和 全选按钮禁止点击-->
         $(".zJMtAEb input[name='fileSelect']").not(':checked').attr('disabled','disabled');
         $("#s-selectAll").attr("disabled","disabled");
-        // <!--要改的文件名字给input value-->
-        let name = $(".zJMtAEb input[name='fileSelect']:checked").attr("data-name");
-        $(".renameInput").val(name);
     },
     // <!--重命名div隐藏-->
     renameDivHide:function (){
@@ -449,13 +456,17 @@ var rename = {
 
             }
         });
-    }
+    },
 };
 
 // <!--重命名点击事件-->
 $("#renameBtn").click(function(){
     if($(".zJMtAEb input[name='fileSelect']:checked").size()==1){
-        rename.rename();
+        //选中行到顶部的距离
+        let a = $(".zJMtAEb input[name='fileSelect']:checked").parent().parent().position().top;
+         // <!--要改的文件名字给input value-->
+        let name = $(".zJMtAEb input[name='fileSelect']:checked").attr("data-name");
+        rename.rename(a,name);
     }
     //<!--重命名取消-->
     $("#rename-cancel").click(function(){
@@ -473,9 +484,122 @@ $("#renameBtn").click(function(){
    });
 
 });
+/*---------------------------------------------------oprate 操作相关------------------------------------------------------------------------------------*/
+//oprate显示隐藏
+function oprateShow(x){
+    //行选中数
+    if($(".zJMtAEb input[name='fileSelect']:checked").size()<=1){
+        $(x).find("div:first-child .oprate").show();
+    }
+}
+function oprateHide(x){
+    $(x).find("div:first-child .oprate").hide();
+}
+
+function gBtnRename(x){
+    let a = $(x).parent().parent().parent().position().top;
+    // $('#file-rename-box').css('top',a);
+    // $('#file-rename-box').show();
+    // <!--要改的文件名字给input value-->
+    let name = $(x).parent().siblings(".s-select-check").attr("data-name");
+    // $(".renameInput").val(name);
+    // // <!--非选中的input 和 全选按钮禁止点击-->
+    // $(".zJMtAEb input[name='fileSelect']").not(':checked').attr('disabled','disabled');
+    // $("#s-selectAll").attr("disabled","disabled");
+    rename.rename(a,name);
+}
 
 
-//-------------------------------------------------------------------------------------------------------------------------------------------------//
+//// //单行下载按钮点击事件下载
+function gBtnDownLoad(id,filehash,filesize,filename,space_no,isFolder){
+    $("#rowDownLoadIpt"+id).change(function(){
+        console.log(id,filehash,filesize,filename,space_no,isFolder);
+        let size = Number(filesize);
+        let space = Number(space_no);
+        let newId = "rowDownLoadIpt"+id;
+        let localPath = document.getElementById(newId).files[0].path;
+        console.log(localPath);
+        if(isFolder=='false'){
+            $.ajax({
+                url:"/api/v1/store/download",
+                method:"POST",
+                contentType: "application/json",
+                data:JSON.stringify({
+                    "filehash":filehash,
+                    "filesize":size,
+                    "filename":filename,
+                    "space_no":space,
+                    "dest_dir":localPath
+                }),
+                success:function(res){
+                    console.log(res);
+                    if(res.code==0){
+                        alert('Download success!');
+                    }else{
+                        alert(res.errmsg);
+                    }
+                }
+            });
+        }else{
+            $.ajax({
+                url:"/api/v1/store/downloaddir",
+                method:"POST",
+                contentType: "application/json",
+                data:JSON.stringify({
+                    "parent":filename,
+                    "space_no":space,
+                    "dest_dir":localPath
+                }),
+                success:function(res){
+                    console.log(res);
+                    if(res.code==0){
+                        alert('Download success!');
+                    }else{
+                        alert(res.errmsg);
+                    }
+                }
+            });
+        }
+    
+    });
+}
+
+// //单行删除按钮点击事件删除
+function gBtnDelete(id,path,ispath,space_no,recursion){
+    console.log(id+','+path+','+ispath+','+space_no+','+recursion);
+    let renameInputV = $(".renameInput").val();
+    console.log(path+renameInputV);
+    let json = {};
+    if(id){
+        json.target = id;
+        json.ispath = false;
+    }else{
+        json.target = path+renameInputV;
+        json.ispath = true;
+    }
+    json['space_no']=parseInt(space_no);
+    json.recursion = recursion;
+    console.log(json);
+    $.ajax({
+        url:"/api/v1/store/remove",
+        method:"POST",
+        contentType: "application/json",
+        data:JSON.stringify(json),
+        success:function(res){
+            console.log(res);
+            if(res.code==0){
+                method.firstInit();
+                $("#file-rename-box").hide(); //重命名输入框显示时，又点击了删除按钮；
+            }else{
+                alert('Delete failed!');
+            }
+        }
+    });
+}
+
+
+
+//---------------------------------------------------上传文件----------------------------------------------------------------------------------------------//
 
 
 
@@ -622,59 +746,7 @@ $("#downLoadBtn").click(function(){
     });
 });
 
-//// //单行下载按钮点击事件下载
-function gBtnDownLoad(id,filehash,filesize,filename,space_no,isFolder){
-    $("#rowDownLoadIpt"+id).change(function(){
-        console.log(id,filehash,filesize,filename,space_no,isFolder);
-        let size = Number(filesize);
-        let space = Number(space_no);
-        let newId = "rowDownLoadIpt"+id;
-        let localPath = document.getElementById(newId).files[0].path;
-        console.log(localPath);
-        if(isFolder=='false'){
-            $.ajax({
-                url:"/api/v1/store/download",
-                method:"POST",
-                contentType: "application/json",
-                data:JSON.stringify({
-                    "filehash":filehash,
-                    "filesize":size,
-                    "filename":filename,
-                    "space_no":space,
-                    "dest_dir":localPath
-                }),
-                success:function(res){
-                    console.log(res);
-                    if(res.code==0){
-                        alert('Download success!');
-                    }else{
-                        alert(res.errmsg);
-                    }
-                }
-            });
-        }else{
-            $.ajax({
-                url:"/api/v1/store/downloaddir",
-                method:"POST",
-                contentType: "application/json",
-                data:JSON.stringify({
-                    "parent":filename,
-                    "space_no":space,
-                    "dest_dir":localPath
-                }),
-                success:function(res){
-                    console.log(res);
-                    if(res.code==0){
-                        alert('Download success!');
-                    }else{
-                        alert(res.errmsg);
-                    }
-                }
-            });
-        }
-    
-    });
-}
+
 
 
 //顶部删除按钮；
@@ -719,39 +791,7 @@ $("#deleteBtn").click(function(){
     } 
 });
 
-// //单行删除按钮点击事件删除
-function gBtnDelete(id,path,ispath,space_no,recursion){
-    console.log(id+','+path+','+ispath+','+space_no+','+recursion);
-    let renameInputV = $(".renameInput").val();
-    console.log(path+renameInputV);
-    let json = {};
-    if(id){
-        json.target = id;
-        json.ispath = false;
-    }else{
-        json.target = path+renameInputV;
-        json.ispath = true;
-    }
-    json['space_no']=parseInt(space_no);
-    json.recursion = recursion;
-    console.log(json);
-    $.ajax({
-        url:"/api/v1/store/remove",
-        method:"POST",
-        contentType: "application/json",
-        data:JSON.stringify(json),
-        success:function(res){
-            console.log(res);
-            if(res.code==0){
-                method.firstInit();
-                $("#file-rename-box").hide(); //重命名输入框显示时，又点击了删除按钮；
-            }else{
-                alert('Delete failed!');
-            }
-        }
-    });
 
-}
 
 //addFolder
 function trigger(){
@@ -987,6 +1027,29 @@ function addCar(id,no){
                 }
             });
         }
+    }else{
+        $.ajax({
+            url:"/api/v1/package/buy",
+            contentType: "application/json",
+            method:"POST",
+            data:JSON.stringify({
+                "id":id,
+                "canceled":true,
+                "quanlity":no
+            }),
+            success:function(res){
+                console.log(res);
+                if(res.code==0){
+                    //加购物车成功
+                    $("#packageUl li").eq(1).addClass("packageOnLi").siblings().removeClass("packageOnLi");
+                    $("#packageItem>div").hide().eq(1).show();
+                    //刷新我的订单
+                    packageMethod.orderAllInit();
+                }else{
+                    alert("Operation failed, please re-operate ~");
+                }
+            }
+        });
     }
 }
 //删除订单
@@ -1099,6 +1162,7 @@ var packageMethod = {
                     if(res.Data.length>0){
                         let html = '';
                         $.each(res.Data,function(idx,obj){
+                            //有未付款的订单；
                             if(!obj.paid){
                                 sessionStorage.setItem("noPaidOrder",true);
                             }
