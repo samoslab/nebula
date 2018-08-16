@@ -145,6 +145,7 @@ func RegisterClient(log logrus.FieldLogger, configFile, trackerServer, emailAddr
 
 	if rsp.GetCode() != 0 {
 		log.Infof("register failed: %+v\n", rsp.GetErrMsg())
+		return fmt.Errorf("%s", rsp.GetErrMsg())
 	}
 
 	err = config.SaveClientConfig(configFile, cc)
