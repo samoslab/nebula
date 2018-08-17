@@ -17,6 +17,7 @@ import (
 
 	"github.com/boltdb/bolt"
 	collectClient "github.com/samoslab/nebula/client/collector_client"
+	"github.com/samoslab/nebula/client/errcode"
 	"github.com/samoslab/nebula/client/progress"
 	"github.com/samoslab/nebula/util/filetype"
 
@@ -145,7 +146,7 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 		Timeout: 1 * time.Second,
 	})
 	if err != nil {
-		log.WithError(err).Error("Open db failed")
+		log.WithError(err).Errorf("Open db %s failed", dbPath)
 		return nil, err
 	}
 	store, err := newStore(db, log)
@@ -598,7 +599,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 	}
 	req, rsp, err := c.CheckFileExists(fileName, dest, interactive, newVersion, password, encryptKey, sno)
 	if err != nil {
-		return common.StatusErrFromError(err)
+		return err
 	}
 
 	log.Infof("Check file exists resp code %d", rsp.GetCode())
@@ -608,7 +609,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 	}
 	// 1 can upload
 	if rsp.GetCode() != 1 {
-		return fmt.Errorf("%d:%s", rsp.GetCode(), rsp.GetErrMsg())
+		return common.NewStatusErr(rsp.Code, rsp.ErrMsg)
 	}
 
 	switch rsp.GetStoreType() {
@@ -704,7 +705,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 		ufprsp, err := c.mclient.UploadFilePrepare(ctx, ufpr)
 		if err != nil {
 			log.Errorf("UploadFilePrepare error %v", err)
-			return common.StatusErrFromError(err)
+			return err
 		}
 
 		rspPartitions := ufprsp.GetPartition()
@@ -876,21 +877,21 @@ func (c *ClientManager) MkFolder(filepath string, folders []string, interactive 
 	}
 	err := req.SignReq(c.cfg.Node.PriKey)
 	if err != nil {
-		return false, err
+		return false, common.NewStatus(errcode.RetSignFailed, err)
 	}
 	log.Infof("Make folder %+v", req.GetFolder())
 	rsp, err := c.mclient.MkFolder(ctx, req)
 	if err != nil {
-		return false, common.StatusErrFromError(err)
+		return false, common.NewStatusErr(rsp.Code, rsp.ErrMsg)
 	}
 	if rsp.GetCode() != 0 {
 		if strings.Contains(rsp.GetErrMsg(), "System error: pq: duplicate key value") {
 			log.Warning("Folder exists %s", rsp.GetErrMsg())
 			return true, nil
 		}
-		return false, fmt.Errorf("%s", rsp.GetErrMsg())
+		return false, common.NewStatusErr(rsp.Code, rsp.ErrMsg)
 	}
-	log.Infof("Make folder response code %d", rsp.GetCode())
+	log.Info("Make folder success")
 	return true, nil
 }
 
@@ -1058,7 +1059,7 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 	ufprsp, err := c.mclient.UploadFilePrepare(ctx, ufpr)
 	if err != nil {
 		log.Errorf("UploadFilePrepare error %v", err)
-		return nil, common.StatusErrFromError(err)
+		return nil, err
 	}
 	///
 
@@ -1152,7 +1153,7 @@ func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitio
 	}
 	err := req.SignReq(c.cfg.Node.PriKey)
 	if err != nil {
-		return err
+		return common.NewStatus(errcode.RetSignFailed, err)
 	}
 	ctx := context.Background()
 	log := c.Log.WithField("filename", req.GetFileName())
@@ -1175,18 +1176,18 @@ func (c *ClientManager) UploadFileDone(reqCheck *mpb.CheckFileExistReq, partitio
 			req.PublicKeyHash = pubkeyHash
 			err = req.SignReq(c.cfg.Node.PriKey)
 			if err != nil {
-				return err
+				return common.NewStatus(errcode.RetSignFailed, err)
 			}
 			log.Info("Check file exist request")
 			ufdrsp, err = c.mclient.UploadFileDone(ctx, req)
 			if err != nil {
-				return common.StatusErrFromError(err)
+				return err
 			}
 		}
 	}
 	log.Infof("Upload done code %d", ufdrsp.GetCode())
 	if ufdrsp.GetCode() != 0 {
-		return fmt.Errorf("%s", ufdrsp.GetErrMsg())
+		return common.NewStatusErr(ufdrsp.Code, ufdrsp.ErrMsg)
 	}
 
 	return nil
@@ -1217,18 +1218,18 @@ func (c *ClientManager) ListFiles(path string, pageSize, pageNum uint32, sortTyp
 	req.Parent = &mpb.FilePath{OneOfPath: &mpb.FilePath_Path{path}, SpaceNo: sno}
 	err := req.SignReq(c.cfg.Node.PriKey)
 	if err != nil {
-		return nil, err
+		return nil, common.NewStatus(errcode.RetSignFailed, err)
 	}
 	ctx := context.Background()
 	log.Info("List path request")
 	rsp, err := c.mclient.ListFiles(ctx, req)
 
 	if err != nil {
-		return nil, common.StatusErrFromError(err)
+		return nil, common.NewStatus(errcode.RetTrackerFailed, err)
 	}
 
 	if rsp.GetCode() != 0 {
-		return nil, fmt.Errorf("errmsg %s", rsp.GetErrMsg())
+		return nil, common.NewStatusErr(rsp.Code, rsp.ErrMsg)
 	}
 	fileLists := []*DownFile{}
 	for _, info := range rsp.GetFof() {
@@ -1319,7 +1320,7 @@ func (c *ClientManager) startDownloadDir(path, destDir string, sno uint32) error
 					c.AddDoneMsg(doneMsg.Serialize())
 					if err != nil {
 						log.Errorf("Download file %s error %v", currentFile, err)
-						errResult = append(errResult, fmt.Errorf("%s %v", currentFile, common.StatusErrFromError(err)))
+						errResult = append(errResult, fmt.Errorf("%s %v", currentFile, err))
 						//return err
 					}
 				}
@@ -1367,10 +1368,10 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 	log.Infof("Download request file hash %x, size %d", fileHash, fileSize)
 	rsp, err := c.mclient.RetrieveFile(ctx, req)
 	if err != nil {
-		return common.StatusErrFromError(err)
+		return err
 	}
 	if rsp.GetCode() != 0 {
-		return fmt.Errorf("%s", rsp.GetErrMsg())
+		return common.NewStatusErr(rsp.Code, rsp.ErrMsg)
 	}
 
 	password := []byte{}
@@ -1632,11 +1633,11 @@ func (c *ClientManager) RemoveFile(target string, recursive bool, isPath bool, s
 	log.Infof("Remove file request")
 	rsp, err := c.mclient.Remove(context.Background(), req)
 	if err != nil {
-		return common.StatusErrFromError(err)
+		return err
 	}
 	log.Infof("Remove file resp code %d msg %s", rsp.GetCode(), rsp.GetErrMsg())
 	if rsp.GetCode() != 0 {
-		return fmt.Errorf("%s", rsp.GetErrMsg())
+		return common.NewStatusErr(rsp.Code, rsp.ErrMsg)
 	}
 	return nil
 
@@ -1670,11 +1671,11 @@ func (c *ClientManager) MoveFile(source, dest string, isPath bool, sno uint32) e
 	log.Infof("Move file to %s", dest)
 	rsp, err := c.mclient.Move(context.Background(), req)
 	if err != nil {
-		return common.StatusErrFromError(err)
+		return err
 	}
 	log.Infof("Move file resp code %d msg %s", rsp.GetCode(), rsp.GetErrMsg())
 	if rsp.GetCode() != 0 {
-		return fmt.Errorf("%s", rsp.GetErrMsg())
+		return common.NewStatusErr(rsp.Code, rsp.ErrMsg)
 	}
 	return nil
 
@@ -1696,7 +1697,7 @@ func (c *ClientManager) GetSpaceSysFileData(sno uint32) ([]byte, error) {
 	log.Infof("Get space %d sys file", sno)
 	rsp, err := c.mclient.SpaceSysFile(context.Background(), req)
 	if err != nil {
-		return nil, common.StatusErrFromError(err)
+		return nil, err
 	}
 	return rsp.GetData(), nil
 }

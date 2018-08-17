@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rsa"
 	"encoding/hex"
-	"fmt"
 	"strconv"
 
 	"github.com/samoslab/nebula/client/common"
@@ -118,7 +117,7 @@ func (om *OrderManager) GetAllPackages() ([]*Package, error) {
 	}
 	rsp, err := om.orderClient.AllPackage(context.Background(), req)
 	if err != nil {
-		return nil, common.StatusErrFromError(err)
+		return nil, err
 	}
 	log.Infof("%+v", rsp)
 	packages := []*Package{}
@@ -141,7 +140,7 @@ func (om *OrderManager) GetPackageInfo(pid string) (*Package, error) {
 	}
 	rsp, err := om.orderClient.PackageInfo(context.Background(), req)
 	if err != nil {
-		return nil, common.StatusErrFromError(err)
+		return nil, err
 	}
 	log.Infof("%+v", rsp)
 	return newPackageFromPbPackage(rsp.GetPackage()), nil
@@ -168,12 +167,12 @@ func (om *OrderManager) BuyPackage(pid string, canceled bool, quanlity uint32) (
 	}
 	rsp, err := om.orderClient.BuyPackage(context.Background(), req)
 	if err != nil {
-		return nil, common.StatusErrFromError(err)
-	}
-	if rsp.GetCode() != 0 {
-		return nil, fmt.Errorf("buy packge error %s", rsp.GetErrMsg())
+		return nil, err
 	}
 	log.Infof("%+v", rsp)
+	if rsp.GetCode() != 0 {
+		return nil, common.NewStatusErr(rsp.Code, rsp.ErrMsg)
+	}
 	return NewOrderFromPbOrder(rsp.GetOrder()), nil
 }
 
@@ -190,7 +189,7 @@ func (om *OrderManager) DiscountPackage(pid string) (map[uint32]string, error) {
 	}
 	rsp, err := om.orderClient.PackageDiscount(context.Background(), req)
 	if err != nil {
-		return nil, common.StatusErrFromError(err)
+		return nil, err
 	}
 	log.Infof("%+v", rsp)
 	return rsp.GetDiscount(), nil
@@ -211,9 +210,12 @@ func (om *OrderManager) MyAllOrders(expired bool) ([]*Order, error) {
 	}
 	rsp, err := om.orderClient.MyAllOrder(context.Background(), req)
 	if err != nil {
-		return nil, common.StatusErrFromError(err)
+		return nil, err
 	}
-	log.Infof("%+v", rsp)
+	log.Infof("All orders %+v", rsp)
+	if rsp.GetCode() != 0 {
+		return nil, common.NewStatusErr(rsp.Code, rsp.ErrMsg)
+	}
 	allOrder := []*Order{}
 	for _, o := range rsp.GetMyAllOrder() {
 		allOrder = append(allOrder, NewOrderFromPbOrder(o))
@@ -241,9 +243,12 @@ func (om *OrderManager) GetOrderInfo(orderId string) (*Order, error) {
 
 	rsp, err := om.orderClient.OrderInfo(context.Background(), req)
 	if err != nil {
-		return nil, common.StatusErrFromError(err)
+		return nil, err
 	}
 	log.Infof("Get order info %+v", rsp)
+	if rsp.GetCode() != 0 {
+		return nil, common.NewStatusErr(rsp.Code, rsp.ErrMsg)
+	}
 
 	return NewOrderFromPbOrder(rsp.GetOrder()), nil
 }
@@ -268,12 +273,12 @@ func (om *OrderManager) RechargeAddress() (*AddressBalance, error) {
 	}
 	rsp, err := om.orderClient.RechargeAddress(context.Background(), req)
 	if err != nil {
-		return nil, common.StatusErrFromError(err)
+		return nil, err
 	}
 	log.Infof("Recharge address %+v", rsp)
 
 	if rsp.GetCode() != 0 {
-		return nil, fmt.Errorf("recharge error %v", rsp.GetErrMsg())
+		return nil, common.NewStatusErr(rsp.Code, rsp.ErrMsg)
 	}
 	address, err := rsalong.DecryptLong(om.privateKey, rsp.GetRechargeAddressEnc(), 256)
 	if err != nil {
@@ -306,9 +311,12 @@ func (om *OrderManager) PayOrdor(orderId string) (*pb.PayOrderResp, error) {
 	}
 	rsp, err := om.orderClient.PayOrder(context.Background(), req)
 	if err != nil {
-		return nil, common.StatusErrFromError(err)
+		return nil, err
 	}
 	log.Infof("Pay order %+v", rsp)
+	if rsp.GetCode() != 0 {
+		return nil, common.NewStatusErr(rsp.Code, rsp.ErrMsg)
+	}
 
 	return rsp, nil
 }
@@ -357,11 +365,11 @@ func (om *OrderManager) UsageAmount() (*UsageAmount, error) {
 	}
 	rsp, err := om.orderClient.UsageAmount(context.Background(), req)
 	if err != nil {
-		return nil, common.StatusErrFromError(err)
+		return nil, err
 	}
 	log.Infof("Usage amount %+v", rsp)
 	if rsp.GetCode() != 0 {
-		return nil, fmt.Errorf("%s", rsp.GetErrMsg())
+		return nil, common.NewStatusErr(rsp.Code, rsp.ErrMsg)
 	}
 	return NewUsageAmount(rsp), nil
 }
@@ -385,9 +393,12 @@ func (om *OrderManager) RemoveOrdor(orderId string) (*pb.RemoveOrderResp, error)
 	}
 	rsp, err := om.orderClient.RemoveOrder(context.Background(), req)
 	if err != nil {
-		return nil, common.StatusErrFromError(err)
+		return nil, err
 	}
 	log.Infof("Remove order %+v", rsp)
+	if rsp.GetCode() != 0 {
+		return nil, common.NewStatusErr(rsp.Code, rsp.ErrMsg)
+	}
 
 	return rsp, nil
 }
