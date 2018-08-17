@@ -64,7 +64,10 @@ function startSamos() {
   var exe = (() => {
         switch (process.platform) {
   case 'darwin':
-    return path.join(appPath, '../../Resources/app/nebula-client');
+    console.log(path.dirname(appPath));
+    var expath = path.join(path.dirname(appPath), '../../../../../../../client/nebula-client');
+    console.log(expath);
+    return expath;
   case 'win32':
     // Use only the relative path on windows due to short path length
     // limits
