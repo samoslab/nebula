@@ -789,14 +789,17 @@ func RegisterHandler(s *HTTPServer) http.HandlerFunc {
 			code = 1
 			errmsg = err.Error()
 			result = ""
-		}
-		if !regReq.Resend {
-			cm, err := InitClientManager(log, s.cfg)
-			if err != nil {
-				code = 1
-				errmsg = err.Error()
-			} else {
-				s.cm = cm
+		} else {
+			if !regReq.Resend {
+				if s.cm == nil {
+					cm, err := InitClientManager(log, s.cfg)
+					if err != nil {
+						code = 1
+						errmsg = err.Error()
+					} else {
+						s.cm = cm
+					}
+				}
 			}
 		}
 
@@ -1562,7 +1565,7 @@ func RemoveHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		log.Infof("Remove %+v", rmReq)
-		err := s.cm.RemoveFile(rmReq.Target, rmReq.Recursion, false, rmReq.Sno)
+		err := s.cm.RemoveFile(rmReq.Target, rmReq.Recursion, rmReq.IsPath, rmReq.Sno)
 		result, code, errmsg := "ok", 0, ""
 		if err != nil {
 			log.Errorf("Remove files %+v error %v", rmReq, err)

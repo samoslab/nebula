@@ -2,14 +2,51 @@ syntax = "proto3";
 package provider.pb;
 
 service ProviderService {
+	//no error
 	rpc Ping(PingReq) returns (PingResp){}
 
+	//codes.Unknown, "RPC Recv failed unexpectadely while reading chunks from stream, blockKey: %x error: %s"
+	//codes.InvalidArgument, "check data size failed, blockKey: %x"
+	//codes.Unauthenticated, "check auth failed, blockKey: %x error: %s"
+	//codes.AlreadyExists, "hash point file exist, blockKey: %x"
+	//codes.ResourceExhausted, "available disk space of this provider is not enlough, blockKey: %s blockSize: %d"
+	//codes.Internal, "open temp write file failed, blockKey: %x error: %s"
+	//codes.InvalidArgument, "transport data size exceed: %d, blockKey: %x blockSize: %d"
+	//codes.Internal, "write file failed, blockKey: %x error: %s"
+	//codes.Internal, "stat temp file failed, blockKey: %x error: %s"
+	//codes.InvalidArgument, "check data size failed, blockKey: %x"
+	//codes.Internal, "sha1 sum file %s failed, blockKey: %x error: %s"
+	//codes.InvalidArgument, "hash verify failed, blockKey: %x error: %s"
+	//codes.Internal, "close temp file failed, tempFilePath: %s blockKey: %x error: %s"
+	//codes.Internal, "save file failed, tempFilePath: %s blockKey: %x error: %s"
+	//codes.Unknown, "RPC SendAndClose failed, blockKey: %x error: %s"
 	rpc Store(stream StoreReq) returns (StoreResp){}//fileSize must equal or more than 512KB
 
+	//codes.InvalidArgument, "check data size failed, blockKey: %x"
+	//codes.InvalidArgument, "check data hash failed, blockKey: %x"
+	//codes.Unauthenticated, "check auth failed, blockKey: %x error: %s"
+	//codes.AlreadyExists, "hash point file exist, blockKey: %x"
+	//codes.ResourceExhausted, "available disk space of this provider is not enlough, blockKey: %s blockSize: %d"
+	//codes.Internal, "save to small file db failed, blockKey: %x error: %s"
+	//codes.Internal, "save to provider db failed, blockKey: %x error: %s"
 	rpc StoreSmall(StoreReq)returns (StoreResp){}//fileSize must less than 512KB
 
+	//codes.InvalidArgument, "check data size failed, blockKey: %x"
+	//codes.Unauthenticated, "check auth failed, blockKey: %x error: %s"
+	//codes.NotFound, "file not exist, blockKey: %x"
+	//codes.FailedPrecondition, "is small file, blockKey: %x"
+	//codes.Internal, "sha1 sum file %s failed, blockKey: %x error: %s"
+	//codes.DataLoss, "hash verify failed, blockKey: %x error: %s"
+	//codes.Internal, "open file failed, blockKey: %x error: %s"
 	rpc Retrieve(RetrieveReq) returns (stream RetrieveResp){}//fileSize must equal or more than 512KB
 
+	//codes.InvalidArgument, "check data size failed, blockKey: %x"
+	//codes.Unauthenticated, "check auth failed, blockKey: %x error: %s"
+	//codes.NotFound, "file not exist, blockKey: %x"
+	//codes.FailedPrecondition, "is not small file, blockKey: %x"
+	//codes.Internal, "read small file error, blockKey: %x error: %s"
+	//codes.InvalidArgument, "check data size failed, read length %d != request length %d, blockKey: %x"
+	//codes.DataLoss, "hash verify failed, blockKey: %x error: %s"
 	rpc RetrieveSmall(RetrieveReq) returns (RetrieveResp){}//fileSize must less than 512KB
 
 	rpc Remove(RemoveReq) returns (RemoveResp){}
@@ -26,6 +63,7 @@ message PingReq {
 }
 
 message PingResp{
+	bytes nodeIdHash=1;
 }
 
 message StoreReq {

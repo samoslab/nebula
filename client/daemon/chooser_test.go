@@ -149,9 +149,9 @@ func TestGenerateSecondAvaliablePro(t *testing.T) {
 		if i == 1 {
 			sortPros = append(sortPros, &SortablePro{Pro: bpa, Delay: common.NetworkUnreachable, OriginIndex: i})
 		} else if i == 2 {
-			sortPros = append(sortPros, &SortablePro{Pro: bpa, Delay: 1001, OriginIndex: i})
+			sortPros = append(sortPros, &SortablePro{Pro: bpa, Delay: common.MaxInvalidDelay + 1, OriginIndex: i})
 		} else {
-			sortPros = append(sortPros, &SortablePro{Pro: bpa, Delay: 999, OriginIndex: i})
+			sortPros = append(sortPros, &SortablePro{Pro: bpa, Delay: common.MaxInvalidDelay - 1, OriginIndex: i})
 		}
 	}
 

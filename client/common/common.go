@@ -124,6 +124,7 @@ type UploadParameter struct {
 	OriginFileSize uint64
 	HF             HashFile
 	Checksum       bool
+	Provider       string
 }
 
 // HashFile file info for reedsolomon
@@ -137,4 +138,11 @@ type HashFile struct {
 // Now return current unix timestamp
 func Now() uint64 {
 	return uint64(time.Now().UTC().Unix())
+}
+
+func Min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

@@ -1,10 +1,18 @@
 {
-  "name": "nebula-client",
-  "version": "1.0.0",
-  "description": "",
+  "name": "samos-me",
+  "version": "0.8.0",
+  "description": "Samos nebula storage client",
   "main": "electron-main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron --dev .",
+    "dist-win32": "build -w --ia32 -p=never",
+    "dist-win64": "build -w --x64 -p=never",
+    "dist-win": "build -w --x64 --ia32 -p=never",
+    "dist-linux32": "build -l --x32 -p=never",
+    "dist-linux64": "build -l --x64 -p=never",
+    "dist-linux": "build -l --x64 --ia32 -p=never",
+    "dist-mac": "build -m --x64 -p=never",
+    "pack-linux": "build --dir -l -p=never"
   },
   "author": "",
   "license": "ISC",
@@ -14,6 +22,71 @@
     "electron-debug": "^2.0.0",
     "electron-log": "^2.2.16",
     "electron-context-menu": "^0.10.0",
+    "electron-updater": "^3.1.1",
+    "electron-builder": "20.27.1",
     "jquery": "3.3.1"
+  },
+  "dependencies": {
+    "electron-context-menu": "^0.10.0",
+    "electron-debug": "^2.0.0",
+    "electron-log": "^2.2.16",
+    "jquery": "3.3.1"
+  },
+  "build": {
+    "appId": "io.samos.storage",
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "http://samos.io/"
+      }
+    ],
+    "nsis": {
+        "oneClick": false,
+        "allowToChangeInstallationDirectory": true
+    },
+    "mac": {
+        "category": "public.app-category.productivity",
+        "extraFiles": [
+            {
+                "from": "../client/dist/${os}-${arch}/nebula-client",
+                "to": "./Resources/app/"
+            }
+        ]
+    },
+    "win": {
+        "target": "nsis",
+        "extraFiles": [
+            {
+                "from": "../client/dist/${os}-${arch}/nebula-client.exe",
+                "to": "./resources/app/"
+            }
+        ]
+    },
+    "linux": {
+      "category": "Network",
+      "target": [
+        "AppImage"
+      ],
+      "extraFiles": [
+        {
+          "from": "../client/dist/${os}-${arch}/nebula-client",
+          "to": "./resources/app/"
+        },
+        {
+          "from": "../assets/icon512x512.png",
+          "to": "./resources/"
+        }
+      ]
+    },
+    "extraResources": [
+      {
+        "from": "../client/web/",
+        "to": "./app/web/",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ]
+>>>>>>> 6d1026805b660ccb83f3767db5f104d171abdaf4
   }
 }

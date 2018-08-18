@@ -73,7 +73,11 @@ func GetBestReplicaProvider(pros []*mpb.ReplicaProvider, needNum int) ([]*mpb.Re
 		}
 	}
 
-	return wellPros[0:needNum], nil
+	if len(wellPros) < MinReplicaNum {
+		return nil, fmt.Errorf("Replica provider only %d", len(wellPros))
+	}
+
+	return wellPros[0:common.Min(needNum, len(wellPros))], nil
 }
 
 type SortablePro struct {

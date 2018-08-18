@@ -18,7 +18,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/prestonTao/upnp"
 	"github.com/robfig/cron"
 	collector "github.com/samoslab/nebula/provider/collector_client"
 	"github.com/samoslab/nebula/provider/config"
@@ -28,7 +27,9 @@ import (
 	pb "github.com/samoslab/nebula/provider/pb"
 	client "github.com/samoslab/nebula/provider/register_client"
 	trp_pb "github.com/samoslab/nebula/tracker/register/provider/pb"
+	util_hash "github.com/samoslab/nebula/util/hash"
 	util_rsa "github.com/samoslab/nebula/util/rsa"
+	upnp "github.com/samoslab/nebula/util/upnp"
 	"github.com/skycoin/skycoin/src/cipher"
 	"github.com/yanzay/log"
 	"golang.org/x/net/context"
@@ -217,7 +218,16 @@ func daemon(configDir string, trackerServer string, collectorServer string, list
 		fmt.Println("parse listen port error: " + err.Error())
 		os.Exit(2)
 	}
-	portMapping(port)
+	// connect to router
+	igd, err := upnp.Discover()
+	if err != nil {
+		fmt.Println("use upnp get router failed: " + err.Error())
+	} else {
+		err = igd.Forward(uint16(port), "Samos storage")
+		if err != nil {
+			fmt.Println("use upnp port mapping failed: " + err.Error())
+		}
+	}
 	grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(520 * 1024))
 	go startServer(listen, grpcServer)
 	defer grpcServer.GracefulStop()
@@ -431,15 +441,25 @@ func doRegister(configDir string, trackerServer string, listen string, walletAdd
 	for _, v := range extraStorage {
 		extraStorageSlice = append(extraStorageSlice, v.Volume)
 	}
-	portMapping(int(port))
-	externalIp, err := externalIpAddr()
+	// connect to router
+	igd, err := upnp.Discover()
 	if err != nil {
-		fmt.Println("use upnp get outer ip failed: " + err.Error())
+		fmt.Println("use upnp get router failed: " + err.Error())
 	} else {
-		fmt.Println("use upnp get outer ip is: " + externalIp)
+		err = igd.Forward(uint16(port), "Samos storage")
+		if err != nil {
+			fmt.Println("use upnp port mapping failed: " + err.Error())
+		}
+		// discover external IP
+		externalIp, err := igd.ExternalIP()
+		if err != nil {
+			fmt.Println("use upnp get outer ip failed: " + err.Error())
+		} else {
+			fmt.Println("use upnp get outer ip is: " + externalIp)
+		}
 	}
 	grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(520 * 1024))
-	go startPingServer(listen, grpcServer)
+	go startPingServer(listen, grpcServer, util_hash.Sha1(no.NodeId))
 	defer grpcServer.GracefulStop()
 	time.Sleep(time.Duration(5) * time.Second) //for loadbalance health check
 	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
@@ -473,6 +493,11 @@ func doRegister(configDir string, trackerServer string, listen string, walletAdd
 			os.Exit(55)
 		}
 		if code != 0 {
+			if code == 300 {
+				fmt.Println(errMsg)
+				fmt.Println("Retrying...")
+				continue
+			}
 			if code == 500 {
 				pubKeyBytes, publicKeyHash, _, err = client.GetPublicKey(prsc)
 				if err != nil {
@@ -506,21 +531,22 @@ func doRegister(configDir string, trackerServer string, listen string, walletAdd
 	}
 }
 
-func startPingServer(listen string, grpcServer *grpc.Server) {
+func startPingServer(listen string, grpcServer *grpc.Server, nodeIdHash []byte) {
 	lis, err := net.Listen("tcp", listen)
 	if err != nil {
 		fmt.Printf("failed to listen: %s, error: %s\n", listen, err.Error())
 		os.Exit(57)
 	}
-	pb.RegisterProviderServiceServer(grpcServer, &pingProviderService{})
+	pb.RegisterProviderServiceServer(grpcServer, &pingProviderService{nodeIdHash: nodeIdHash})
 	grpcServer.Serve(lis)
 }
 
 type pingProviderService struct {
+	nodeIdHash []byte
 }
 
 func (self *pingProviderService) Ping(ctx context.Context, req *pb.PingReq) (*pb.PingResp, error) {
-	return &pb.PingResp{}, nil
+	return &pb.PingResp{NodeIdHash: self.nodeIdHash}, nil
 }
 func (self *pingProviderService) Store(stream pb.ProviderService_StoreServer) error {
 	return nil
@@ -623,33 +649,6 @@ func newProviderConfig(no *node.Node, walletAddress string, billEmail string,
 	return pc
 }
 
-func portMapping(port int) {
-	defer func() {
-		if er := recover(); er != nil {
-			fmt.Printf("use upnp port mapping failed: %s\n", er)
-		}
-	}()
-	upnpMan := new(upnp.Upnp)
-	if err := upnpMan.AddPortMapping(port, port, "TCP"); err != nil {
-		fmt.Println("use upnp port mapping failed: " + err.Error())
-	} else {
-		fmt.Println("use upnp port mapping success.")
-	}
-}
-
-func externalIpAddr() (outIp string, err error) {
-	defer func() {
-		if er := recover(); err != nil {
-			err = fmt.Errorf("use upnp get external ip address failed: %s", er)
-		}
-	}()
-	upnpMan := new(upnp.Upnp)
-	if err = upnpMan.ExternalIPAddr(); err != nil {
-		return
-	}
-	return upnpMan.GatewayOutsideIP, nil
-}
-
 func refreshIp(trackerServer string, providerPort int, exitOnError bool) (ip string) {
 	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
 	if err != nil {
@@ -657,7 +656,7 @@ func refreshIp(trackerServer string, providerPort int, exitOnError bool) (ip str
 			fmt.Printf("RPC Dial failed: %s\n", err.Error())
 			os.Exit(61)
 		} else {
-			log.Errorf("RPC Dial failed when refresh ip, error info: %s", err)
+			log.Warningf("RPC Dial failed when refresh ip, info: %s", err)
 			return
 		}
 	}
@@ -669,7 +668,7 @@ func refreshIp(trackerServer string, providerPort int, exitOnError bool) (ip str
 			fmt.Printf("refresh ip failed: %s\n", err.Error())
 			os.Exit(62)
 		} else {
-			log.Errorf("refresh ip failed, error info: %s", err)
+			log.Warningf("refresh ip failed, info: %s", err)
 			return
 		}
 	}
