@@ -32,7 +32,7 @@ func main() {
 			panic(err)
 		}
 	}
-	log, err := logger.NewLogger("", true)
+	log, err := logger.NewLogger("", false)
 	if err != nil {
 		return
 	}

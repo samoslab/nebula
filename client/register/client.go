@@ -67,11 +67,14 @@ func DoRegister(registClient pb.ClientRegisterServiceClient, cfg *config.ClientC
 		return nil, err
 	}
 	fmt.Printf("rsp %+v\n", rsp)
+	if rsp.GetCode() != 0 {
+		return nil, common.NewStatusErr(rsp.Code, rsp.ErrMsg)
+	}
 	return rsp, nil
 }
 
 // VerifyContactEmail verify email
-func VerifyContactEmail(client pb.ClientRegisterServiceClient, verifyCode string, node *node.Node) (code uint32, errMsg string, err error) {
+func VerifyContactEmail(client pb.ClientRegisterServiceClient, verifyCode string, node *node.Node) (err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	req := &pb.VerifyContactEmailReq{NodeId: node.NodeId,
@@ -80,13 +83,16 @@ func VerifyContactEmail(client pb.ClientRegisterServiceClient, verifyCode string
 
 	err = req.SignReq(node.PriKey)
 	if err != nil {
-		return 0, "", err
+		return err
 	}
-	resp, err := client.VerifyContactEmail(ctx, req)
+	rsp, err := client.VerifyContactEmail(ctx, req)
 	if err != nil {
-		return 0, "", err
+		return err
 	}
-	return resp.Code, resp.ErrMsg, nil
+	if rsp.GetCode() != 0 {
+		return common.NewStatusErr(rsp.Code, rsp.ErrMsg)
+	}
+	return nil
 }
 
 func resendVerifyCode(client pb.ClientRegisterServiceClient, node *node.Node) (success bool, err error) {
@@ -101,11 +107,11 @@ func resendVerifyCode(client pb.ClientRegisterServiceClient, node *node.Node) (s
 	if err != nil {
 		return false, err
 	}
-	resp, err := client.ResendVerifyCode(ctx, req)
+	rsp, err := client.ResendVerifyCode(ctx, req)
 	if err != nil {
 		return false, err
 	}
-	return resp.Success, nil
+	return rsp.Success, nil
 }
 
 // RegisterClient register client info to tracker
@@ -137,15 +143,10 @@ func RegisterClient(log logrus.FieldLogger, configFile, trackerServer, emailAddr
 		}
 	}
 
-	rsp, err := DoRegister(registerClient, cc)
+	_, err = DoRegister(registerClient, cc)
 	if err != nil {
 		log.Infof("register error %v", err)
 		return err
-	}
-
-	if rsp.GetCode() != 0 {
-		log.Infof("register failed: %+v\n", rsp.GetErrMsg())
-		return fmt.Errorf("%s", rsp.GetErrMsg())
 	}
 
 	err = config.SaveClientConfig(configFile, cc)
@@ -160,6 +161,9 @@ func RegisterClient(log logrus.FieldLogger, configFile, trackerServer, emailAddr
 
 // VerifyEmail verify email
 func VerifyEmail(configFile string, trackerServer string, verifyCode string) error {
+	if verifyCode == "" {
+		return fmt.Errorf("verifyCode is required.")
+	}
 	cc, err := config.LoadConfig(configFile)
 	if err != nil {
 		if err == config.ErrNoConf {
@@ -172,10 +176,6 @@ func VerifyEmail(configFile string, trackerServer string, verifyCode string) err
 		fmt.Println("failed to load config, can not verify email: " + err.Error())
 		return err
 	}
-	if verifyCode == "" {
-		fmt.Printf("verifyCode is required.\n")
-		os.Exit(9)
-	}
 	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
 	if err != nil {
 		fmt.Printf("RPC Dial failed: %s\n", err.Error())
@@ -183,14 +183,10 @@ func VerifyEmail(configFile string, trackerServer string, verifyCode string) err
 	}
 	defer conn.Close()
 	registerClient := regpb.NewClientRegisterServiceClient(conn)
-	code, errMsg, err := VerifyContactEmail(registerClient, verifyCode, cc.Node)
+	err = VerifyContactEmail(registerClient, verifyCode, cc.Node)
 	if err != nil {
 		fmt.Printf("verifyEmail failed: %s\n", err.Error())
 		return err
-	}
-	if code != 0 {
-		fmt.Println(errMsg)
-		return fmt.Errorf(errMsg)
 	}
 	fmt.Println("verifyEmail success, you can start upload now.")
 	return nil

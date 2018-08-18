@@ -30,9 +30,8 @@ func GetAllPackageHandler(s *HTTPServer) http.HandlerFunc {
 		errmsg := ""
 		if err != nil {
 			log.Errorf("Get all packages error %v", err)
-			code = 1
-			errmsg = err.Error()
 			result = nil
+			code, errmsg = common.StatusErrFromError(err)
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
@@ -71,9 +70,8 @@ func GetPackageInfoHandler(s *HTTPServer) http.HandlerFunc {
 		errmsg := ""
 		if err != nil {
 			log.Errorf("Get package error %v", err)
-			code = 1
-			errmsg = err.Error()
 			result = nil
+			code, errmsg = common.StatusErrFromError(err)
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
@@ -133,9 +131,8 @@ func BuyPackageHandler(s *HTTPServer) http.HandlerFunc {
 		errmsg := ""
 		if err != nil {
 			log.Errorf("Buy package error %v", err)
-			code = 1
-			errmsg = err.Error()
 			result = nil
+			code, errmsg = common.StatusErrFromError(err)
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
@@ -178,9 +175,8 @@ func DiscountPackageHandler(s *HTTPServer) http.HandlerFunc {
 		errmsg := ""
 		if err != nil {
 			log.Errorf("Discount package error %v", err)
-			code = 1
-			errmsg = err.Error()
 			result = nil
+			code, errmsg = common.StatusErrFromError(err)
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
@@ -224,9 +220,8 @@ func MyAllOrderHandler(s *HTTPServer) http.HandlerFunc {
 		errmsg := ""
 		if err != nil {
 			log.Errorf("Get all my orders error %v", err)
-			code = 1
-			errmsg = err.Error()
 			result = nil
+			code, errmsg = common.StatusErrFromError(err)
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
@@ -265,9 +260,8 @@ func GetOrderInfoHandler(s *HTTPServer) http.HandlerFunc {
 		errmsg := ""
 		if err != nil {
 			log.Errorf("Get order info error %v", err)
-			code = 1
-			errmsg = err.Error()
 			result = nil
+			code, errmsg = common.StatusErrFromError(err)
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
@@ -325,9 +319,8 @@ func PayOrderHandler(s *HTTPServer) http.HandlerFunc {
 		errmsg := ""
 		if err != nil {
 			log.Errorf("Pay order error %v", err)
-			code = 1
-			errmsg = err.Error()
 			result = nil
+			code, errmsg = common.StatusErrFromError(err)
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
@@ -380,9 +373,8 @@ func RemoveOrderHandler(s *HTTPServer) http.HandlerFunc {
 		errmsg := ""
 		if err != nil {
 			log.Errorf("Pay order error %v", err)
-			code = 1
-			errmsg = err.Error()
 			result = nil
+			code, errmsg = common.StatusErrFromError(err)
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
@@ -416,9 +408,8 @@ func RechargeAddressHandler(s *HTTPServer) http.HandlerFunc {
 		errmsg := ""
 		if err != nil {
 			log.Errorf("Get recharge address error %v", err)
-			code = 1
-			errmsg = err.Error()
 			result = nil
+			code, errmsg = common.StatusErrFromError(err)
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
@@ -452,9 +443,8 @@ func UsageAmountHandler(s *HTTPServer) http.HandlerFunc {
 		errmsg := ""
 		if err != nil {
 			log.Errorf("Get usage amount error %v", err)
-			code = 1
-			errmsg = err.Error()
 			result = nil
+			code, errmsg = common.StatusErrFromError(err)
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
