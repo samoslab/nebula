@@ -35,6 +35,7 @@ import (
 
 	"github.com/samoslab/nebula/client/register"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/status"
 )
 
@@ -116,12 +117,12 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 	if cfg == nil {
 		return nil, errors.New("client config nil")
 	}
-	//conn, err := grpc.Dial(webcfg.TrackerServer, grpc.WithBlock(), grpc.WithInsecure(), grpc.WithKeepaliveParams(keepalive.ClientParameters{
-	//	Time:                50 * time.Millisecond,
-	//	Timeout:             100 * time.Millisecond,
-	//	PermitWithoutStream: true,
-	//}))
-	conn, err := grpc.Dial(webcfg.TrackerServer, grpc.WithBlock(), grpc.WithInsecure())
+	conn, err := grpc.Dial(webcfg.TrackerServer, grpc.WithBlock(), grpc.WithInsecure(), grpc.WithKeepaliveParams(keepalive.ClientParameters{
+		Time:                200 * time.Millisecond,
+		Timeout:             1000 * time.Millisecond,
+		PermitWithoutStream: true,
+	}))
+	//conn, err := grpc.Dial(webcfg.TrackerServer, grpc.WithBlock(), grpc.WithInsecure())
 	if err != nil {
 		log.Errorf("Rpc dial failed: %s", err.Error())
 		return nil, err
