@@ -10,7 +10,6 @@ import (
 	pb "github.com/samoslab/nebula/tracker/register/client/pb"
 	rsalong "github.com/samoslab/nebula/util/rsa"
 	"github.com/sirupsen/logrus"
-	"google.golang.org/grpc"
 )
 
 // OrderManager order manager
@@ -95,7 +94,7 @@ func NewOrderFromPbOrder(o *pb.Order) *Order {
 
 // NewOrderManager create order manager ,only communicate with tracker server
 func NewOrderManager(trackerServer string, log logrus.FieldLogger, privateKey *rsa.PrivateKey, nodeId []byte) *OrderManager {
-	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
+	conn, err := common.GrpcDial(trackerServer)
 	if err != nil {
 		log.Fatalf("RPC Dial failed: %s", err.Error())
 		return nil

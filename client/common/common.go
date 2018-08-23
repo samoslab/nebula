@@ -10,6 +10,9 @@ import (
 	"io/ioutil"
 	"net/http"
 	"time"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 )
 
 // UploadReq request struct for upload file
@@ -145,4 +148,18 @@ func Min(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func GrpcDial(server string) (*grpc.ClientConn, error) {
+	conn, err := grpc.Dial(server, grpc.WithBlock(), grpc.WithTimeout(3*time.Second), grpc.WithInsecure(), grpc.WithKeepaliveParams(keepalive.ClientParameters{
+		Time:                200 * time.Millisecond,
+		Timeout:             1000 * time.Millisecond,
+		PermitWithoutStream: true,
+	}))
+	if err != nil && err.Error() == "transport is closing" {
+		// try one more times
+		fmt.Printf("grpc dial err %v\n", err)
+		conn, err = grpc.Dial(server, grpc.WithInsecure(), grpc.WithTimeout(3*time.Second), grpc.WithBlock())
+	}
+	return conn, err
 }
