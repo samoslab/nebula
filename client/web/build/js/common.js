@@ -107,7 +107,7 @@ var method = {
         //传输列表和我的套餐隐藏
         $(".tabDiv").hide();
 
-        list(path,space_no,1000,1,'modtime',true);  
+        list(path,space_no,3,1,'modtime',true);  
     },
     //隐私空间初始化
     priviteInit:function(path,space_no){
@@ -174,6 +174,7 @@ var method = {
                 "interactive":true
             }),
             success:function(res){
+                console.log(res);
                 if(res.Data == true){
                     $(".zJMtAEb dd:eq(0) .appendFileName").html(name).attr('href',`${'#'+initPath+'/'+name}`);
                     $(".zJMtAEb dd:eq(0) .oprate").attr('style','');
@@ -333,8 +334,10 @@ function btngroupshow(){
     }
     if($(".zJMtAEb input[name='fileSelect']:checked").size()==$(".zJMtAEb input[name='fileSelect']").length){
         $("#s-selectAll").prop('checked','checked');
+        $(".AuPKyz").addClass("activeSelect");
     }else{
         $("#s-selectAll").prop('checked',false);
+        //$(".zJMtAEb input[name='fileSelect']:checked").addClass("activeSelect");
     }
     if($(".zJMtAEb input[name='fileSelect']:checked").size()!=1){
         $("#renameBtn").css('opacity',0.5);
@@ -353,9 +356,9 @@ function btngroupshow(){
          //$(".s-select-check").change(function(){
              if($(this).is(":checked")){
                  //console.log($(this).attr("data-name"));查 选中行的文件夹名字
-                 $(this).parent().parent().addClass("activeSelect");
+                 $(this).parents(".AuPKyz").addClass("activeSelect");
              }else{
-                 $(this).parent().parent().removeClass("activeSelect");
+                 $(this).parents(".AuPKyz").removeClass("activeSelect");
              }
              btngroupshow();
          });
@@ -398,62 +401,57 @@ function btngroupshow(){
 
 /*-------------------------------------------------重命名-----------------------------------------------------------------------------*/
 var rename = {
-    // <!--重命名-->
+    // <!--重命名条框显示-->
     rename:function (a,name){
-        // let a = $(".zJMtAEb input[name='fileSelect']:checked").parent().parent().position().top;
         $('#file-rename-box').css('top',a);
         $('#file-rename-box').show();
-         // <!--要改的文件名字给input value-->
-        // let name = $(".zJMtAEb input[name='fileSelect']:checked").attr("data-name");
-        $(".renameInput").val(name);
+        $("#file-rename-box .renameInput").val(name);
+
         // <!--非选中的input 和 全选按钮禁止点击-->
         $(".zJMtAEb input[name='fileSelect']").not(':checked').attr('disabled','disabled');
         $("#s-selectAll").attr("disabled","disabled");
     },
     // <!--重命名div隐藏-->
     renameDivHide:function (){
-        $(".renameInput").val('');
+        $("#file-rename-box .renameInput").val('');
         $(".zJMtAEb input[name='fileSelect']").not(':checked').attr('disabled',false);
         $("#s-selectAll").attr("disabled",false);
         $("#file-rename-box").hide();
     },
     //重命名确定
     renameCf:function(){
-        let renameInputV= $(".renameInput").val();
-        $(".zJMtAEb input[name='fileSelect']:checked").next().next().html(renameInputV);
-        let dataId = $(".zJMtAEb input[name='fileSelect']:checked").attr("data-id");
+        let renameInputV= $("#file-rename-box .renameInput").val();
+        $(".zJMtAEb input[name='fileSelect']:checked").siblings(".file-name").html(renameInputV).attr("title",renameInputV);
+        $(".zJMtAEb input[name='fileSelect']:checked").attr("data-name",renameInputV);
+        //let dataId = $(".zJMtAEb input[name='fileSelect']:checked").attr("data-id");
         let dataPath = $(".zJMtAEb input[name='fileSelect']:checked").attr("data-path");
         let spaceNo =  Number($(".zJMtAEb input[name='fileSelect']:checked").attr("data-spaceno"));
-        // let json = {};
+        console.log(dataPath);
 
-        // if(dataId){
-        //     json.src = dataId;
-        //     json.ispath = false;
-        // }else{
-        //     json.target = dataPath;
-        //     json.ispath = true;
-        // }
-        // json['space_no']=parseInt(spaceNo);
-        // json.recursion = true;
+        let b = dataPath.lastIndexOf('/');
+        let c = dataPath.substring(0,b+1);
+
         $.ajax({
             url:"/api/v1/store/rename",
             method:"POST",
             contentType: "application/json",
             //data:JSON.stringify(json),
             data:JSON.stringify({
-                "src":dataId,
+                "src":dataPath,
                 "dest":renameInputV,
-                "space_no":spaceNo
+                "space_no":spaceNo,
+                "ispath":true
             }),
             success:function(res){
                 console.log(res);
                 if(res.code==0){
                     //重命名成功，隐藏重命名组件
                     rename.renameDivHide();
+                      //重命名后给input赋值；
+                    $(".zJMtAEb input[name='fileSelect']:checked").attr("data-path",c+renameInputV);
                 }else if(res.code!=0){
                     alert(res.errmsg);
                 }
-
             }
         });
     },
@@ -463,26 +461,26 @@ var rename = {
 $("#renameBtn").click(function(){
     if($(".zJMtAEb input[name='fileSelect']:checked").size()==1){
         //选中行到顶部的距离
-        let a = $(".zJMtAEb input[name='fileSelect']:checked").parent().parent().position().top;
+        let a = $(".zJMtAEb input[name='fileSelect']:checked").parents(".AuPKyz").position().top;
          // <!--要改的文件名字给input value-->
         let name = $(".zJMtAEb input[name='fileSelect']:checked").attr("data-name");
         rename.rename(a,name);
     }
-    //<!--重命名取消-->
-    $("#rename-cancel").click(function(){
-        rename.renameDivHide();
-    });
-    //<!--重命名确定-->
-    $("#rename-cfm").click(function(){
-        rename.renameCf();
-    });
-    //回车事件
-    $('.renameInput').keyup(function(event){
-        if(event.keyCode ==13){
-            rename.renameCf();
-        }
-   });
 
+});
+ //<!--重命名取消-->
+ $("#rename-cancel").click(function(){
+    rename.renameDivHide();
+});
+//<!--重命名确定-->
+$("#rename-cfm").click(function(){
+    rename.renameCf();
+});
+//回车事件
+$('.renameInput').keyup(function(event){
+    if(event.keyCode ==13){
+        rename.renameCf();
+    }
 });
 /*---------------------------------------------------oprate 操作相关------------------------------------------------------------------------------------*/
 //oprate显示隐藏
@@ -495,17 +493,16 @@ function oprateShow(x){
 function oprateHide(x){
     $(x).find("div:first-child .oprate").hide();
 }
-
+//行内重命名操作；
 function gBtnRename(x){
-    let a = $(x).parent().parent().parent().position().top;
-    // $('#file-rename-box').css('top',a);
-    // $('#file-rename-box').show();
+    //位置
+    let a = $(x).parents(".AuPKyz").position().top;
     // <!--要改的文件名字给input value-->
     let name = $(x).parent().siblings(".s-select-check").attr("data-name");
-    // $(".renameInput").val(name);
-    // // <!--非选中的input 和 全选按钮禁止点击-->
-    // $(".zJMtAEb input[name='fileSelect']").not(':checked').attr('disabled','disabled');
-    // $("#s-selectAll").attr("disabled","disabled");
+
+    $(".s-select-check").prop("checked",false);
+    $("#listBox>dd").removeClass("activeSelect");
+    $(x).parent().siblings(".s-select-check").prop("checked",true);
     rename.rename(a,name);
 }
 
@@ -566,35 +563,41 @@ function gBtnDownLoad(id,filehash,filesize,filename,space_no,isFolder){
 
 // //单行删除按钮点击事件删除
 function gBtnDelete(id,path,ispath,space_no,recursion){
-    console.log(id+','+path+','+ispath+','+space_no+','+recursion);
-    let renameInputV = $(".renameInput").val();
-    console.log(path+renameInputV);
-    let json = {};
-    if(id){
-        json.target = id;
-        json.ispath = false;
-    }else{
-        json.target = path+renameInputV;
-        json.ispath = true;
-    }
-    json['space_no']=parseInt(space_no);
-    json.recursion = recursion;
-    console.log(json);
-    $.ajax({
-        url:"/api/v1/store/remove",
-        method:"POST",
-        contentType: "application/json",
-        data:JSON.stringify(json),
-        success:function(res){
-            console.log(res);
-            if(res.code==0){
-                method.firstInit();
-                $("#file-rename-box").hide(); //重命名输入框显示时，又点击了删除按钮；
-            }else{
-                alert('Delete failed!');
-            }
+    //console.log(id+','+path+','+ispath+','+space_no+','+recursion);
+    let a =confirm("Confirm to delete the selected file?");
+    if(a==true){
+        let renameInputV = $(".renameInput").val();
+        console.log(path+renameInputV);
+        let json = {};
+        if(id){
+            json.target = id;
+            json.ispath = false;
+        }else{
+            json.target = path+renameInputV;
+            json.ispath = true;
         }
-    });
+        json['space_no']=parseInt(space_no);
+        json.recursion = recursion;
+        console.log(json);
+        $.ajax({
+            url:"/api/v1/store/remove",
+            method:"POST",
+            contentType: "application/json",
+            data:JSON.stringify(json),
+            success:function(res){
+                console.log(res);
+                if(res.code==0){
+                    method.firstInit();
+                    $("#file-rename-box").hide(); //重命名输入框显示时，又点击了删除按钮；
+                }else{
+                    alert('Delete failed!');
+                }
+            }
+        });
+    }
+
+    
+   
 }
 
 
@@ -751,44 +754,46 @@ $("#downLoadBtn").click(function(){
 
 //顶部删除按钮；
 $("#deleteBtn").click(function(){
-    let inputArr = $(".zJMtAEb input[name='fileSelect']:checked");
-    let arr=[];
-    //let json = {};
-    for(i=0;i<inputArr.length;i++){
-        let json = {};
-        let id = $(inputArr[i]).attr("data-id");
-        let path = $(inputArr[i]).attr("data-path");
-        if(id){
-            json.target = id;
-            json.ispath = false;
-        }else{
-            json.target = path;
-            json.ispath = true;
-        }
-        json['space_no']=parseInt($(inputArr[i]).attr("data-spaceNo"));
-        json.recursion = true;
-        arr.push(json);
-
-    }
-    console.log(arr);
-    for(var i = 0;i<arr.length;i++){
-        console.log(arr[i]);
-        $.ajax({
-            url:"/api/v1/store/remove",
-            method:"POST",
-            contentType: "application/json",
-            data:JSON.stringify(arr[i]),
-            success:function(res){
-                console.log(res);
-                if(res.code==0){
-                    method.firstInit();
-                    $("#file-rename-box").hide(); //重命名输入框显示时，又点击了删除按钮；
-                }else{
-                    alert('Delete failed!');
-                }
+    let a =confirm("Confirm to delete the selected file?");
+    if(a==true){
+        let inputArr = $(".zJMtAEb input[name='fileSelect']:checked");
+        let arr=[];
+        for(i=0;i<inputArr.length;i++){
+            let json = {};
+            let id = $(inputArr[i]).attr("data-id");
+            let path = $(inputArr[i]).attr("data-path");
+            if(id){
+                json.target = id;
+                json.ispath = false;
+            }else{
+                json.target = path;
+                json.ispath = true;
             }
-        });
-    } 
+            json['space_no']=parseInt($(inputArr[i]).attr("data-spaceNo"));
+            json.recursion = true;
+            arr.push(json);
+    
+        }
+        console.log(arr);
+        for(var i = 0;i<arr.length;i++){
+            console.log(arr[i]);
+            $.ajax({
+                url:"/api/v1/store/remove",
+                method:"POST",
+                contentType: "application/json",
+                data:JSON.stringify(arr[i]),
+                success:function(res){
+                    console.log(res);
+                    if(res.code==0){
+                        method.firstInit();
+                        $("#file-rename-box").hide(); //重命名输入框显示时，又点击了删除按钮；
+                    }else{
+                        alert('Delete failed!');
+                    }
+                }
+            });
+        } 
+    }
 });
 
 
@@ -888,6 +893,9 @@ function trigger(){
 $("#s-selectAll").click(function(){
     let target = $(this).attr('data-check-target');
     $(target).prop('checked',$(this).prop('checked'));
+    if(!$(this).prop('checked')){
+        $(target).parents(".AuPKyz").removeClass("activeSelect");
+    }
     btngroupshow();
 });
 
@@ -1001,7 +1009,7 @@ var public = {
 
  //购买 确认订单
 function addCar(id,no){
-    if(sessionStorage.getItem("noPaidOrder")){
+    if(sessionStorage.getItem("noPaidOrder")=='true'){
         let r=confirm("You have an unpaid order and the submission will overwrite the order.");
         if (r==true){
             $.ajax({
@@ -1165,12 +1173,14 @@ var packageMethod = {
                             //有未付款的订单；
                             if(!obj.paid){
                                 sessionStorage.setItem("noPaidOrder",true);
+                            }else{
+                                sessionStorage.setItem("noPaidOrder",false);
                             }
                             html +=` <div class="order-list">
                                         <div class="order-list-head clearfix">
                                             <span data-locale="createdTime">创建日期：<span>${public.Date(obj.creation)}</span></span>
                                             <span data-locale="orderNumber">订单号：<span>${obj.id}</span></span>
-                                            <div  class="order-list-del" onclick="delOrder(${obj.id})">
+                                            <div  class="order-list-del" onclick="delOrder('${obj.id}')">
                                                 ${obj.paid?'':'&times;'}
                                             </div>
                                         </div>
