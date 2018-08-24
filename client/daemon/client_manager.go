@@ -116,12 +116,7 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 	if cfg == nil {
 		return nil, errors.New("client config nil")
 	}
-	//conn, err := grpc.Dial(webcfg.TrackerServer, grpc.WithBlock(), grpc.WithInsecure(), grpc.WithKeepaliveParams(keepalive.ClientParameters{
-	//	Time:                50 * time.Millisecond,
-	//	Timeout:             100 * time.Millisecond,
-	//	PermitWithoutStream: true,
-	//}))
-	conn, err := grpc.Dial(webcfg.TrackerServer, grpc.WithBlock(), grpc.WithInsecure())
+	conn, err := common.GrpcDial(webcfg.TrackerServer)
 	if err != nil {
 		log.Errorf("Rpc dial failed: %s", err.Error())
 		return nil, err
@@ -977,7 +972,7 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 	log := c.Log
 	server := fmt.Sprintf("%s:%d", pro.GetServer(), pro.GetPort())
 	uploadPara.Provider = server
-	conn, err := grpc.Dial(server, grpc.WithInsecure())
+	conn, err := common.GrpcDial(server)
 	if err != nil {
 		log.Errorf("Rpc dial failed: %s", err.Error())
 		return nil, err
@@ -1096,7 +1091,7 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 		ccControl.Add()
 		go func(pro *mpb.ReplicaProvider) {
 			server := fmt.Sprintf("%s:%d", pro.Server, pro.Port)
-			conn, err := grpc.Dial(server, grpc.WithInsecure())
+			conn, err := common.GrpcDial(server)
 			if err != nil {
 				log.Errorf("Rpc dail failed: %v", err)
 				mutex.Lock()
@@ -1553,7 +1548,7 @@ func (c *ClientManager) saveFileByPartition(fileName string, partition *mpb.Retr
 		go func(log logrus.FieldLogger, block *mpb.RetrieveBlock, fileName string) {
 			node := BestRetrieveNode(block.GetStoreNode())
 			server := fmt.Sprintf("%s:%d", node.GetServer(), node.GetPort())
-			conn, err := grpc.Dial(server, grpc.WithInsecure(), grpc.WithTimeout(3*time.Second), grpc.WithBlock())
+			conn, err := common.GrpcDial(server)
 			if err != nil {
 				log.Errorf("Rpc dial %s failed, error %v", server, err)
 				mutex.Lock()
