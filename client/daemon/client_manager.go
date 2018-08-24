@@ -128,7 +128,7 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 		return nil, err
 	}
 
-	om := order.NewOrderManager(webcfg.TrackerServer, log, cfg.Node.PriKey, cfg.Node.NodeId)
+	om := order.NewOrderManager(conn, log, cfg.Node.PriKey, cfg.Node.NodeId)
 
 	spaceM := NewSpaceManager()
 	for _, sp := range cfg.Space {
@@ -301,7 +301,10 @@ func (c *ClientManager) ExecuteTask() error {
 					}
 					log := log.WithField("task key", taskInfo.Key)
 					log.Infof("Handle task %+v", taskInfo)
+					retry := 0
+				RETRY:
 					doneMsg := common.MakeSuccDoneMsg(task.Type, "")
+					retry++
 					switch task.Type {
 					case common.TaskUploadFileType:
 						req := task.Payload.(*common.UploadReq)
@@ -324,9 +327,14 @@ func (c *ClientManager) ExecuteTask() error {
 					}
 					errStr := ""
 					if err != nil {
+						log.WithError(err).Error("Execute task failed")
+						code, _ := common.StatusErrFromError(err)
+						if code == 300 && retry < 3 {
+							log.WithError(err).Error("Execute task failed, retrying")
+							goto RETRY
+						}
 						errStr = err.Error()
 						doneMsg.SetError(1, err)
-						log.WithError(err).Error("Execute task failed")
 					} else {
 						log.Infof("Execute task success")
 					}
@@ -374,7 +382,7 @@ func (c *ClientManager) SendProgressMsg() error {
 				for _, msg := range msgList {
 					c.AddDoneMsg(msg)
 				}
-
+			case <-time.After(5 * time.Second): // keep connect alive
 			}
 		}
 	}()
@@ -1097,6 +1105,7 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 				mutex.Lock()
 				errArr = append(errArr, err)
 				mutex.Unlock()
+				ccControl.Done()
 				return
 			}
 			done := make(chan struct{})
@@ -1277,8 +1286,16 @@ func (c *ClientManager) startDownloadDir(path, destDir string, sno uint32) error
 	page := uint32(1)
 	for {
 		// list 1 page 100 items order by name
+		retry := 0
+	RETRY:
 		downFiles, err := c.ListFiles(path, 100, page, "name", true, sno)
+		retry++
 		if err != nil {
+			code, errmsg := common.StatusErrFromError(err)
+			fmt.Printf("code %d, errmsg %s\n", code, errmsg)
+			if code == 300 && retry < 3 {
+				goto RETRY
+			}
 			return err
 		}
 		if len(downFiles.Files) == 0 {
@@ -1555,6 +1572,7 @@ func (c *ClientManager) saveFileByPartition(fileName string, partition *mpb.Retr
 				failedCount++
 				errArray = append(errArray, err.Error())
 				mutex.Unlock()
+				ccControl.Done()
 				return
 			}
 			done := make(chan struct{})
@@ -1594,6 +1612,7 @@ func (c *ClientManager) saveFileByPartition(fileName string, partition *mpb.Retr
 	ccControl.Wait()
 
 	if len(errArray) > 0 {
+		fmt.Printf("download goroutine failed %d\n", len(errArray))
 		errRtn := fmt.Errorf("%s", strings.Join(errArray, "\n"))
 		return dataShards, parityShards, failedCount, middleFiles, errRtn
 	}

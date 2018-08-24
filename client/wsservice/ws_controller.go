@@ -139,7 +139,7 @@ func (c *WSController) Run(addr string) error {
 	http.HandleFunc("/message", c.ServeWs)
 	var wg sync.WaitGroup
 	errC := make(chan error)
-	go c.Consume()
+	//go c.Consume()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
