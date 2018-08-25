@@ -31,7 +31,8 @@ func (hook ContextHook) Fire(entry *logrus.Entry) error {
 	frames := runtime.CallersFrames(pc[:n])
 
 	for {
-		frame, _ := frames.Next()
+		frame, more := frames.Next()
+
 		if strings.Contains(frame.File, "github.com/sirupsen/logrus") {
 			continue
 		}
@@ -54,8 +55,9 @@ func (hook ContextHook) Fire(entry *logrus.Entry) error {
 		}
 
 		entry.Data = data
-
-		break
+		if !more {
+			break
+		}
 	}
 
 	return nil

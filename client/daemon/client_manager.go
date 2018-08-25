@@ -1,6 +1,7 @@
 package daemon
 
 import (
+	"bytes"
 	"context"
 	"crypto/rsa"
 	"encoding/hex"
@@ -1348,8 +1349,24 @@ func (c *ClientManager) startDownloadDir(path, destDir string, sno uint32) error
 	return nil
 }
 
+func (c *ClientManager) CheckFileExistsInLocal(downFileName string, filehash []byte) bool {
+	if !util_file.Exists(downFileName) {
+		return false
+	}
+	localHash, err := util_hash.Sha1File(downFileName)
+	if err != nil {
+		return false
+	}
+	if bytes.Compare(localHash, filehash) == 0 {
+		return true
+	}
+	return false
+}
+
 // DownloadFile download file
 func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fileSize uint64, sno uint32) error {
+	_, fileName := filepath.Split(downFileName)
+	downFileName = filepath.Join(destDir, fileName)
 	log := c.Log.WithField("download file", downFileName)
 	defer func() {
 		if r := recover(); r != nil {
@@ -1359,6 +1376,12 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 	fileHash, err := hex.DecodeString(filehash)
 	if err != nil {
 		return err
+	}
+	exists := c.CheckFileExistsInLocal(downFileName, fileHash)
+	if exists {
+		log.Info("File exists in local")
+		c.PM.SetProgress(common.TaskDownloadProgressType, downFileName, fileSize, fileSize)
+		return nil
 	}
 	req := &mpb.RetrieveFileReq{
 		SpaceNo:   sno,
@@ -1372,8 +1395,6 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 	if err != nil {
 		return err
 	}
-	_, fileName := filepath.Split(downFileName)
-	downFileName = filepath.Join(destDir, fileName)
 	c.PM.SetProgress(common.TaskDownloadProgressType, downFileName, 0, req.FileSize)
 
 	ctx := context.Background()
