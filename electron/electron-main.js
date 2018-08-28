@@ -73,7 +73,9 @@ function startSamos() {
     exe = (() => {
       switch (process.platform) {
         case 'darwin':
-    	var expath = path.join(path.dirname(appPath), '../../../../../../../client/nebula-client');
+     // var expath = path.join(path.dirname(appPath), '../../../../../../../client/nebula-client');
+      return path.join(appPath, '../../Resources/app/nebula-client');
+
     	console.log(expath);
     	return expath;
         case 'win32':
@@ -90,7 +92,9 @@ function startSamos() {
     exe = (() => {
       switch (process.platform) {
         case 'darwin':
-    	var expath = path.join(path.dirname(appPath), '../../../../../../../client/nebula-client');
+       //expath = path.join(path.dirname(appPath), '../../../../../../../client/nebula-client');
+       expath =  path.join(appPath, '../../Resources/app/nebula-client');
+
     	console.log(expath);
     	return expath;
         case 'win32':
