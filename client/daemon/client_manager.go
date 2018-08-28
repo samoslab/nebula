@@ -607,9 +607,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 
 	log.Infof("Check file exists resp code %d", rsp.GetCode())
 	if rsp.GetCode() == 0 {
-		c.PM.SetProgress(common.TaskUploadProgressType, fileName, 0, uint64(len(req.FileData)))
-		c.PM.SetPartitionMap(fileName, fileName)
-		c.PM.SetIncrement(fileName, uint64(len(req.FileData)))
+		c.PM.SetProgress(common.TaskUploadProgressType, fileName, req.FileSize, req.FileSize)
 		log.Infof("Upload %s success", fileName)
 		return nil
 	}
@@ -831,9 +829,7 @@ func (c *ClientManager) CheckFileExists(fileName, dest string, interactive, newV
 			}
 		}
 		req.FileData = fileData
-		c.PM.SetProgress(common.TaskUploadProgressType, fileName, 0, uint64(len(req.FileData)))
-		c.PM.SetPartitionMap(fileName, fileName)
-		c.PM.SetIncrement(fileName, uint64(len(req.FileData)))
+		c.PM.SetProgress(common.TaskUploadProgressType, fileName, req.FileSize, req.FileSize)
 		fmt.Printf("Origin filesize %d, encrypted size %d\n", req.FileSize, len(req.FileData))
 	}
 	err = req.SignReq(c.cfg.Node.PriKey)

@@ -19,6 +19,15 @@ type ProgressCell struct {
 	LastReaded bool
 }
 
+func calRate(current, total uint64) float64 {
+	rateS := fmt.Sprintf("%0.2f", float64(current)/float64(total))
+	rate, err := strconv.ParseFloat(rateS, 10)
+	if err != nil {
+		rate = 0.0
+	}
+	return rate
+}
+
 // ProgressManager progress stats
 type ProgressManager struct {
 	Mutex                sync.Mutex
@@ -36,7 +45,7 @@ func NewProgressManager() *ProgressManager {
 
 // SetProgress set current progress file size
 func (pm *ProgressManager) SetProgress(tp, fileName string, currentSize, totalSize uint64) {
-	pm.Progress[fileName] = ProgressCell{Type: tp, Total: totalSize, Current: currentSize, Rate: 0.0, Time: common.Now()}
+	pm.Progress[fileName] = ProgressCell{Type: tp, Total: totalSize, Current: currentSize, Rate: calRate(currentSize, totalSize), Time: common.Now()}
 }
 
 // SetPartitionMap set progress file map
@@ -52,12 +61,7 @@ func (pm *ProgressManager) SetIncrement(fileName string, increment uint64) error
 		cell.Current = cell.Current + increment
 		cell.Time = common.Now()
 		if cell.Total > 0 {
-			rate := fmt.Sprintf("%0.2f", float64(cell.Current)/float64(cell.Total))
-			var err error
-			cell.Rate, err = strconv.ParseFloat(rate, 10)
-			if err != nil {
-				cell.Rate = 0.0
-			}
+			cell.Rate = calRate(cell.Current, cell.Total)
 			cell.LastReaded = false
 		}
 		pm.Progress[fileName] = cell
