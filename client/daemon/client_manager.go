@@ -607,6 +607,9 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 
 	log.Infof("Check file exists resp code %d", rsp.GetCode())
 	if rsp.GetCode() == 0 {
+		c.PM.SetProgress(common.TaskUploadProgressType, fileName, 0, uint64(len(req.FileData)))
+		c.PM.SetPartitionMap(fileName, fileName)
+		c.PM.SetIncrement(fileName, uint64(len(req.FileData)))
 		log.Infof("Upload %s success", fileName)
 		return nil
 	}
