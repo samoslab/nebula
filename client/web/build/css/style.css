@@ -511,6 +511,13 @@ body {
     top: 6px;
     left: 5px;
 }
+.fOHAbxb .updownGif{
+    display:none;
+    float:right;
+}
+.fOHAbxb .updownGif img{
+    width:32px;
+}
 .fOHAbxb .active a{
     color: #3b8cff;
     background: #eff4f8;
