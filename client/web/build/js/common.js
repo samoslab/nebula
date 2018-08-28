@@ -1116,7 +1116,7 @@ function pay(orderId){
             if(res.code==0){
                 alert('Payment success!');
             }else{
-                alert(res.errMsg);
+                alert(res.errmsg);
             }
         }
     });
