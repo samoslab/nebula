@@ -383,7 +383,6 @@ func (c *ClientManager) SendProgressMsg() error {
 				for _, msg := range msgList {
 					c.AddDoneMsg(msg)
 				}
-			case <-time.After(5 * time.Second): // keep connect alive
 			}
 		}
 	}()
@@ -1380,7 +1379,9 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 	exists := c.CheckFileExistsInLocal(downFileName, fileHash)
 	if exists {
 		log.Info("File exists in local")
-		c.PM.SetProgress(common.TaskDownloadProgressType, downFileName, fileSize, fileSize)
+		c.PM.SetProgress(common.TaskDownloadProgressType, downFileName, 0, fileSize)
+		c.PM.SetPartitionMap(downFileName, downFileName)
+		c.PM.SetIncrement(downFileName, fileSize)
 		return nil
 	}
 	req := &mpb.RetrieveFileReq{

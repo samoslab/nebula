@@ -1,7 +1,7 @@
 package wsservice
 
 import (
-	"log"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -87,6 +87,7 @@ func (c *WSController) answerWriter(ws *websocket.Conn, msgType string) {
 		case msg := <-(*c.cm).GetMsgChan():
 			(*c.cm).DecreaseMsgCount()
 			ws.SetWriteDeadline(time.Now().Add(writeWait))
+			fmt.Printf("send msg:%s\n", msg)
 			if err := ws.WriteMessage(websocket.TextMessage, []byte(msg)); err != nil {
 				return
 			}
@@ -98,7 +99,7 @@ func (c *WSController) ServeWs(w http.ResponseWriter, r *http.Request) {
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		if _, ok := err.(websocket.HandshakeError); !ok {
-			log.Println(err)
+			c.log.Println(err)
 		}
 		return
 	}
@@ -136,6 +137,10 @@ func (c *WSController) Consume() {
 }
 
 func (c *WSController) Run(addr string) error {
+	log := c.log
+	defer func() {
+		log.Info("websocket shutdown")
+	}()
 	http.HandleFunc("/message", c.ServeWs)
 	var wg sync.WaitGroup
 	errC := make(chan error)
@@ -143,6 +148,7 @@ func (c *WSController) Run(addr string) error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		log.Info("start websocket service")
 		if err := http.ListenAndServe(addr, nil); err != nil {
 			errC <- err
 			return
@@ -154,6 +160,7 @@ func (c *WSController) Run(addr string) error {
 		wg.Wait()
 		close(done)
 	}()
+	log.Info("wait websocket shutdown")
 	select {
 	case err := <-errC:
 		return err
