@@ -2,6 +2,7 @@ syntax = "proto3";
 package metadata.pb;
 
 service MatadataService {
+    rpc Ping(PingReq) returns (PingResp){}
 
     rpc GetPublicKey(GetPublicKeyReq) returns (GetPublicKeyResp){}
 
@@ -23,6 +24,13 @@ service MatadataService {
 
     rpc SpaceSysFile(SpaceSysFileReq) returns (SpaceSysFileResp){}
 
+}
+
+message PingReq {
+	uint32 version=1;
+}
+
+message PingResp{
 }
 
 message GetPublicKeyReq {
