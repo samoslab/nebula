@@ -5,7 +5,7 @@
     <title>samos</title>
     <meta content="SkyDrive,samos SkyDrive,Network U disk, network hard disk, free SkyDrive, SkyDrive download, SkyDrive resources, synchronization, cloud storage, external chain sharing, offline Download" name="keywords"/>
     <meta content="samos SkyDrive To provide you with network backup, synchronization and sharing services. Large space, fast speed, safe and stable." name="description"/>
-    <link href="./images/favicon.ico" rel="shortcut icon" type="images/x-icon"/>
+    <link href="./images/favicon.ico" rel="icon"  sizes="any"/>
     <link href="./css/style.css" rel="stylesheet" type="text/css"/>
     <link rel="Shortcut Icon" href="favicon.ico">
     <script>if (typeof module === 'object') {window.module = module; module = undefined;}</script>
@@ -26,7 +26,7 @@
                     <a href="javascript:;" target="_blank" title="samos"></a>
                 </dt>
               
-                <dd class="languageBox">
+                <dd class="languageBox" style="display:none;">
                     <a href="javascript:changeLang('index', 'zh_CN');" class="s-cnen" id="changeToCn">EN</a>
                     <a href="javascript:changeLang('index', 'en');" class="s-cnen" id="changeToEn"  style="display:none;">CN</a>
                 </dd>
@@ -74,6 +74,9 @@
                             </svg>
                         </span>
                         <span data-locale="transportList">Transport List</span>
+                        <span id="updownGif" class="updownGif">
+                            <img src="images/upload.gif">
+                         </span>
                     </span>
                 </a>
             </li>
@@ -330,8 +333,8 @@
             <div class="balanceRow">
                 <span data-locale="balance">余额：</span>
                 <span id="balanceNo">0</span><span>samos</span>
-                <input id="refreshBtn" class="btn btn-default" type="button" value="refresh">
                 <input id="topUp" class="btn btn-default" type="button" value="充值" data-target="#myModal" data-toggle="modal" data-locale="rechange">
+                <input id="refreshBtn" class="btn btn-default" type="button" value="refresh">
             </div>
            
 
@@ -414,7 +417,8 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button id="initBalance" type="button" class="btn btn-default" data-dismiss="modal" data-locale="confirm">确定</button>
+                <button id="inquireBalance"  type="button" class="btn btn-default">查询明细</button>
+                <button id="initBalance" type="button" class="btn btn-default" data-dismiss="modal" data-locale="confirm">关闭</button>
             </div>
         </div><!-- /.modal-content -->
     </div><!-- /.modal -->
@@ -431,12 +435,6 @@
     //     // loadProperties('index', l);
     //     // showSwitch(l);
     // })
-
-    //<!--网盘 传输列表 选项卡-->
-    // $(".vyQhNyb0").click(function(){
-    //     $(this).addClass("vyQhNyb").siblings().removeClass("vyQhNyb");
-    //     $("div.tabDiv").hide().eq($(this).index()-1).show();
-    // });
 $(function(){
     //第一步判断是否注册过；未注册回登录页；
     method.login();
@@ -454,7 +452,7 @@ $(function(){
 
     //页面路径发生变化时初始化页面；
     window.addEventListener('hashchange',function(){
-         if(method.getParamsUrl().path){
+        if(method.getParamsUrl().path){
             method.firstInit();
         }
     },false);
@@ -486,26 +484,6 @@ $(function(){
 
 });
 
-// setTimeout(function(){
-//     var wsServer = 'ws://127.0.0.1:7799/message'; //服务器地址
-//     var websocket = new WebSocket(wsServer); //创建WebSocket对象
-//     // websocket.send("hello");//向服务器发送消息
-//     // alert(websocket.readyState);//查看websocket当前状态
-//     websocket.onopen = function (evt) {
-//     //已经建立连接
-//     };
-//     websocket.onclose = function (evt) {
-//     //已经关闭连接
-//     };
-//     websocket.onmessage = function (evt) {
-//     //收到服务器消息，使用evt.data提取
-//     };
-//     websocket.onerror = function (evt) {
-//     //产生异常
-//     }; 
-// },3000);
-
-   
 </script>
 </body>
 </html>

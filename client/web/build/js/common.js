@@ -15,18 +15,10 @@ var method = {
             }
         })
     },
-    //订单使用情况
-    usage:function (){
-        $.ajax({
-            url:"/api/v1/usage/amount",
-            success:function(res){
-                console.log(res);
-            }
-        });
-    },
     //获取hashName;
     getParamsUrl:function (){
         var hashName = location.hash.split("#")[1];//路由地址
+        //console.log(location.hash);
         return 	{
             path:hashName
         }
@@ -63,7 +55,7 @@ var method = {
         let space_no = 0;
         let a = path.split(":")[0];
          //左侧选项卡
-         $("#frameAsideUl li").removeClass("active");
+        $("#frameAsideUl li").removeClass("active");
         if(a == "myspace"){
             space_no = 0;
             // //左侧选项卡
@@ -88,6 +80,8 @@ var method = {
             path = "/";
         }
         console.log(path);
+        //按钮组隐藏
+        $("#s-button-group").hide();
         if(space_no==0){
             this.myspaceInit(path,space_no);
         }else if(space_no==1){
@@ -107,7 +101,7 @@ var method = {
         //传输列表和我的套餐隐藏
         $(".tabDiv").hide();
 
-        list(path,space_no,3,1,'modtime',true);  
+        list(path,space_no,1000,1,'modtime',true);  
     },
     //隐私空间初始化
     priviteInit:function(path,space_no){
@@ -143,9 +137,9 @@ var method = {
         $("#PackageDiv").hide();
         $("#transportDiv").show();
         //调用传输列表初始化的方法；
-        refreshTransportTimer = setInterval(function(){
+       // refreshTransportTimer = setInterval(function(){
             transportMethod.transportInit();
-        },2000);
+        //},2000);
          
     },
     //我的套餐初始化
@@ -193,7 +187,15 @@ var method = {
 
 };
 
-
+// $("#listBox").scroll(function () { 
+//     let scrollTop = $(this).scrollTop(); 
+//     let winHeight = $(this).height(); 
+//     let contentHeight = $("#listContent").height();
+//     console.log(scrollTop+','+winHeight+","+','+$("#listContent").height());
+//     if (scrollTop + winHeight >= contentHeight) {
+//         alert('到底了');
+//     }
+// });
 //查所有文件类型
 // $.ajax({
 //     url:"/api/v1/service/filetype",
@@ -234,6 +236,17 @@ function list(path,space_no,pagesize,pagenum,sorttype,ascorder){
             //插入面包屑导航内容；
              let html = breadNav(path,space_no);
             $("#breadNav").html(html);
+
+            //把面包屑最后一个的链接地址给到左侧导航栏，目的是左侧切换时回到原目录，记得以前位置；
+            let hrefPath = $("#breadNav li:last a").attr("href");
+            switch(space_no){
+                case 0:
+                    $("#mySpace").attr("href",hrefPath);
+                    break;
+                case 1:
+                    $("#privteSpace").attr("href",hrefPath);
+                    break;
+            }
         }
     });
  }
@@ -246,15 +259,20 @@ function append(res,path,space_no){
         $(".no-file-ab").show();
         return false;
     }
-  
+    console.log(res);
 
     $(".no-file-ab").hide();
 
     //let typeArr=["epub", "otf", "woff", "gz", "doc", "eot", "pdf", "ps", "rtf", "cab", "xls", "ppt", "pptx", "xlsx", "docx", "7z", "bz2", "Z", "deb", "elf", "crx", "lz", "exe", "nes", "rar", "rpm", "swf", "sqlite", "tar", "ar", "xz", "zip", "amr", "m4a", "mid", "mp3", "ogg", "flac", "wav", "bmp", "gif", "jpg", "png", "tif", "psd", "jxr", "webp", "cr2", "ico", "mp4", "mpg", "mov", "webm", "flv", "m4v", "mkv", "wmv", "avi"];
    
     $.each(res.Data.files,function(index,obj){
-        let a = obj.extension;
-            k = obj.filesize; 
+        let a;
+        if(obj.folder){
+             a = 'folder';
+        }else{
+             a = obj.extension;
+        }
+        let k = obj.filesize; 
             no = '';                          //文件大小
         if(k&&k<1024){
             k = obj.filesize+' B'
@@ -272,13 +290,13 @@ function append(res,path,space_no){
         }
         if(path=="/"){
             path="";
-        }
-        // onclick="gBtnDownLoad('${obj.filehash}','${obj.filesize}','${obj.filename}','${space_no}','${obj.folder}')"
-        html+=` <dd class="AuPKyz" onmouseenter = "oprateShow(this)" onmouseleave = "oprateHide(this)">
+        } 
+        // onclick="gBtnDownLoad('${obj.filehash}','${obj.filesize}','${obj.filename}','${space_no}','${obj.folder}')" 
+        html+=`<dd class="AuPKyz" onmouseenter = "oprateShow(this)" onmouseleave = "oprateHide(this)">
                     <div data-key="name" class="AuPKyz-li" style="width:44%;">
                         <input class="s-select-check" type="checkbox" name="fileSelect" data-name="${obj.filename}" data-id="${obj.id}" data-path="${path}${'/'+obj.filename}" data-hash="${obj.filehash}" data-size="${obj.filesize}" data-folder=${obj.folder} data-spaceNo="${space_no}">
                         <span class="file-icon my-file-${a}"></span>
-                        <a class="file-name" title="${obj.filename}" href="${no}${path}${'/'+obj.filename}">${obj.filename}</a>
+                        <a class="file-name" title="${obj.filename}" href="${obj.folder?(no+path+'/'+obj.filename):'javascript:;'}">${obj.filename}</a>
                         <div class="oprate">
                             <a class="g-button g-btn-download" href="javascript:;" title="DownLoad"  onclick="gBtnDownLoad('${obj.id}','${obj.filehash}','${obj.filesize}','${path}${'/'+obj.filename}','${space_no}','${obj.folder}')">
                                 <span>
@@ -318,7 +336,7 @@ function append(res,path,space_no){
                     </div>
                 </dd>`;
     });
-    $('.zJMtAEb').html(html);
+    $('.zJMtAEb').html(`<div id="listContent">${html}</div>`);
 
      // <!--单行选中增加类-->
     rowSelected(); 
@@ -377,7 +395,7 @@ function btngroupshow(){
     let pathArr2 = [...pathArr1];
     let liHtml = '';
     let tmpArr = [];
-    for(let i = 1;i<pathArr1.length;i++){
+    for(let i = 1;i<=pathArr1.length;i++){
         let b ='';
         for(let j=0;j<i;j++){
             b+='/'+pathArr1[j]; 
@@ -510,7 +528,7 @@ function gBtnRename(x){
 //// //单行下载按钮点击事件下载
 function gBtnDownLoad(id,filehash,filesize,filename,space_no,isFolder){
     $("#rowDownLoadIpt"+id).change(function(){
-        console.log(id,filehash,filesize,filename,space_no,isFolder);
+        //console.log(id,filehash,filesize,filename,space_no,isFolder);
         let size = Number(filesize);
         let space = Number(space_no);
         let newId = "rowDownLoadIpt"+id;
@@ -531,7 +549,8 @@ function gBtnDownLoad(id,filehash,filesize,filename,space_no,isFolder){
                 success:function(res){
                     console.log(res);
                     if(res.code==0){
-                        alert('Download success!');
+                        $("#updownGif").show();
+                        // alert('Download success!');
                     }else{
                         alert(res.errmsg);
                     }
@@ -550,7 +569,8 @@ function gBtnDownLoad(id,filehash,filesize,filename,space_no,isFolder){
                 success:function(res){
                     console.log(res);
                     if(res.code==0){
-                        alert('Download success!');
+                        $("#updownGif").show();
+                        // alert('Download success!');
                     }else{
                         alert(res.errmsg);
                     }
@@ -628,7 +648,7 @@ $("#upLoadFileBtn").click(function(){
             //每个选择文件的路
             let localPath = local[i].path;
             $.ajax({
-                url:"/api/v1/store/upload",
+                url:"/api/v1/task/upload",
                 method:"POST",
                 contentType: "application/json",
                 data:JSON.stringify({
@@ -641,9 +661,10 @@ $("#upLoadFileBtn").click(function(){
                 }),
                 success:function(res){
                     console.log(res);
-                    if(res.code==0){
-                        method.firstInit();
-                    }
+                    $("#updownGif").show();
+                    // if(res.code==0){
+                    //     method.firstInit();
+                    // }
                 }
             });
         }
@@ -671,20 +692,22 @@ $("#upLoadFolderBtn").click(function(){
         console.log(localPath+";"+hashPath);
 
         $.ajax({
-            url:"/api/v1/store/uploaddir",
+            url:"/api/v1/task/uploaddir",
             method:"POST",
             contentType: "application/json",
             data:JSON.stringify({
                 "parent":localPath,
                 "dest_dir": hashPath,
+                "interactive":true,
                 "space_no":space_no,
                 "is_encrypt":false
             }),
             success:function(res){
                 console.log(res);
-                if(res.code==0){
-                    method.firstInit();
-                }
+                $("#updownGif").show();
+                // if(res.code==0){
+                //     method.firstInit();
+                // }
             }
         });
 
@@ -706,7 +729,7 @@ $("#downLoadBtn").click(function(){
             let isFolder = $(obj).attr("data-folder");
             if(isFolder=='false'){
                 $.ajax({
-                    url:"/api/v1/store/download",
+                    url:"/api/v1/task/download",
                     method:"POST",
                     contentType: "application/json",
                     data:JSON.stringify({
@@ -719,7 +742,8 @@ $("#downLoadBtn").click(function(){
                     success:function(res){
                         console.log(res);
                         if(res.code==0){
-                            alert('Download success!');
+                            $("#updownGif").show();
+                            //alert('Download success!');
                         }else{
                             alert(res.errmsg);
                         }
@@ -727,7 +751,7 @@ $("#downLoadBtn").click(function(){
                 });
             }else{
                 $.ajax({
-                    url:"/api/v1/store/downloaddir",
+                    url:"/api/v1/task/downloaddir",
                     method:"POST",
                     contentType: "application/json",
                     data:JSON.stringify({
@@ -738,7 +762,8 @@ $("#downLoadBtn").click(function(){
                     success:function(res){
                         console.log(res);
                         if(res.code==0){
-                            alert('Download success!');
+                            $("#updownGif").show();
+                           // alert('Download success!');
                         }else{
                             alert(res.errmsg);
                         }
@@ -1089,7 +1114,7 @@ function pay(orderId){
             if(res.code==0){
                 alert('Payment success!');
             }else{
-                alert(res.errMsg);
+                alert(res.errmsg);
             }
         }
     });
@@ -1116,7 +1141,7 @@ var transportMethod = {
                                     <div class="tsList-l" title="${idx}">${idx.split("\\")[idx.split("\\").length-1]}</div>
                                     <div class="tsList-r">
                                         <div class="tsList-r-Bar">
-                                            <div class="tsList-r-progressBar" style="width:${obj*100+'%'};">${Math.round(obj*100)+'%'}</div>
+                                            <div class="tsList-r-progressBar" data-name="${idx.split("\\")[idx.split("\\").length-1]}" style="width:${obj*100+'%'};">${Math.round(obj*100)+'%'}</div>
                                         </div>
                                     </div>
                                 </li>`;
@@ -1157,7 +1182,12 @@ var packageMethod = {
             }
         });
     },
-    
+    //查询转账情况
+    inquireBalance:function(){
+        let code = $("#samosWalletAddress").val();
+        const {ipcRenderer} = require('electron'); 
+        ipcRenderer.send('explorer',code);
+    },
     
     // 所有订单初始化
     orderAllInit:function(){
@@ -1330,9 +1360,6 @@ var packageMethod = {
     }
 };
 
-
-
-
 //转账刷新页面；
 $("#initBalance").click(function(){
     packageMethod.queryBalanceInit();
@@ -1348,6 +1375,10 @@ $("#samosWalletCopyBtn").click(function(){
         console.log(e.text);
     });
 });
+//转账明细查询
+$("#inquireBalance").click(function(){
+    packageMethod.inquireBalance();
+});
 //刷新钱包金额
 $("#refreshBtn").click(function(){
     packageMethod.queryBalanceInit();
@@ -1357,9 +1388,58 @@ $("#refreshBtn").click(function(){
 packageMethod.amountInit();
 
 
+//建立websocket
+var wsServer = "ws://127.0.0.1:7799/message"; //服务器地址
+var websocket = new WebSocket(wsServer); //创建WebSocket对象
 
+console.log(websocket.readyState);//查看websocket当前状态
+websocket.onopen = function (evt) {
+    console.log(evt);//已经建立连接
+};
+websocket.onclose = function (evt) {
+    console.log('colose');//已经关闭连接
+};
+websocket.onmessage = function (evt) {
+    //收到服务器消息，使用evt.data提取
 
+    console.log(evt.data);
+    let data = JSON.parse(evt.data);
+    if((data.type=="DownloadProgress")||(data.type=="UploadProgress")){
+        if(data.progress!=1){
+            if(data.filename){
+                let filename = data.filename;
+                let name = filename.split('\\')[filename.split('\\').length-1];
+                console.log(name);
+                $(".tsList-r-progressBar[data-name='"+name+"']").css("width",data.progress*100+'%').html(data.progress*100+'%');
+                $("#updownGif").show();
+            }
+        }else{
+            if(data.source){
+                let source = data.source;
+                let s = source.split('\\')[source.split('\\').length-1];
+                $(".tsList-r-progressBar[data-name='"+s+"']").css("width",'100%').html('100%');
+            }
+            method.firstInit();
+            $("#updownGif").hide();
+        }
+       
+        
+    }else if((data.type=="DownloadFile")||(data.type=="UploadFile")){
+        if(data.source){
+            let source = data.source;
+            let s = source.split('\\')[source.split('\\').length-1];
+            $(".tsList-r-progressBar[data-name='"+s+"']").css("width",'100%').html('100%');
+        }
+        method.firstInit();
+        $("#updownGif").hide();
+    }
+   
 
+};
+websocket.onerror = function (evt) {
+//产生异常
+    console.log(evt);
+}; 
 
 
 

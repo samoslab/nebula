@@ -73,7 +73,9 @@ function startSamos() {
     exe = (() => {
       switch (process.platform) {
         case 'darwin':
-    	var expath = path.join(path.dirname(appPath), '../../../../../../../client/nebula-client');
+     // var expath = path.join(path.dirname(appPath), '../../../../../../../client/nebula-client');
+      return path.join(appPath, '../../Resources/app/nebula-client');
+
     	console.log(expath);
     	return expath;
         case 'win32':
@@ -90,7 +92,9 @@ function startSamos() {
     exe = (() => {
       switch (process.platform) {
         case 'darwin':
-    	var expath = path.join(path.dirname(appPath), '../../../../../../../client/nebula-client');
+       //expath = path.join(path.dirname(appPath), '../../../../../../../client/nebula-client');
+       expath =  path.join(appPath, '../../Resources/app/nebula-client');
+
     	console.log(expath);
     	return expath;
         case 'win32':
@@ -294,6 +298,11 @@ ipcMain.on('default', (code) => {
   win.loadURL(defaultURL);
 });
 
+const {shell} = require('electron')
+ipcMain.on('explorer', (event,code) => {
+  shell.openExternal("http://explorer.samos.io/app/address/"+code+"/1")
+}); 
+  
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and require them here.
