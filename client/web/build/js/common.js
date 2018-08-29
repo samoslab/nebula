@@ -15,15 +15,6 @@ var method = {
             }
         })
     },
-    //订单使用情况
-    // usage:function (){
-    //     $.ajax({
-    //         url:"/api/v1/usage/amount",
-    //         success:function(res){
-    //             console.log(res);
-    //         }
-    //     });
-    // },
     //获取hashName;
     getParamsUrl:function (){
         var hashName = location.hash.split("#")[1];//路由地址
@@ -89,6 +80,8 @@ var method = {
             path = "/";
         }
         console.log(path);
+        //按钮组隐藏
+        $("#s-button-group").hide();
         if(space_no==0){
             this.myspaceInit(path,space_no);
         }else if(space_no==1){
@@ -274,7 +267,6 @@ function append(res,path,space_no){
    
     $.each(res.Data.files,function(index,obj){
         let a;
-        console.log(typeof obj.folder);
         if(obj.folder){
              a = 'folder';
         }else{
