@@ -13,7 +13,7 @@
     <!-- <script>if (window.module) module = window.module;</script> -->
 </head>
 <body>
-    <div id="login-container"><!--登录内容区开始-->
+    <div id="login-container" style="display: none;"><!--登录内容区开始-->
         <div class="ibg-bg index-banner-0"></div>
         <div id="login-header">
             <div class="logo">
@@ -82,11 +82,20 @@
             </div>
         </div>
     </div><!--登录内容区结束-->
-
+    <div id="loading">
+        <img class="load-timg" src="./images/timg.gif">
+    </div>
 
 
 <script>
     var $ = require("jquery");
+
+    //loading
+    setTimeout(function(){
+        $("#loading").hide();
+        $("#login-container").show();
+    },1000);
+
     var util = {
         //获取hashName;
         getParamsUrl:function (){
@@ -116,6 +125,8 @@
         },
         //页面跳转（成功的，跳转内容页）
         render:function(){
+            console.log(localStorage.verifyemail);
+            if(localStorage.verifyemail=='false')return;
             const {ipcRenderer} = require('electron')
             ipcRenderer.send('filemanage') 
         }
@@ -130,21 +141,18 @@
     },false);
 
 
-
-
-    //判断是否注册过邮箱！
-    $.ajax({
-        url:"/api/v1/service/status",
-        method:"GET",
-        success:function(res){
-            console.log(res);
-            if(res.status){
-                util.render();
-            }
-        }
-    })
-
     $(function(){
+        //判断是否注册过邮箱！
+        $.ajax({
+            url:"/api/v1/service/status",
+            method:"GET",
+            success:function(res){
+                console.log(res);
+                if(res.status){
+                    util.render();
+                }
+            }
+        })
         // <!--发送邮件-->
         $("#submit-btn").click(function(){
             let mailReg = /^\w+([-+.]\w+)*@\w+([-.]\w+)*\.\w+([-.]\w+)*$/;
@@ -166,8 +174,11 @@
                         'resend':false
                     }),
                     success:function(res){
+                        console.log(res);
                         if(res.code==0){
                             alert("The mail has been sent！");
+                        }else{
+                            alert(res.errmsg);
                         }
                     }
                 });
@@ -185,8 +196,10 @@
                     console.log(res);
                     if(res.code==0){
                         //alert("验证成功");
+                        localStorage.setItem("verifyemail", true);
                         util.render();
                     }else{
+                        localStorage.setItem("verifyemail", false);
                         alert(res.errmsg);
                     }
                     
@@ -196,6 +209,7 @@
         //配置文件验证
         $("#config-submit-btn").click(function(){
           let filename =  document.getElementById("configFile").files[0].path;
+          console.log(filename);
             $.ajax({
                 url:"/api/v1/config/import",
                 contentType:"application/json",

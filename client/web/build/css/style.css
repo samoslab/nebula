@@ -26,6 +26,11 @@ body {
     background-color: #eff4f8;
     font-family: Microsoft YaHei,SimHei,Tahoma!important;
 }
+.load-timg{
+    position: absolute;
+    top:calc(50% - 62px);
+    left:calc(50% - 62px);
+}
 #login-container{
     position: relative;
     height: 550px;
@@ -778,6 +783,9 @@ body {
     margin:0 10px;
     background-position: -160px -322px;
 }
+.file-name{
+    padding:10px;
+}
 /*-------------小图标类----------------------*/
 .my-file-ai { background-position: -20px -0px;  }
 .my-file-aiff { background-position: -66px -0px;  }
@@ -852,8 +860,8 @@ body {
 .my-file-xsl { background-position: -20px -322px;  }
 .my-file-zip,.my-file-epub,.my-file-gz,.my-file-7z,.my-file-bz2,.my-file-tar{ background-position: -66px -322px;  }
 .my-file-ac3 { background-position: -112px -322px;  }
-.my-file-unknown{ background-position: -160px -322px; }
-
+.my-file-folder{ background-position: -160px -322px; }
+.my-file-unknown{ background-position: -296px -92px; }
 
 
 

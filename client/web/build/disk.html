@@ -26,7 +26,7 @@
                     <a href="javascript:;" target="_blank" title="samos"></a>
                 </dt>
               
-                <dd class="languageBox">
+                <dd class="languageBox" style="display:none;">
                     <a href="javascript:changeLang('index', 'zh_CN');" class="s-cnen" id="changeToCn">EN</a>
                     <a href="javascript:changeLang('index', 'en');" class="s-cnen" id="changeToEn"  style="display:none;">CN</a>
                 </dd>
@@ -333,8 +333,8 @@
             <div class="balanceRow">
                 <span data-locale="balance">余额：</span>
                 <span id="balanceNo">0</span><span>samos</span>
-                <input id="refreshBtn" class="btn btn-default" type="button" value="refresh">
                 <input id="topUp" class="btn btn-default" type="button" value="充值" data-target="#myModal" data-toggle="modal" data-locale="rechange">
+                <input id="refreshBtn" class="btn btn-default" type="button" value="refresh">
             </div>
            
 
@@ -417,7 +417,8 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button id="initBalance" type="button" class="btn btn-default" data-dismiss="modal" data-locale="confirm">确定</button>
+                <button id="inquireBalance"  type="button" class="btn btn-default">查询明细</button>
+                <button id="initBalance" type="button" class="btn btn-default" data-dismiss="modal" data-locale="confirm">关闭</button>
             </div>
         </div><!-- /.modal-content -->
     </div><!-- /.modal -->
@@ -435,11 +436,7 @@
     //     // showSwitch(l);
     // })
 
-    //<!--网盘 传输列表 选项卡-->
-    // $(".vyQhNyb0").click(function(){
-    //     $(this).addClass("vyQhNyb").siblings().removeClass("vyQhNyb");
-    //     $("div.tabDiv").hide().eq($(this).index()-1).show();
-    // });
+
 $(function(){
     //第一步判断是否注册过；未注册回登录页；
     method.login();

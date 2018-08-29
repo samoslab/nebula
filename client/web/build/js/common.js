@@ -16,14 +16,14 @@ var method = {
         })
     },
     //订单使用情况
-    usage:function (){
-        $.ajax({
-            url:"/api/v1/usage/amount",
-            success:function(res){
-                console.log(res);
-            }
-        });
-    },
+    // usage:function (){
+    //     $.ajax({
+    //         url:"/api/v1/usage/amount",
+    //         success:function(res){
+    //             console.log(res);
+    //         }
+    //     });
+    // },
     //获取hashName;
     getParamsUrl:function (){
         var hashName = location.hash.split("#")[1];//路由地址
@@ -266,15 +266,21 @@ function append(res,path,space_no){
         $(".no-file-ab").show();
         return false;
     }
-  
+    console.log(res);
 
     $(".no-file-ab").hide();
 
     //let typeArr=["epub", "otf", "woff", "gz", "doc", "eot", "pdf", "ps", "rtf", "cab", "xls", "ppt", "pptx", "xlsx", "docx", "7z", "bz2", "Z", "deb", "elf", "crx", "lz", "exe", "nes", "rar", "rpm", "swf", "sqlite", "tar", "ar", "xz", "zip", "amr", "m4a", "mid", "mp3", "ogg", "flac", "wav", "bmp", "gif", "jpg", "png", "tif", "psd", "jxr", "webp", "cr2", "ico", "mp4", "mpg", "mov", "webm", "flv", "m4v", "mkv", "wmv", "avi"];
    
     $.each(res.Data.files,function(index,obj){
-        let a = obj.extension;
-            k = obj.filesize; 
+        let a;
+        console.log(typeof obj.folder);
+        if(obj.folder){
+             a = 'folder';
+        }else{
+             a = obj.extension;
+        }
+        let k = obj.filesize; 
             no = '';                          //文件大小
         if(k&&k<1024){
             k = obj.filesize+' B'
@@ -292,13 +298,13 @@ function append(res,path,space_no){
         }
         if(path=="/"){
             path="";
-        }
-        // onclick="gBtnDownLoad('${obj.filehash}','${obj.filesize}','${obj.filename}','${space_no}','${obj.folder}')"
+        } 
+        // onclick="gBtnDownLoad('${obj.filehash}','${obj.filesize}','${obj.filename}','${space_no}','${obj.folder}')" 
         html+=`<dd class="AuPKyz" onmouseenter = "oprateShow(this)" onmouseleave = "oprateHide(this)">
                     <div data-key="name" class="AuPKyz-li" style="width:44%;">
                         <input class="s-select-check" type="checkbox" name="fileSelect" data-name="${obj.filename}" data-id="${obj.id}" data-path="${path}${'/'+obj.filename}" data-hash="${obj.filehash}" data-size="${obj.filesize}" data-folder=${obj.folder} data-spaceNo="${space_no}">
                         <span class="file-icon my-file-${a}"></span>
-                        <a class="file-name" title="${obj.filename}" href="${no}${path}${'/'+obj.filename}">${obj.filename}</a>
+                        <a class="file-name" title="${obj.filename}" href="${obj.folder?(no+path+'/'+obj.filename):'javascript:;'}">${obj.filename}</a>
                         <div class="oprate">
                             <a class="g-button g-btn-download" href="javascript:;" title="DownLoad"  onclick="gBtnDownLoad('${obj.id}','${obj.filehash}','${obj.filesize}','${path}${'/'+obj.filename}','${space_no}','${obj.folder}')">
                                 <span>
@@ -1184,7 +1190,12 @@ var packageMethod = {
             }
         });
     },
-    
+    //查询转账情况
+    inquireBalance:function(){
+        let code = $("#samosWalletAddress").val();
+        const {ipcRenderer} = require('electron'); 
+        ipcRenderer.send('explorer',code);
+    },
     
     // 所有订单初始化
     orderAllInit:function(){
@@ -1371,6 +1382,10 @@ $("#samosWalletCopyBtn").click(function(){
     clipboard.on('success', function(e) {
         console.log(e.text);
     });
+});
+//转账明细查询
+$("#inquireBalance").click(function(){
+    packageMethod.inquireBalance();
 });
 //刷新钱包金额
 $("#refreshBtn").click(function(){
