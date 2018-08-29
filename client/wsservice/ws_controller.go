@@ -106,6 +106,17 @@ func (c *WSController) ServeWs(w http.ResponseWriter, r *http.Request) {
 
 	msgType := r.FormValue("type")
 
+	log := c.log
+	// may be user hasn't register , so client manster pointer is nil, webservice should not start
+	for {
+		if *c.cm == nil {
+			log.Info("client manager hasn't init, waiting 3 seconds")
+			time.Sleep(3 * time.Second)
+		} else {
+			break
+		}
+	}
+	log.Info("client manager inited, start web socket\n")
 	go c.answerWriter(ws, msgType)
 }
 

@@ -47,6 +47,7 @@ const (
 
 	// ClientDBName client db name
 	ClientDBName = "data.db"
+	WRONGSNO     = 999
 )
 
 var (
@@ -304,25 +305,29 @@ func (c *ClientManager) ExecuteTask() error {
 					log.Infof("Handle task %+v", taskInfo)
 					retry := 0
 				RETRY:
-					doneMsg := common.MakeSuccDoneMsg(task.Type, "")
+					doneMsg := common.MakeSuccDoneMsg(task.Type, "", WRONGSNO)
 					retry++
 					switch task.Type {
 					case common.TaskUploadFileType:
 						req := task.Payload.(*common.UploadReq)
 						err = c.UploadFile(req.Filename, req.Dest, req.Interactive, req.NewVersion, req.IsEncrypt, req.Sno)
 						doneMsg.Source = req.Filename
+						doneMsg.SpaceNo = req.Sno
 					case common.TaskUploadDirType:
 						req := task.Payload.(*common.UploadDirReq)
 						err = c.UploadDir(req.Parent, req.Dest, req.Interactive, req.NewVersion, req.IsEncrypt, req.Sno)
 						doneMsg.Source = req.Parent
+						doneMsg.SpaceNo = req.Sno
 					case common.TaskDownloadFileType:
 						req := task.Payload.(*common.DownloadReq)
 						err = c.DownloadFile(req.FileName, req.Dest, req.FileHash, req.FileSize, req.Sno)
 						doneMsg.Source = req.FileName
+						doneMsg.SpaceNo = req.Sno
 					case common.TaskDownloadDirType:
 						req := task.Payload.(*common.DownloadDirReq)
 						err = c.DownloadDir(req.Parent, req.Dest, req.Sno)
 						doneMsg.Source = req.Parent
+						doneMsg.SpaceNo = req.Sno
 					default:
 						err = errors.New("unknown")
 					}
@@ -526,7 +531,7 @@ func (c *ClientManager) UploadDir(parent, dest string, interactive, newVersion, 
 					close(done)
 					ccControl.Done()
 				}()
-				doneMsg := common.MakeSuccDoneMsg(common.TaskUploadFileType, dpair.Name)
+				doneMsg := common.MakeSuccDoneMsg(common.TaskUploadFileType, dpair.Name, sno)
 				err := c.UploadFile(dpair.Name, dpair.Parent, interactive, newVersion, isEncrypt, sno)
 				if err != nil {
 					doneMsg.SetError(1, err)
@@ -607,7 +612,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 
 	log.Infof("Check file exists resp code %d", rsp.GetCode())
 	if rsp.GetCode() == 0 {
-		c.PM.SetProgress(common.TaskUploadProgressType, fileName, req.FileSize, req.FileSize)
+		c.PM.SetProgress(common.TaskUploadProgressType, common.ProgressKey(fileName, sno), req.FileSize, req.FileSize, sno)
 		log.Infof("Upload %s success", fileName)
 		return nil
 	}
@@ -634,7 +639,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 				deleteTemporaryFile(log, fileName)
 			}()
 		}
-		partitions, err := c.uploadFileByMultiReplica(originFileName, fileName, req, rsp)
+		partitions, err := c.uploadFileByMultiReplica(originFileName, fileName, req, rsp, sno)
 		if err != nil {
 			return err
 		}
@@ -685,7 +690,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 			c.PM.SetPartitionMap(fname, fileName)
 		}
 
-		c.PM.SetProgress(common.TaskUploadProgressType, fileName, 0, uint64(realSizeAfterRS))
+		c.PM.SetProgress(common.TaskUploadProgressType, common.ProgressKey(fileName, sno), 0, uint64(realSizeAfterRS), sno)
 
 		// delete temporary file
 		defer func() {
@@ -829,7 +834,7 @@ func (c *ClientManager) CheckFileExists(fileName, dest string, interactive, newV
 			}
 		}
 		req.FileData = fileData
-		c.PM.SetProgress(common.TaskUploadProgressType, fileName, req.FileSize, req.FileSize)
+		c.PM.SetProgress(common.TaskUploadProgressType, common.ProgressKey(fileName, sno), req.FileSize, req.FileSize, sno)
 		fmt.Printf("Origin filesize %d, encrypted size %d\n", req.FileSize, len(req.FileData))
 	}
 	err = req.SignReq(c.cfg.Node.PriKey)
@@ -1024,7 +1029,7 @@ func (c *ClientManager) uploadFileToReplicaProvider(conn *grpc.ClientConn, pro *
 	return pro.GetNodeId(), nil
 }
 
-func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string, req *mpb.CheckFileExistReq, rsp *mpb.CheckFileExistResp) ([]*mpb.StorePartition, error) {
+func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string, req *mpb.CheckFileExistReq, rsp *mpb.CheckFileExistResp, sno uint32) ([]*mpb.StorePartition, error) {
 	log := c.Log
 	hash, err := util_hash.Sha1File(fileName)
 	if err != nil {
@@ -1086,9 +1091,9 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 		return nil, err
 	}
 	if fileName == originFileName {
-		c.PM.SetProgress(common.TaskUploadProgressType, originFileName, 0, uint64(len(providers))*req.FileSize)
+		c.PM.SetProgress(common.TaskUploadProgressType, common.ProgressKey(originFileName, sno), 0, uint64(len(providers))*req.FileSize, sno)
 	} else {
-		c.PM.SetProgress(common.TaskUploadProgressType, originFileName, 0, uint64(int64(len(providers))*fileSize))
+		c.PM.SetProgress(common.TaskUploadProgressType, common.ProgressKey(originFileName, sno), 0, uint64(int64(len(providers))*fileSize), sno)
 	}
 
 	errArr := []error{}
@@ -1322,7 +1327,7 @@ func (c *ClientManager) startDownloadDir(path, destDir string, sno uint32) error
 					log.Infof("Only create %s because file size is 0", fileInfo.FileName)
 					SaveFile(destFile, []byte{})
 				} else {
-					doneMsg := common.MakeSuccDoneMsg(common.TaskDownloadFileType, currentFile)
+					doneMsg := common.MakeSuccDoneMsg(common.TaskDownloadFileType, currentFile, sno)
 					err = c.DownloadFile(currentFile, destDir, fileInfo.FileHash, fileInfo.FileSize, sno)
 					if err != nil {
 						doneMsg.SetError(1, err)
@@ -1378,9 +1383,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 	exists := c.CheckFileExistsInLocal(downFileName, fileHash)
 	if exists {
 		log.Info("File exists in local")
-		c.PM.SetProgress(common.TaskDownloadProgressType, downFileName, 0, fileSize)
-		c.PM.SetPartitionMap(downFileName, downFileName)
-		c.PM.SetIncrement(downFileName, fileSize)
+		c.PM.SetProgress(common.TaskDownloadProgressType, common.ProgressKey(downFileName, sno), fileSize, fileSize, sno)
 		return nil
 	}
 	req := &mpb.RetrieveFileReq{
@@ -1395,7 +1398,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 	if err != nil {
 		return err
 	}
-	c.PM.SetProgress(common.TaskDownloadProgressType, downFileName, 0, req.FileSize)
+	c.PM.SetProgress(common.TaskDownloadProgressType, common.ProgressKey(downFileName, sno), 0, req.FileSize, sno)
 
 	ctx := context.Background()
 	log.Infof("Download request file hash %x, size %d", fileHash, fileSize)
@@ -1425,7 +1428,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 			}
 		}
 		SaveFile(downFileName, filedata)
-		c.PM.SetProgress(common.TaskDownloadProgressType, downFileName, req.FileSize, req.FileSize)
+		c.PM.SetProgress(common.TaskDownloadProgressType, common.ProgressKey(downFileName, sno), req.FileSize, req.FileSize, sno)
 		log.Info("Download tiny file")
 		return nil
 	}
@@ -1467,7 +1470,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 			log.Infof("Partition %d block %d hash %x size %d checksum %v seq %d", i, j, block.Hash, block.Size, block.Checksum, block.BlockSeq)
 		}
 	}
-	c.PM.SetProgress(common.TaskDownloadProgressType, downFileName, 0, realSizeAfterRS)
+	c.PM.SetProgress(common.TaskDownloadProgressType, common.ProgressKey(downFileName, sno), 0, realSizeAfterRS, sno)
 
 	if len(partitions) == 1 {
 		partition := partitions[0]
@@ -1738,7 +1741,7 @@ func (c *ClientManager) GetSpaceSysFileData(sno uint32) ([]byte, error) {
 }
 
 // GetProgress returns progress rate
-func (c *ClientManager) GetProgress(files []string) (map[string]float64, error) {
+func (c *ClientManager) GetProgress(files []string) (map[string]progress.ProgressCell, error) {
 	return c.PM.GetProgress(files)
 }
 

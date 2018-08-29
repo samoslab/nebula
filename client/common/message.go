@@ -47,10 +47,11 @@ func (m MsgType) String() string {
 }
 
 type DoneMsg struct {
-	Type   string `json:"type"`
-	Source string `json:"source"`
-	Code   uint32 `json:"code"`
-	Err    string `json:"error"`
+	Type    string `json:"type"`
+	Source  string `json:"source"`
+	SpaceNo uint32 `json:"space_no"`
+	Code    uint32 `json:"code"`
+	Err     string `json:"error"`
 }
 
 func (m *DoneMsg) SetError(code uint32, err error) *DoneMsg {
@@ -64,12 +65,13 @@ func (m *DoneMsg) Serialize() string {
 	return string(data)
 }
 
-func MakeSuccDoneMsg(tp string, fileName string) *DoneMsg {
+func MakeSuccDoneMsg(tp string, fileName string, spaceNo uint32) *DoneMsg {
 	return &DoneMsg{
-		Type:   tp,
-		Source: fileName,
-		Code:   0,
-		Err:    "",
+		Type:    tp,
+		Source:  fileName,
+		SpaceNo: spaceNo,
+		Code:    0,
+		Err:     "",
 	}
 }
 
@@ -77,6 +79,7 @@ type ProgressMsg struct {
 	Type     string  `json:"type"`
 	FileName string  `json:"filename"`
 	Progress float64 `json:"progress"`
+	SpaceNo  int     `json:"space_no"`
 	Code     uint32  `json:"code"`
 	Err      string  `json:"error"`
 }
@@ -92,11 +95,12 @@ func (m *ProgressMsg) Serialize() string {
 	return string(data)
 }
 
-func MakeSuccProgressMsg(tp, fileName string, progress float64) *ProgressMsg {
+func MakeSuccProgressMsg(tp, fileName string, progress float64, sno int) *ProgressMsg {
 	return &ProgressMsg{
 		Type:     tp,
 		FileName: fileName,
 		Progress: progress,
+		SpaceNo:  sno,
 		Code:     0,
 		Err:      "",
 	}

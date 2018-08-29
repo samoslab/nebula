@@ -161,3 +161,7 @@ func GrpcDial(server string) (*grpc.ClientConn, error) {
 	//}
 	return grpc.Dial(server, grpc.WithInsecure(), grpc.WithTimeout(3*time.Second), grpc.WithBlock())
 }
+
+func ProgressKey(fileName string, sno uint32) string {
+	return fmt.Sprintf("%d@%s", sno, fileName)
+}

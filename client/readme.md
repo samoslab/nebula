@@ -332,7 +332,11 @@ curl -X POST -H "Content-Type:application/json" -d '{"files":[]}' http://127.0.0
     "errmsg": "",
     "code": 0,
     "Data": {
-        "/tmp/abc/ipip.big1": 0.66
+            "0@/root/test124/xab-1012": {
+            "type": "UploadProgress",
+            "rate": 1,
+            "spaco_no": 0
+        }
     }
 }
 ```
@@ -951,12 +955,12 @@ uri: /message
 消息格式：
 
 ```
-1. {"type":"UploadFile","source":"/root/testmul.txt","code":0,"error":""}
-2. {"type":"UploadDir","source":"/root/test","code":0,"error":""}
-3. {"type":"DownloadFile","source":"/root/testmul.txt","code":0,"error":""}
-4. {"type":"DownloadDir","source":"/root/test","code":0,"error":""}
-5. {"type":"UploadProgress","filename":"/root/test124/CMakeLists.txt","progress":1,"code":0,"error":""}
-6. {"type":"DownloadProgress","filename":"/root/test124/CMakeLists.txt","progress":1,"code":0,"error":""}
+1. {"type":"UploadFile","source":"/root/testmul.txt","space_no":0, code":0,"error":""}
+2. {"type":"UploadDir","source":"/root/test","space_no":0,"code":0,"error":""}
+3. {"type":"DownloadFile","source":"/root/testmul.txt","space_no":0,"code":0,"error":""}
+4. {"type":"DownloadDir","source":"/root/test","space_no":0,"code":0,"error":""}
+5. {"type":"UploadProgress","filename":"0@/root/test124/CMakeLists.txt","progress":1,"space_no":0,"code":0,"error":""}
+6. {"type":"DownloadProgress","filename":"0@/root/test124/CMakeLists.txt","progress":1,"space_no":0,"code":0,"error":""}
 ```
 
 # specification
