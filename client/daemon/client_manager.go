@@ -388,10 +388,26 @@ func (c *ClientManager) SendProgressMsg() error {
 				for _, msg := range msgList {
 					c.AddDoneMsg(msg)
 				}
+			case <-time.After(5 * time.Second):
+				c.SendPingMsg()
 			}
 		}
 	}()
 	wg.Wait()
+	return nil
+}
+
+func (c *ClientManager) SendPingMsg() error {
+	req := &mpb.PingReq{
+		Version: common.Version,
+	}
+
+	c.Log.Info("Ping msg")
+	_, err := c.mclient.Ping(context.Background(), req)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -1743,15 +1759,6 @@ func (c *ClientManager) GetSpaceSysFileData(sno uint32) ([]byte, error) {
 // GetProgress returns progress rate
 func (c *ClientManager) GetProgress(files []string) (map[string]progress.ProgressCell, error) {
 	return c.PM.GetProgress(files)
-}
-
-// ImportConfig import config file
-func (c *ClientManager) ImportConfig(fileName, clientConfigFile string) error {
-	cfg, err := config.LoadConfig(fileName)
-	if err != nil {
-		return err
-	}
-	return config.SaveClientConfig(clientConfigFile, cfg)
 }
 
 // ExportConfig export config file

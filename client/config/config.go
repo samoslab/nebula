@@ -153,3 +153,12 @@ func GetConfigFile() (string, string) {
 	defaultAppDir, _ := filepath.Split(defaultConfig)
 	return defaultAppDir, defaultConfig
 }
+
+// ImportConfig import config file
+func ImportConfig(fileName, clientConfigFile string) error {
+	cfg, err := LoadConfig(fileName)
+	if err != nil {
+		return err
+	}
+	return SaveClientConfig(clientConfigFile, cfg)
+}
