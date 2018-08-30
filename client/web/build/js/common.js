@@ -100,8 +100,11 @@ var method = {
         $("#priviteCondition").hide();
         //传输列表和我的套餐隐藏
         $(".tabDiv").hide();
-
-        list(path,space_no,1000,1,'modtime',true);  
+        //遍历按哪种类型的排序
+        let sorttype = sessionStorage.getItem("viewtype");
+        $("#viewTypeDrop>span[data-key='"+sorttype+"']").addClass('ugcOHtb').siblings().removeClass('ugcOHtb'); //给类名
+        list(path,space_no,1000,1,sorttype,true);  
+        
     },
     //隐私空间初始化
     priviteInit:function(path,space_no){
@@ -113,7 +116,9 @@ var method = {
         if(sessionStorage['hadImport']){
             $("#priviteCondition").hide();
             $("#diskDivAll").show();
-            list(path,space_no,1000,1,'modtime',true);   
+            let sorttype = sessionStorage.getItem("viewtype");
+            $("#viewTypeDrop>span[data-key='"+sorttype+"']").addClass('ugcOHtb').siblings().removeClass('ugcOHtb'); //给类名
+            list(path,space_no,1000,1,sorttype,true);  
         }else{
             // 内容区隐藏
             $("#diskDivAll").hide();
@@ -187,6 +192,18 @@ var method = {
 
 };
 
+//排序选择
+ $("#viewType").mouseenter(function(){
+    $(".viewTypeDrop").show();
+});
+$("#viewTypeDrop>span").click(function(){
+    $("#viewTypeDrop>span").removeClass('ugcOHtb');
+    $(this).addClass('ugcOHtb');
+    let key = $(this).attr("data-key");
+    sessionStorage.setItem("viewtype", key);
+    $("#viewTypeDrop").hide();
+    method.firstInit();
+});
 // $("#listBox").scroll(function () { 
 //     let scrollTop = $(this).scrollTop(); 
 //     let winHeight = $(this).height(); 
@@ -231,6 +248,7 @@ function list(path,space_no,pagesize,pagenum,sorttype,ascorder){
                       return;
             }
             if(res.code!=0) {alert(res.errmsg);return;}
+            $("#listTotalNum").html(res.Data.total);
             //插入列表内容；
             append(res,path,space_no);
             //插入面包屑导航内容；
@@ -259,7 +277,6 @@ function append(res,path,space_no){
         $(".no-file-ab").show();
         return false;
     }
-    console.log(res);
 
     $(".no-file-ab").hide();
 
@@ -1024,8 +1041,8 @@ var public = {
     //求窗口尺寸大小
     wh:function(){
         let fmh = $(".frame-main").height();
-        $("#listBox").css('height',(fmh-100)+'px');
-        $("#tsMenu").css('height',(fmh-100)+'px');
+        $("#listBox").css('height',(fmh-106)+'px');
+        $("#tsMenu").css('height',(fmh-106)+'px');
     }
 };
 
