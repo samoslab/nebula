@@ -46,7 +46,7 @@ var method = {
             }
         });
     },
-
+    //初始化哪个选项
     firstInit:function(){
         clearInterval(refreshTransportTimer);
         let path = method.getParamsUrl().path;
@@ -54,18 +54,22 @@ var method = {
         console.log(path);
         let space_no = 0;
         let a = path.split(":")[0];
+
+        //请求参做个记录
+        $("#thisListAugs").attr("path",path.split(":")[1]);
+
          //左侧选项卡
         $("#frameAsideUl li").removeClass("active");
         if(a == "myspace"){
             space_no = 0;
             // //左侧选项卡
             $("#mySpace").parent().addClass("active");
-            this.init(path,space_no);
+            this.spaceSelect(path,space_no);
         }else if(a == "privite"){
             space_no = 1;
             //左侧选项卡
             $("#privteSpace").parent().addClass("active");
-            this.init(path,space_no);
+            this.spaceSelect(path,space_no);
         }else if(a=="transport"){
             this.transportInit();
         }else if(a=="package"){
@@ -73,8 +77,8 @@ var method = {
         }
         
     },
-    //初始化
-    init:function (path,space_no){
+    //初始化我的空间或 隐藏空间
+    spaceSelect:function (path,space_no){
         path = path.split(":")[1];
         if(path.length == 0){
             path = "/";
@@ -103,7 +107,8 @@ var method = {
         //遍历按哪种类型的排序
         let sorttype = sessionStorage.getItem("viewtype");
         $("#viewTypeDrop>span[data-key='"+sorttype+"']").addClass('ugcOHtb').siblings().removeClass('ugcOHtb'); //给类名
-        list(path,space_no,1000,1,sorttype,true);  
+        $("#listContent").html('');
+        list(path,space_no,100,1,sorttype,true);  
         
     },
     //隐私空间初始化
@@ -118,7 +123,7 @@ var method = {
             $("#diskDivAll").show();
             let sorttype = sessionStorage.getItem("viewtype");
             $("#viewTypeDrop>span[data-key='"+sorttype+"']").addClass('ugcOHtb').siblings().removeClass('ugcOHtb'); //给类名
-            list(path,space_no,1000,1,sorttype,true);  
+            list(path,space_no,100,1,sorttype,true);  
         }else{
             // 内容区隐藏
             $("#diskDivAll").hide();
@@ -204,15 +209,26 @@ $("#viewTypeDrop>span").click(function(){
     $("#viewTypeDrop").hide();
     method.firstInit();
 });
-// $("#listBox").scroll(function () { 
-//     let scrollTop = $(this).scrollTop(); 
-//     let winHeight = $(this).height(); 
-//     let contentHeight = $("#listContent").height();
-//     console.log(scrollTop+','+winHeight+","+','+$("#listContent").height());
-//     if (scrollTop + winHeight >= contentHeight) {
-//         alert('到底了');
-//     }
-// });
+
+//滚动加载
+$("#listBox").scroll(function () { 
+    let total = parseInt($("#thisListAugs").attr("total")),
+        pagesize = parseInt($("#thisListAugs").attr("pagesize")),
+        pagenum = parseInt($("#thisListAugs").attr("pagenum")),
+        path = $("#thisListAugs").attr("path"),
+        space_no = parseInt($("#thisListAugs").attr("space_no"));
+
+    let scrollTop =Math.round($(this).scrollTop()),
+        winHeight = $(this).height(), 
+        contentHeight = $("#listContent").height();
+
+   if((pagesize*pagenum<total)&&(scrollTop + winHeight>= contentHeight)){
+        let sorttype = sessionStorage.getItem("viewtype");
+        console.log(path,space_no,pagenum,sorttype);
+        list(path,space_no,100,pagenum+1,sorttype,true); 
+        console.log('到底了');
+    }
+});
 //查所有文件类型
 // $.ajax({
 //     url:"/api/v1/service/filetype",
@@ -248,11 +264,23 @@ function list(path,space_no,pagesize,pagenum,sorttype,ascorder){
                       return;
             }
             if(res.code!=0) {alert(res.errmsg);return;}
+            //列表总数
             $("#listTotalNum").html(res.Data.total);
+            //请求参做个记录
+            $("#thisListAugs").attr({
+                "path":path,
+                "space_no":space_no,
+                "pagesize":pagesize,
+                "pagenum":pagenum,
+                "sorttype":sorttype,
+                "ascorder":ascorder,
+                "total":res.Data.total
+            });
+
             //插入列表内容；
             append(res,path,space_no);
             //插入面包屑导航内容；
-             let html = breadNav(path,space_no);
+            let html = breadNav(path,space_no);
             $("#breadNav").html(html);
 
             //把面包屑最后一个的链接地址给到左侧导航栏，目的是左侧切换时回到原目录，记得以前位置；
@@ -273,7 +301,7 @@ function list(path,space_no,pagesize,pagenum,sorttype,ascorder){
 function append(res,path,space_no){
     let html = '';
     if((res.Data.total<1)||(res.code!=0)){
-        $('.zJMtAEb').html('');
+        $('#listContent').html('');
         $(".no-file-ab").show();
         return false;
     }
@@ -308,7 +336,7 @@ function append(res,path,space_no){
         if(path=="/"){
             path="";
         } 
-        // onclick="gBtnDownLoad('${obj.filehash}','${obj.filesize}','${obj.filename}','${space_no}','${obj.folder}')" 
+        
         html+=`<dd class="AuPKyz" onmouseenter = "oprateShow(this)" onmouseleave = "oprateHide(this)">
                     <div data-key="name" class="AuPKyz-li" style="width:44%;">
                         <input class="s-select-check" type="checkbox" name="fileSelect" data-name="${obj.filename}" data-id="${obj.id}" data-path="${path}${'/'+obj.filename}" data-hash="${obj.filehash}" data-size="${obj.filesize}" data-folder=${obj.folder} data-spaceNo="${space_no}">
@@ -353,9 +381,10 @@ function append(res,path,space_no){
                     </div>
                 </dd>`;
     });
-    $('.zJMtAEb').html(`<div id="listContent">${html}</div>`);
+    $('#listContent').append(html);
+    //$('#listContent').html(`${html}`);
 
-     // <!--单行选中增加类-->
+    // <!--单行选中增加类-->
     rowSelected(); 
 }
 
@@ -989,7 +1018,7 @@ $("#goInPriviteSpace2").click(function(){
                     sessionStorage.setItem("hadImport",true);
                     $("#priviteCondition").hide();
                     $("#diskDivAll").show();
-                    list('/',1,1000,1,'modtime',true);  
+                    list('/',1,100,1,'modtime',true);  
 
                 }else{
                     alert('Password incorrect!');
