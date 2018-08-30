@@ -16,6 +16,7 @@ type ProgressCell struct {
 	Current    uint64  `json:"-"`
 	Time       uint64  `json:"-"`
 	Rate       float64 `json:"rate"`
+	Local      string  `json:"local"`
 	LastReaded bool    `json:"-"`
 	SpaceNo    int     `json:"spaco_no"`
 }
@@ -45,8 +46,8 @@ func NewProgressManager() *ProgressManager {
 }
 
 // SetProgress set current progress file size
-func (pm *ProgressManager) SetProgress(tp, fileName string, currentSize, totalSize uint64, sno uint32) {
-	pm.Progress[fileName] = ProgressCell{Type: tp, Total: totalSize, Current: currentSize, Rate: calRate(currentSize, totalSize), Time: common.Now(), SpaceNo: int(sno)}
+func (pm *ProgressManager) SetProgress(tp, fileName string, currentSize, totalSize uint64, sno uint32, local string) {
+	pm.Progress[fileName] = ProgressCell{Type: tp, Total: totalSize, Current: currentSize, Rate: calRate(currentSize, totalSize), Time: common.Now(), SpaceNo: int(sno), Local: local}
 }
 
 // SetPartitionMap set progress file map
@@ -111,7 +112,7 @@ func (pm *ProgressManager) GetProgressingMsg(files []string) ([]string, error) {
 		}
 		// skip already sended
 		if !v.Sended && !v.LastReaded {
-			msg := common.MakeSuccProgressMsg(v.Type, k, v.Rate, v.SpaceNo)
+			msg := common.MakeSuccProgressMsg(v.Type, k, v.Rate, v.SpaceNo, v.Local)
 			result = append(result, msg.Serialize())
 			v.LastReaded = true
 			if int(v.Rate) == 1 {

@@ -332,9 +332,28 @@ curl -X POST -H "Content-Type:application/json" -d '{"files":[]}' http://127.0.0
     "errmsg": "",
     "code": 0,
     "Data": {
-            "0@/root/test124/xab-1012": {
+        "0@/tmp/def/test124/file1.4m": {
             "type": "UploadProgress",
             "rate": 1,
+            "local": "/root/test124/file1.4m",
+            "spaco_no": 0
+        },
+        "0@/tmp/def/test124/samllfile": {
+            "type": "UploadProgress",
+            "rate": 1,
+            "local": "/root/test124/samllfile",
+            "spaco_no": 0
+        },
+        "0@/tmp/def/test124/smallfile1": {
+            "type": "UploadProgress",
+            "rate": 1,
+            "local": "/root/test124/smallfile1",
+            "spaco_no": 0
+        },
+        "0@/tmp/download/app-1008.txt": {
+            "type": "DownloadProgress",
+            "rate": 1,
+            "local": "d06334bcf4fbb554bc864c790d7c07ed48137c2f",
             "spaco_no": 0
         }
     }
@@ -955,12 +974,12 @@ uri: /message
 消息格式：
 
 ```
-1. {"type":"UploadFile","source":"/root/testmul.txt","space_no":0, code":0,"error":""}
-2. {"type":"UploadDir","source":"/root/test","space_no":0,"code":0,"error":""}
-3. {"type":"DownloadFile","source":"/root/testmul.txt","space_no":0,"code":0,"error":""}
-4. {"type":"DownloadDir","source":"/root/test","space_no":0,"code":0,"error":""}
-5. {"type":"UploadProgress","filename":"0@/root/test124/CMakeLists.txt","progress":1,"space_no":0,"code":0,"error":""}
-6. {"type":"DownloadProgress","filename":"0@/root/test124/CMakeLists.txt","progress":1,"space_no":0,"code":0,"error":""}
+1. {"type":"UploadFile","key":"0@/tmp/xab-1012","local":"/root/test124/xab-1012","space_no":0,"code":0,"error":""}
+2. {"type":"UploadDir","key":"/root/test124","local":"/tmp/def","space_no":0,"code":0,"error":""}
+3. "type":"DownloadFile","key":"0@/root/tmp/app-1008.txt","local":"/tmp/download/app-1008.txt","space_no":0,"code":0,"error":""}
+4. {"type":"DownloadDir","key":"/root/test", "local":"/tmp","space_no":0,"code":0,"error":""}
+5. {"type":"UploadProgress","key":"0@/tmp/xab-1012","local":"/root/test124/xab-1012","progress":1,"space_no":0,"code":0,"error":""}
+6. {"type":"DownloadProgress","key":"0@/root/test124/CMakeLists.txt", "lcoal":"/local/CMakeLists.txt","progress":1,"space_no":0,"code":0,"error":""}
 ```
 
 # specification
