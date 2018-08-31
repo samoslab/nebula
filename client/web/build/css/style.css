@@ -1328,7 +1328,7 @@ body {
     white-space: nowrap;
 }
 .tsList-r{
-    flex: 3;
+    flex: 1;
 }
 .tsList-r-Bar{
     position: relative;
