@@ -606,7 +606,10 @@ func (c *ClientManager) AddTask(tp string, req interface{}) (string, error) {
 
 func serverPath(dest, fileName string) string {
 	_, onlyFileName := filepath.Split(fileName)
-	return filepath.Join(dest, onlyFileName)
+	if strings.HasSuffix(dest, "/") {
+		return dest + onlyFileName
+	}
+	return dest + "/" + onlyFileName
 }
 
 func localPath(dest, fileName string) string {
