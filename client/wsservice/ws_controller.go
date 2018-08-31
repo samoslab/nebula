@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/samoslab/nebula/client/common"
 	"github.com/samoslab/nebula/client/daemon"
 	"github.com/sirupsen/logrus"
 )
@@ -134,7 +133,7 @@ func (c *WSController) Consume() {
 			return
 		case <-fileTicker.C:
 			cnt := (*c.cm).GetMsgCount()
-			if cnt > uint32(common.MsgQueueLen-common.MsgQueueLen+5) {
+			if cnt > 1000 { // if accumulated message count exceed 1000, then consume it
 				for i := 0; i < int(cnt); i++ {
 					select {
 					case msg := <-(*c.cm).GetMsgChan():
@@ -155,7 +154,7 @@ func (c *WSController) Run(addr string) error {
 	http.HandleFunc("/message", c.ServeWs)
 	var wg sync.WaitGroup
 	errC := make(chan error)
-	//go c.Consume()
+	go c.Consume()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -171,7 +170,6 @@ func (c *WSController) Run(addr string) error {
 		wg.Wait()
 		close(done)
 	}()
-	log.Info("wait websocket shutdown")
 	select {
 	case err := <-errC:
 		return err

@@ -379,11 +379,12 @@ func (c *ClientManager) SendProgressMsg() error {
 			wg.Done()
 			log.Infof("Shutdown progress goroutine")
 		}()
+		pingTicker := time.NewTicker(5 * time.Second)
 		for {
 			select {
 			case <-c.quit:
 				return
-			case <-time.After(5 * time.Second):
+			case <-pingTicker.C:
 				c.SendPingMsg()
 			case <-time.After(1 * time.Second):
 				msgList, err := c.PM.GetProgressingMsg([]string{})
@@ -406,7 +407,6 @@ func (c *ClientManager) SendPingMsg() error {
 		Version: common.Version,
 	}
 
-	c.Log.Info("Ping msg")
 	_, err := c.mclient.Ping(context.Background(), req)
 	if err != nil {
 		return err
