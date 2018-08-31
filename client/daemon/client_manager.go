@@ -20,6 +20,7 @@ import (
 	collectClient "github.com/samoslab/nebula/client/collector_client"
 	"github.com/samoslab/nebula/client/errcode"
 	"github.com/samoslab/nebula/client/progress"
+	tcppb "github.com/samoslab/nebula/tracker/collector/client/pb"
 	"github.com/samoslab/nebula/util/filetype"
 
 	"github.com/samoslab/nebula/client/common"
@@ -61,7 +62,7 @@ var (
 	DefaultTempDir = "/tmp/nebula_client"
 
 	// ReplicaNum number of muliti-replication
-	ReplicaNum    = 5
+	ReplicaNum    = 4
 	MinReplicaNum = 3
 )
 
@@ -1070,6 +1071,14 @@ func (c *ClientManager) uploadFileToReplicaProvider(conn *grpc.ClientConn, pro *
 	return pro.GetNodeId(), nil
 }
 
+func newActionLogFromUpload(fileName string) *tcppb.ActionLog {
+	return &tcppb.ActionLog{
+		Type:      3,
+		BeginTime: common.Now(),
+		Info:      fileName,
+	}
+}
+
 func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string, req *mpb.CheckFileExistReq, rsp *mpb.CheckFileExistResp, sno uint32) ([]*mpb.StorePartition, error) {
 	log := c.Log
 	hash, err := util_hash.Sha1File(fileName)
@@ -1129,7 +1138,7 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 	uniqKey := common.ProgressKey(sp, sno)
 	c.PM.SetPartitionMap(fileName, uniqKey)
 
-	providers, err := GetBestReplicaProvider(ufprsp.GetProvider(), ReplicaNum)
+	providers, backupPros, err := GetBestReplicaProvider(ufprsp.GetProvider(), ReplicaNum)
 	if err != nil {
 		return nil, err
 	}
@@ -1139,43 +1148,63 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 		c.PM.SetProgress(common.TaskUploadProgressType, uniqKey, 0, uint64(int64(len(providers))*fileSize), sno, originFileName)
 	}
 
-	errArr := []error{}
-	var mutex sync.Mutex
-	ccControl := NewCCController(common.CCUploadFileNum)
-	for _, pro := range providers {
-		ccControl.Add()
-		go func(pro *mpb.ReplicaProvider) {
-			server := fmt.Sprintf("%s:%d", pro.Server, pro.Port)
-			conn, err := common.GrpcDial(server)
-			if err != nil {
-				log.Errorf("Rpc dail failed: %v", err)
+	HandlerUpload := func(providers []*mpb.ReplicaProvider, block *mpb.StoreBlock, uploadPara *common.UploadParameter) []error {
+		errArr := []error{}
+		var mutex sync.Mutex
+		ccControl := NewCCController(common.CCUploadFileNum)
+		for _, pro := range providers {
+			ccControl.Add()
+			go func(pro *mpb.ReplicaProvider) {
+				server := fmt.Sprintf("%s:%d", pro.Server, pro.Port)
+				conn, err := common.GrpcDial(server)
+				if err != nil {
+					log.Errorf("Rpc dail failed: %v", err)
+					mutex.Lock()
+					errArr = append(errArr, err)
+					mutex.Unlock()
+					ccControl.Done()
+					return
+				}
+				done := make(chan struct{})
+				go HandleQuit(c.quit, done, ccControl, func() { conn.Close() })
+				defer func() {
+					conn.Close()
+					close(done)
+					ccControl.Done()
+				}()
+				proID, err := c.uploadFileToReplicaProvider(conn, pro, uploadPara)
+				if err != nil {
+					mutex.Lock()
+					errArr = append(errArr, err)
+					mutex.Unlock()
+				}
 				mutex.Lock()
-				errArr = append(errArr, err)
+				block.StoreNodeId = append(block.StoreNodeId, proID)
 				mutex.Unlock()
-				ccControl.Done()
-				return
-			}
-			done := make(chan struct{})
-			go HandleQuit(c.quit, done, ccControl, func() { conn.Close() })
-			defer func() {
-				conn.Close()
-				close(done)
-				ccControl.Done()
-			}()
-			proID, err := c.uploadFileToReplicaProvider(conn, pro, uploadPara)
-			if err != nil {
-				mutex.Lock()
-				errArr = append(errArr, err)
-				mutex.Unlock()
-			}
-			mutex.Lock()
-			block.StoreNodeId = append(block.StoreNodeId, proID)
-			mutex.Unlock()
-		}(pro)
-	}
+			}(pro)
+		}
 
-	ccControl.Wait()
+		ccControl.Wait()
+		return errArr
+	}
+	al := newActionLogFromUpload(fileName)
+	defer collectClient.Collect(al)
+	errArr := HandlerUpload(providers, block, uploadPara)
 	if len(errArr) > 0 {
+		log.Errorf("Upload error %v, total %d", errArr[0], len(errArr))
+		if len(backupPros) < len(errArr) {
+			log.Errorf("Not enough bakcup providers, backup provider %d", len(backupPros))
+			errInfo := ""
+			for _, err := range errArr {
+				errInfo += err.Error() + "\n"
+			}
+			client.SetActionLog(err, al)
+			return nil, errors.New(errInfo)
+		}
+		errArr = HandlerUpload(backupPros[0:len(errArr)], block, uploadPara)
+	}
+	if len(errArr) > 0 {
+		log.Errorf("No solution for upload")
 		return nil, errArr[0]
 	}
 
@@ -1338,8 +1367,7 @@ func (c *ClientManager) startDownloadDir(path, destDir string, sno uint32) error
 		downFiles, err := c.ListFiles(path, 100, page, "name", true, sno)
 		retry++
 		if err != nil {
-			code, errmsg := common.StatusErrFromError(err)
-			fmt.Printf("code %d, errmsg %s\n", code, errmsg)
+			code, _ := common.StatusErrFromError(err)
 			if code == 300 && retry < 3 {
 				goto RETRY
 			}

@@ -1,7 +1,6 @@
 package wsservice
 
 import (
-	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -86,7 +85,6 @@ func (c *WSController) answerWriter(ws *websocket.Conn, msgType string) {
 		case msg := <-(*c.cm).GetMsgChan():
 			(*c.cm).DecreaseMsgCount()
 			ws.SetWriteDeadline(time.Now().Add(writeWait))
-			fmt.Printf("send msg:%s\n", msg)
 			if err := ws.WriteMessage(websocket.TextMessage, []byte(msg)); err != nil {
 				return
 			}

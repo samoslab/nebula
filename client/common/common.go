@@ -142,6 +142,12 @@ func Now() uint64 {
 	return uint64(time.Now().UTC().Unix())
 }
 
+func Max(a, b int) int {
+	if a < b {
+		return b
+	}
+	return a
+}
 func Min(a, b int) int {
 	if a < b {
 		return a
