@@ -107,7 +107,7 @@ var method = {
         //遍历按哪种类型的排序
         let sorttype = sessionStorage.getItem("viewtype");
         $("#viewTypeDrop>span[data-key='"+sorttype+"']").addClass('ugcOHtb').siblings().removeClass('ugcOHtb'); //给类名
-        $("#listContent").html('');
+        $("#listContent").html("");
         list(path,space_no,100,1,sorttype,true);  
         
     },
@@ -123,6 +123,7 @@ var method = {
             $("#diskDivAll").show();
             let sorttype = sessionStorage.getItem("viewtype");
             $("#viewTypeDrop>span[data-key='"+sorttype+"']").addClass('ugcOHtb').siblings().removeClass('ugcOHtb'); //给类名
+            $("#listContent").html("");
             list(path,space_no,100,1,sorttype,true);  
         }else{
             // 内容区隐藏
@@ -1167,7 +1168,7 @@ function pay(orderId){
 }
 
 
-//我的传输入列表方法集
+//我的传输入列表方法集  ${idx.split("\\")[idx.split("\\").length-1]}
 var transportMethod = {
     transportInit:function(){
         $.ajax({
@@ -1182,12 +1183,16 @@ var transportMethod = {
                if((res.code==0)&&(JSON.stringify(res.Data)!="{}")){
                     let html = '';
                     $.each(res.Data,function(idx,obj){
-                        //console.log(idx.split("\\")[idx.split("\\").length-1]);
+                    
                         html +=`<li class="tsList">
-                                    <div class="tsList-l" title="${idx}">${idx.split("\\")[idx.split("\\").length-1]}</div>
+                                    <div class="tsList-l" title="${idx}">
+                                        <span>${obj.type}</span>
+                                        <span>${(idx.split('@')[0]=='0')?"默认空间":"隐私空间"}</span>
+                                        <span> 路径是：${idx.split('@')[1]}</span>
+                                    </div>
                                     <div class="tsList-r">
                                         <div class="tsList-r-Bar">
-                                            <div class="tsList-r-progressBar" data-name="${idx.split("\\")[idx.split("\\").length-1]}" style="width:${obj*100+'%'};">${Math.round(obj*100)+'%'}</div>
+                                            <div class="tsList-r-progressBar" data-name="${idx}" style="width:${obj.rate*100+'%'};">${Math.round(obj.rate*100)+'%'}</div>
                                         </div>
                                     </div>
                                 </li>`;
@@ -1447,35 +1452,15 @@ websocket.onclose = function (evt) {
 };
 websocket.onmessage = function (evt) {
     //收到服务器消息，使用evt.data提取
-
     console.log(evt.data);
     let data = JSON.parse(evt.data);
-    if((data.type=="DownloadProgress")||(data.type=="UploadProgress")){
-        if(data.progress!=1){
-            if(data.filename){
-                let filename = data.filename;
-                let name = filename.split('\\')[filename.split('\\').length-1];
-                console.log(name);
-                $(".tsList-r-progressBar[data-name='"+name+"']").css("width",data.progress*100+'%').html(data.progress*100+'%');
-                $("#updownGif").show();
-            }
-        }else{
-            if(data.source){
-                let source = data.source;
-                let s = source.split('\\')[source.split('\\').length-1];
-                $(".tsList-r-progressBar[data-name='"+s+"']").css("width",'100%').html('100%');
-            }
-            method.firstInit();
-            $("#updownGif").hide();
-        }
-       
-        
-    }else if((data.type=="DownloadFile")||(data.type=="UploadFile")){
-        if(data.source){
-            let source = data.source;
-            let s = source.split('\\')[source.split('\\').length-1];
-            $(".tsList-r-progressBar[data-name='"+s+"']").css("width",'100%').html('100%');
-        }
+    if(((data.type=="DownloadProgress")||(data.type=="UploadProgress"))&&(data.progress!=1)){
+        let key = data.key;
+        $(".tsList-r-progressBar[data-name='"+key+"']").css("width",data.progress*100+'%').html(data.progress*100+'%');
+        $("#updownGif").show();
+    }else if((data.type=="DownloadFile")||(data.type=="UploadFile")||(data.progress==1)){
+        let key = data.key;
+        $(".tsList-r-progressBar[data-name='"+key+"']").css("width",'100%').html('100%');
         method.firstInit();
         $("#updownGif").hide();
     }
