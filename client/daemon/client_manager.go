@@ -1514,7 +1514,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 			log.Info("File store as multi-replication")
 			// for progress stats
 			for _, block := range partitions[0].GetBlock() {
-				c.PM.SetPartitionMap(hex.EncodeToString(block.GetHash()), common.ProgressKey(downFileName, sno))
+				c.PM.SetPartitionMap(hex.EncodeToString(block.GetHash()), common.ProgressKey(serverFile, sno))
 			}
 			_, _, _, _, err := c.saveFileByPartition(downFileName, partitions[0], rsp.GetTimestamp(), req.FileHash, req.FileSize, true)
 			if err != nil {
@@ -1537,7 +1537,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 	realSizeAfterRS := uint64(0)
 	for i, partition := range partitions {
 		for j, block := range partition.GetBlock() {
-			c.PM.SetPartitionMap(hex.EncodeToString(block.GetHash()), common.ProgressKey(downFileName, sno))
+			c.PM.SetPartitionMap(hex.EncodeToString(block.GetHash()), common.ProgressKey(serverFile, sno))
 			realSizeAfterRS += block.GetSize()
 			log.Infof("Partition %d block %d hash %x size %d checksum %v seq %d", i, j, block.Hash, block.Size, block.Checksum, block.BlockSeq)
 		}
