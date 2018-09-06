@@ -170,7 +170,7 @@ func RsDecoder(log logrus.FieldLogger, fName, outFname string, filesize int64, d
 		outfn = fName
 	}
 
-	log.Infof("Writing data to %s", outfn)
+	log.Infof("Reconstructing success, writing data to %s", outfn)
 	f, err := os.Create(outfn)
 	if err != nil {
 		return err

@@ -1361,6 +1361,8 @@ func (c *ClientManager) startDownloadDir(path, destDir string, sno uint32) error
 	log := c.Log.WithField("download dir", path)
 	errResult := []error{}
 	page := uint32(1)
+	var mutex sync.Mutex
+	ccControl := NewCCController(common.CCDownloadGoNum)
 	for {
 		// list 1 page 100 items order by name
 		retry := 0
@@ -1399,22 +1401,35 @@ func (c *ClientManager) startDownloadDir(path, destDir string, sno uint32) error
 					log.Infof("Only create %s because file size is 0", fileInfo.FileName)
 					SaveFile(destFile, []byte{})
 				} else {
-					doneMsg := common.MakeSuccDoneMsg(common.TaskDownloadFileType, currentFile, sno)
-					err = c.DownloadFile(currentFile, destDir, fileInfo.FileHash, fileInfo.FileSize, sno)
-					if err != nil {
-						doneMsg.SetError(1, err)
-					}
+					ccControl.Add()
+					go func(currentFile, destDir string, fileInfo *DownFile, sno uint32) {
+						done := make(chan struct{})
+						go HandleQuit(c.quit, done, ccControl)
+						defer func() {
+							close(done)
+							ccControl.Done()
+						}()
+						doneMsg := common.MakeSuccDoneMsg(common.TaskDownloadFileType, currentFile, sno)
+						err = c.DownloadFile(currentFile, destDir, fileInfo.FileHash, fileInfo.FileSize, sno)
+						if err != nil {
+							doneMsg.SetError(1, err)
+						}
 
-					c.AddDoneMsg(doneMsg.Serialize())
-					if err != nil {
-						log.Errorf("Download file %s error %v", currentFile, err)
-						errResult = append(errResult, fmt.Errorf("%s %v", currentFile, err))
-						//return err
-					}
+						c.AddDoneMsg(doneMsg.Serialize())
+						if err != nil {
+							log.Errorf("Download file %s error %v", currentFile, err)
+							//errResult = append(errResult, fmt.Errorf("%s %v", currentFile, err))
+							mutex.Lock()
+							errResult = append(errResult, err)
+							mutex.Unlock()
+							//return err
+						}
+					}(currentFile, destDir, fileInfo, sno)
 				}
 			}
 		}
 	}
+	ccControl.Wait()
 	if len(errResult) > 0 {
 		for _, err := range errResult {
 			log.Errorf("Download dir error: %v", err)
@@ -1553,6 +1568,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 			log.Error("File cannot be recoved!!!")
 			return err
 		}
+		log.Infof("DataShards %d, parityShards %d, failedCount %d, middlefile %d", datas, paritys, failedCount, len(middleFiles))
 		if err != nil {
 			log.Errorf("Save file by partition error %v, but file still can be recoverd", err)
 			for _, file := range allMiddleFiles {
@@ -1567,10 +1583,15 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 				}
 			}
 		}
+		if len(middleFiles) < datas {
+			err := fmt.Errorf("need %d shards, but only download %d, so cannot reconstrct", datas, len(middleFiles))
+			log.Error(err)
+			return err
+		}
 
 		if len(password) != 0 {
 			for _, file := range middleFiles {
-				fmt.Printf("password:%s\n", string(password))
+				log.Infof("middle file %s", file)
 				if err := aes.DecryptFile(file, password, file); err != nil {
 					return err
 				}
@@ -1579,12 +1600,10 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 
 		// delete middle files
 		defer func() {
-			for _, file := range middleFiles {
+			for _, file := range allMiddleFiles {
 				deleteTemporaryFile(log, file)
 			}
 		}()
-
-		log.Infof("DataShards %d, parityShards %d, failedCount %d", datas, paritys, failedCount)
 
 		_, onlyFileName := filepath.Split(downFileName)
 		tempDownFileName := filepath.Join(c.TempDir, onlyFileName)
@@ -1647,7 +1666,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 
 		partFiles = append(partFiles, tempDownFileName)
 		// delete middle files
-		for _, file := range middleFiles {
+		for _, file := range allMiddleFiles {
 			deleteTemporaryFile(log, file)
 		}
 
