@@ -1454,6 +1454,15 @@ websocket.onopen = function (evt) {
 };
 websocket.onclose = function (evt) {
     console.log('colose');//已经关闭连接
+    if(evt){
+        var r=confirm("Sorry,An error in the system requires a reboot!");
+        if (r==true){
+            const {ipcRenderer} = require('electron'); 
+            ipcRenderer.send('close');
+        }else{
+           alert("You pressed Cancel! Please restart!");
+        }
+    }
 };
 websocket.onmessage = function (evt) {
     //收到服务器消息，使用evt.data提取
@@ -1477,12 +1486,16 @@ websocket.onmessage = function (evt) {
 websocket.onerror = function (evt) {
 //产生异常
     console.log(evt);
+    if(evt){
+        var r=confirm("Sorry,An error in the system requires a reboot!");
+        if (r==true){
+            const {ipcRenderer} = require('electron'); 
+            ipcRenderer.send('close');
+        }else{
+            alert("You pressed Cancel! Please restart!");
+        }
+    }
 }; 
-
-
-
-
-
 
 
 
