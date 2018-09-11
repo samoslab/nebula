@@ -1,4 +1,4 @@
-var refreshTransportTimer = null;
+//var refreshTransportTimer = null;
 var method = {
      //判断是否注册过邮箱！
      login:function(){
@@ -48,7 +48,7 @@ var method = {
     },
     //初始化哪个选项
     firstInit:function(){
-        clearInterval(refreshTransportTimer);
+        //clearInterval(refreshTransportTimer);
         let path = method.getParamsUrl().path;
         location.hash = path;
         console.log(path);
@@ -164,7 +164,7 @@ var method = {
     },
     //增加文件夹确定事件
     addFolderCf:function(initPath,path,space_no){
-        let name = $(".zJMtAEb dd:eq(0) .renameInput").val();
+        let name = $("#listContent dd:eq(0) .renameInput").val();
         let html = ``;
 
         $.ajax({
@@ -181,10 +181,10 @@ var method = {
             success:function(res){
                 console.log(res);
                 if(res.Data == true){
-                    $(".zJMtAEb dd:eq(0) .appendFileName").html(name).attr('href',`${'#'+initPath+'/'+name}`);
-                    $(".zJMtAEb dd:eq(0) .oprate").attr('style','');
+                    $("#listContent dd:eq(0) .appendFileName").html(name).attr('href',`${'#'+initPath+'/'+name}`);
+                    $("#listContent dd:eq(0) .oprate").attr('style','');
                     $(".renameSpan").hide();
-                    $(".zJMtAEb dd:eq(0) .s-select-check").attr({
+                    $("#listContent dd:eq(0) .s-select-check").attr({
                         "data-path":`${path}${path=='/'?'':'/'}${name}`,
                         "data-name":name
                     });
@@ -226,7 +226,7 @@ $("#listBox").scroll(function () {
    if((pagesize*pagenum<total)&&(scrollTop + winHeight>= contentHeight)){
         let sorttype = sessionStorage.getItem("viewtype");
         console.log(path,space_no,pagenum,sorttype);
-        list(path,space_no,100,pagenum+1,sorttype,true); 
+        list(path,space_no,100,pagenum+1,sorttype,true,true); 
         console.log('到底了');
     }
 });
@@ -244,7 +244,7 @@ $("#listBox").scroll(function () {
 // });
 
 //请求列表
-function list(path,space_no,pagesize,pagenum,sorttype,ascorder){
+function list(path,space_no,pagesize,pagenum,sorttype,ascorder,apd){
     $.ajax({
         url:"/api/v1/store/list",
         method:'POST',
@@ -279,7 +279,7 @@ function list(path,space_no,pagesize,pagenum,sorttype,ascorder){
             });
 
             //插入列表内容；
-            append(res,path,space_no);
+            append(res,path,space_no,apd);
             //插入面包屑导航内容；
             let html = breadNav(path,space_no);
             $("#breadNav").html(html);
@@ -299,7 +299,7 @@ function list(path,space_no,pagesize,pagenum,sorttype,ascorder){
  }
 
  //列表中插入所有list
-function append(res,path,space_no){
+function append(res,path,space_no,apd){
     let html = '';
     if((res.Data.total<1)||(res.code!=0)){
         $('#listContent').html('');
@@ -375,14 +375,20 @@ function append(res,path,space_no){
                         <span class="text">${k}</span>
                     </div>
                     <div data-key="type" class="AuPKyz-li" style="width:16%;">
-                        <span class="text">${(obj.filetype!='unknown')?obj.filetype:'folder'}</span>
+                        <span class="text">${(obj.folder==true)?'folder':obj.filetype}</span>
                     </div>
                     <div data-key="time" class="AuPKyz-li" style="width:23%;">
                         <span class="text">${public.Date(obj.modtime)}</span>
                     </div>
                 </dd>`;
     });
-    $('#listContent').append(html);
+    if(apd){
+        $('#listContent').append(html);
+    }else{
+        $('#listContent').html(html);
+    }
+    //$('#listContent').append(html);
+   // $('#listContent').html(html);
     //$('#listContent').html(`${html}`);
 
     // <!--单行选中增加类-->
@@ -392,19 +398,18 @@ function append(res,path,space_no){
 
 //<!--列表是否选中是否显示按钮组 全选中的情况下 全选按钮也选中  如若选中数量大于1个禁止重命名按按钮点击事件-->
 function btngroupshow(){
-    if($(".zJMtAEb input[name='fileSelect']:checked").size()!=0){
+    if($("#listContent input[name='fileSelect']:checked").size()!=0){
         $("#s-button-group").show();
     }else{
         $("#s-button-group").hide();
     }
-    if($(".zJMtAEb input[name='fileSelect']:checked").size()==$(".zJMtAEb input[name='fileSelect']").length){
+    if($("#listContent input[name='fileSelect']:checked").size()==$("#listContent input[name='fileSelect']").length){
         $("#s-selectAll").prop('checked','checked');
         $(".AuPKyz").addClass("activeSelect");
     }else{
         $("#s-selectAll").prop('checked',false);
-        //$(".zJMtAEb input[name='fileSelect']:checked").addClass("activeSelect");
     }
-    if($(".zJMtAEb input[name='fileSelect']:checked").size()!=1){
+    if($("#listContent input[name='fileSelect']:checked").size()!=1){
         $("#renameBtn").css('opacity',0.5);
         $("#renameBtn").click(function(event){
             event.preventDefault();
@@ -416,7 +421,7 @@ function btngroupshow(){
 
  // <!--单行选中增加类-->
  function rowSelected(){
-    $(".zJMtAEb input[name='fileSelect']").each(function(){
+    $("#listContent input[name='fileSelect']").each(function(){
         $(this).change(function(){
          //$(".s-select-check").change(function(){
              if($(this).is(":checked")){
@@ -473,24 +478,24 @@ var rename = {
         $("#file-rename-box .renameInput").val(name);
 
         // <!--非选中的input 和 全选按钮禁止点击-->
-        $(".zJMtAEb input[name='fileSelect']").not(':checked').attr('disabled','disabled');
+        $("#listContent input[name='fileSelect']").not(':checked').attr('disabled','disabled');
         $("#s-selectAll").attr("disabled","disabled");
     },
     // <!--重命名div隐藏-->
     renameDivHide:function (){
         $("#file-rename-box .renameInput").val('');
-        $(".zJMtAEb input[name='fileSelect']").not(':checked').attr('disabled',false);
+        $("#listContent input[name='fileSelect']").not(':checked').attr('disabled',false);
         $("#s-selectAll").attr("disabled",false);
         $("#file-rename-box").hide();
     },
     //重命名确定
     renameCf:function(){
         let renameInputV= $("#file-rename-box .renameInput").val();
-        $(".zJMtAEb input[name='fileSelect']:checked").siblings(".file-name").html(renameInputV).attr("title",renameInputV);
-        $(".zJMtAEb input[name='fileSelect']:checked").attr("data-name",renameInputV);
-        //let dataId = $(".zJMtAEb input[name='fileSelect']:checked").attr("data-id");
-        let dataPath = $(".zJMtAEb input[name='fileSelect']:checked").attr("data-path");
-        let spaceNo =  Number($(".zJMtAEb input[name='fileSelect']:checked").attr("data-spaceno"));
+        $("#listContent input[name='fileSelect']:checked").siblings(".file-name").html(renameInputV).attr("title",renameInputV);
+        $("#listContent input[name='fileSelect']:checked").attr("data-name",renameInputV);
+        //let dataId = $("#listContent input[name='fileSelect']:checked").attr("data-id");
+        let dataPath = $("#listContent input[name='fileSelect']:checked").attr("data-path");
+        let spaceNo =  Number($("#listContent input[name='fileSelect']:checked").attr("data-spaceno"));
         console.log(dataPath);
 
         let b = dataPath.lastIndexOf('/');
@@ -513,7 +518,7 @@ var rename = {
                     //重命名成功，隐藏重命名组件
                     rename.renameDivHide();
                       //重命名后给input赋值；
-                    $(".zJMtAEb input[name='fileSelect']:checked").attr("data-path",c+renameInputV);
+                    $("#listContent input[name='fileSelect']:checked").attr("data-path",c+renameInputV);
                 }else if(res.code!=0){
                     alert(res.errmsg);
                 }
@@ -524,11 +529,11 @@ var rename = {
 
 // <!--重命名点击事件-->
 $("#renameBtn").click(function(){
-    if($(".zJMtAEb input[name='fileSelect']:checked").size()==1){
+    if($("#listContent input[name='fileSelect']:checked").size()==1){
         //选中行到顶部的距离
-        let a = $(".zJMtAEb input[name='fileSelect']:checked").parents(".AuPKyz").position().top;
+        let a = $("#listContent input[name='fileSelect']:checked").parents(".AuPKyz").position().top;
          // <!--要改的文件名字给input value-->
-        let name = $(".zJMtAEb input[name='fileSelect']:checked").attr("data-name");
+        let name = $("#listContent input[name='fileSelect']:checked").attr("data-name");
         rename.rename(a,name);
     }
 
@@ -551,7 +556,7 @@ $('.renameInput').keyup(function(event){
 //oprate显示隐藏
 function oprateShow(x){
     //行选中数
-    if($(".zJMtAEb input[name='fileSelect']:checked").size()<=1){
+    if($("#listContent input[name='fileSelect']:checked").size()<=1){
         $(x).find("div:first-child .oprate").show();
     }
 }
@@ -692,7 +697,7 @@ $("#upLoadFileBtn").click(function(){
         //选择的文件
         let local = document.getElementById("upLoadFileIpt").files;
         for(let i=0;i<local.length;i++){
-            //每个选择文件的路
+            //每个选择文件的路径
             let localPath = local[i].path;
             $.ajax({
                 url:"/api/v1/task/upload",
@@ -766,7 +771,7 @@ $("#upLoadFolderBtn").click(function(){
 $("#downLoadBtn").click(function(){
     $("#downLoadIpt").unbind().change(function(){
         let localPath = document.getElementById("downLoadIpt").files[0].path;
-        let selectedArr = $(".zJMtAEb input[name='fileSelect']:checked");
+        let selectedArr = $("#listContent input[name='fileSelect']:checked");
        $("#downLoadIpt1")[0].reset();
         $.each(selectedArr,function(index,obj){
             let filehash = $(obj).attr("data-hash");
@@ -828,7 +833,7 @@ $("#downLoadBtn").click(function(){
 $("#deleteBtn").click(function(){
     let a =confirm("Confirm to delete the selected file?");
     if(a==true){
-        let inputArr = $(".zJMtAEb input[name='fileSelect']:checked");
+        let inputArr = $("#listContent input[name='fileSelect']:checked");
         let arr=[];
         for(i=0;i<inputArr.length;i++){
             let json = {};
@@ -933,13 +938,13 @@ function trigger(){
                         <span class="text">--</span>
                     </div>
                 </dd>`;
-    $('.zJMtAEb').prepend(row);
+    $('#listContent').prepend(row);
    
     //取消点击事件，避免重复点击；
     $("#addFolderBtn").removeAttr("onclick");
 
     $(".rename-cancel").click(function(){
-        $('.zJMtAEb dd').remove('.zJMtAEb dd:eq(0)');
+        $('#listContent dd').remove('#listContent dd:eq(0)');
         $("#addFolderBtn").attr("onclick",'trigger()');
    });
    $(".rename-cfm").click(function(){
@@ -1449,16 +1454,27 @@ websocket.onopen = function (evt) {
 };
 websocket.onclose = function (evt) {
     console.log('colose');//已经关闭连接
+    if(evt){
+        var r=confirm("Sorry,An error in the system requires a reboot!");
+        if (r==true){
+            const {ipcRenderer} = require('electron'); 
+            ipcRenderer.send('close');
+        }else{
+           alert("You pressed Cancel! Please restart!");
+        }
+    }
 };
 websocket.onmessage = function (evt) {
     //收到服务器消息，使用evt.data提取
     console.log(evt.data);
+    if(!evt.data)return;
     let data = JSON.parse(evt.data);
     if(((data.type=="DownloadProgress")||(data.type=="UploadProgress"))&&(data.progress!=1)){
         let key = data.key;
         $(".tsList-r-progressBar[data-name='"+key+"']").css("width",data.progress*100+'%').html(data.progress*100+'%');
         $("#updownGif").show();
-    }else if((data.type=="DownloadFile")||(data.type=="UploadFile")||(data.progress==1)){
+    //}else if((data.type=="DownloadFile")||(data.type=="UploadFile")||(data.progress==1)){
+    }else if((data.type=="DownloadFile")||(data.type=="UploadFile")){
         let key = data.key;
         $(".tsList-r-progressBar[data-name='"+key+"']").css("width",'100%').html('100%');
         method.firstInit();
@@ -1470,12 +1486,16 @@ websocket.onmessage = function (evt) {
 websocket.onerror = function (evt) {
 //产生异常
     console.log(evt);
+    if(evt){
+        var r=confirm("Sorry,An error in the system requires a reboot!");
+        if (r==true){
+            const {ipcRenderer} = require('electron'); 
+            ipcRenderer.send('close');
+        }else{
+            alert("You pressed Cancel! Please restart!");
+        }
+    }
 }; 
-
-
-
-
-
 
 
 

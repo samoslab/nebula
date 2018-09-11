@@ -298,6 +298,9 @@ ipcMain.on('default', (code) => {
   win.loadURL(defaultURL);
 });
 
+
+ipcMain.on('close', e=> win.close());
+
 const {shell} = require('electron')
 ipcMain.on('explorer', (event,code) => {
   shell.openExternal("http://explorer.samos.io/app/address/"+code+"/1")
