@@ -30,6 +30,10 @@ func calRate(current, total uint64) float64 {
 	return rate
 }
 
+type ProgressReadable struct {
+	Progress map[string]ProgressCell `json:"progress"`
+}
+
 // ProgressManager progress stats
 type ProgressManager struct {
 	Mutex                sync.Mutex
@@ -81,9 +85,11 @@ func match(fileMap map[string]struct{}, file string) bool {
 }
 
 // GetProgress return progress data
-func (pm *ProgressManager) GetProgress(files []string) (map[string]ProgressCell, error) {
+func (pm *ProgressManager) GetProgress(files []string) (ProgressReadable, error) {
+	pm.Mutex.Lock()
+	defer pm.Mutex.Unlock()
 	if len(files) == 0 {
-		return pm.Progress, nil
+		return ProgressReadable{Progress: pm.Progress}, nil
 	}
 	mp := map[string]struct{}{}
 	for _, file := range files {
@@ -96,7 +102,7 @@ func (pm *ProgressManager) GetProgress(files []string) (map[string]ProgressCell,
 		}
 		a[k] = v
 	}
-	return a, nil
+	return ProgressReadable{Progress: a}, nil
 }
 
 // GetProgress return progress data
