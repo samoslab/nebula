@@ -26,6 +26,11 @@ body {
     background-color: #eff4f8;
     font-family: Microsoft YaHei,SimHei,Tahoma!important;
 }
+.load-timg{
+    position: absolute;
+    top:calc(50% - 62px);
+    left:calc(50% - 62px);
+}
 #login-container{
     position: relative;
     height: 550px;
@@ -643,6 +648,10 @@ body {
     display: block;
     padding:0px 0 0 16px;
 }
+.listTotal{
+    float: right;
+    color:#888;
+}
 .FcucHsb{
     float:right;
     margin-right:20px;
@@ -668,6 +677,58 @@ body {
 .FuIxtL .EKIHPEb, .FuIxtL .KLxwHFb {
     color: #c5d8f3;
 }
+
+.frame-main-header>div.viewType{
+    position: relative;
+    margin: 12px 30px 10px 0;
+    float: right;
+}
+.viewType .viewTypeIcon{
+    display: block;
+    width: 30px;
+    height: 30px;
+    text-align: center;
+    color: #5F6F95;
+    cursor: pointer;
+}
+
+.viewType .viewTypeDrop{
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 30px;
+    z-index: 999;
+    width: 105px;
+    height: auto;
+    background: #fff;
+    border-radius: 4px;
+    border: 1px solid #c0d9fe;
+}
+.viewType .viewTypeDrop .vAFAFF{
+    display: block;
+    padding: 5px 10px;
+    text-align: left;
+    cursor: pointer;
+    color: #3B8CFF;
+    position: relative;
+    text-indent: 18px;
+}
+.viewType .viewTypeDrop .vAFAFF:hover,.viewType .viewTypeDrop .ugcOHtb{
+    background:#f6faff;
+}
+.viewType .viewTypeDrop .vAFAFF:first-child{
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+}
+.viewType .viewTypeDrop .vAFAFF:last-child{
+    border-bottom-left-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+.viewType:hover .viewTypeDrop{
+    display: block;
+}
+
+
 
 
 .no-file-ab{
@@ -727,6 +788,7 @@ body {
 
 .zJMtAEb{
     overflow-y: auto;
+    overflow-x:hidden;
 }
 .AuPKyz{
     height: 44px;
@@ -777,6 +839,9 @@ body {
     vertical-align: -8px;
     margin:0 10px;
     background-position: -160px -322px;
+}
+.file-name{
+    padding:10px;
 }
 /*-------------小图标类----------------------*/
 .my-file-ai { background-position: -20px -0px;  }
@@ -852,8 +917,8 @@ body {
 .my-file-xsl { background-position: -20px -322px;  }
 .my-file-zip,.my-file-epub,.my-file-gz,.my-file-7z,.my-file-bz2,.my-file-tar{ background-position: -66px -322px;  }
 .my-file-ac3 { background-position: -112px -322px;  }
-.my-file-unknown{ background-position: -160px -322px; }
-
+.my-file-folder{ background-position: -160px -322px; }
+.my-file-unknown{ background-position: -296px -92px; }
 
 
 
@@ -1263,7 +1328,7 @@ body {
     white-space: nowrap;
 }
 .tsList-r{
-    flex: 3;
+    flex: 1;
 }
 .tsList-r-Bar{
     position: relative;

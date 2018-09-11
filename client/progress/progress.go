@@ -10,13 +10,15 @@ import (
 
 // ProgressCell for progress bar
 type ProgressCell struct {
-	Sended     bool
-	Type       string
-	Total      uint64
-	Current    uint64
-	Time       uint64
-	Rate       float64
-	LastReaded bool
+	Sended     bool    `json:"-"`
+	Type       string  `json:"type"`
+	Total      uint64  `json:"-"`
+	Current    uint64  `json:"-"`
+	Time       uint64  `json:"-"`
+	Rate       float64 `json:"rate"`
+	Local      string  `json:"local"`
+	LastReaded bool    `json:"-"`
+	SpaceNo    int     `json:"spaco_no"`
 }
 
 func calRate(current, total uint64) float64 {
@@ -44,8 +46,8 @@ func NewProgressManager() *ProgressManager {
 }
 
 // SetProgress set current progress file size
-func (pm *ProgressManager) SetProgress(tp, fileName string, currentSize, totalSize uint64) {
-	pm.Progress[fileName] = ProgressCell{Type: tp, Total: totalSize, Current: currentSize, Rate: calRate(currentSize, totalSize), Time: common.Now()}
+func (pm *ProgressManager) SetProgress(tp, fileName string, currentSize, totalSize uint64, sno uint32, local string) {
+	pm.Progress[fileName] = ProgressCell{Type: tp, Total: totalSize, Current: currentSize, Rate: calRate(currentSize, totalSize), Time: common.Now(), SpaceNo: int(sno), Local: local}
 }
 
 // SetPartitionMap set progress file map
@@ -79,17 +81,20 @@ func match(fileMap map[string]struct{}, file string) bool {
 }
 
 // GetProgress return progress data
-func (pm *ProgressManager) GetProgress(files []string) (map[string]float64, error) {
+func (pm *ProgressManager) GetProgress(files []string) (map[string]ProgressCell, error) {
+	if len(files) == 0 {
+		return pm.Progress, nil
+	}
 	mp := map[string]struct{}{}
 	for _, file := range files {
 		mp[file] = struct{}{}
 	}
-	a := map[string]float64{}
+	a := map[string]ProgressCell{}
 	for k, v := range pm.Progress {
 		if !match(mp, k) {
 			continue
 		}
-		a[k] = v.Rate
+		a[k] = v
 	}
 	return a, nil
 }
@@ -107,7 +112,7 @@ func (pm *ProgressManager) GetProgressingMsg(files []string) ([]string, error) {
 		}
 		// skip already sended
 		if !v.Sended && !v.LastReaded {
-			msg := common.MakeSuccProgressMsg(v.Type, k, v.Rate)
+			msg := common.MakeSuccProgressMsg(v.Type, k, v.Rate, v.SpaceNo, v.Local)
 			result = append(result, msg.Serialize())
 			v.LastReaded = true
 			if int(v.Rate) == 1 {

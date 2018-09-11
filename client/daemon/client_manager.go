@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -20,6 +21,7 @@ import (
 	collectClient "github.com/samoslab/nebula/client/collector_client"
 	"github.com/samoslab/nebula/client/errcode"
 	"github.com/samoslab/nebula/client/progress"
+	tcppb "github.com/samoslab/nebula/tracker/collector/client/pb"
 	"github.com/samoslab/nebula/util/filetype"
 
 	"github.com/samoslab/nebula/client/common"
@@ -47,6 +49,7 @@ const (
 
 	// ClientDBName client db name
 	ClientDBName = "data.db"
+	WRONGSNO     = 999
 )
 
 var (
@@ -60,7 +63,7 @@ var (
 	DefaultTempDir = "/tmp/nebula_client"
 
 	// ReplicaNum number of muliti-replication
-	ReplicaNum    = 5
+	ReplicaNum    = 4
 	MinReplicaNum = 3
 )
 
@@ -304,33 +307,49 @@ func (c *ClientManager) ExecuteTask() error {
 					log.Infof("Handle task %+v", taskInfo)
 					retry := 0
 				RETRY:
-					doneMsg := common.MakeSuccDoneMsg(task.Type, "")
+					doneMsg := common.MakeSuccDoneMsg(task.Type, "", WRONGSNO)
 					retry++
 					switch task.Type {
 					case common.TaskUploadFileType:
 						req := task.Payload.(*common.UploadReq)
 						err = c.UploadFile(req.Filename, req.Dest, req.Interactive, req.NewVersion, req.IsEncrypt, req.Sno)
-						doneMsg.Source = req.Filename
+						doneMsg.Key = common.ProgressKey(serverPath(req.Dest, req.Filename), req.Sno)
+						doneMsg.SpaceNo = req.Sno
+						doneMsg.Local = req.Filename
 					case common.TaskUploadDirType:
 						req := task.Payload.(*common.UploadDirReq)
 						err = c.UploadDir(req.Parent, req.Dest, req.Interactive, req.NewVersion, req.IsEncrypt, req.Sno)
-						doneMsg.Source = req.Parent
+						doneMsg.Key = req.Dest
+						doneMsg.SpaceNo = req.Sno
+						doneMsg.Local = req.Parent
 					case common.TaskDownloadFileType:
 						req := task.Payload.(*common.DownloadReq)
 						err = c.DownloadFile(req.FileName, req.Dest, req.FileHash, req.FileSize, req.Sno)
-						doneMsg.Source = req.FileName
+						doneMsg.Key = common.ProgressKey(req.FileName, req.Sno)
+						doneMsg.SpaceNo = req.Sno
+						doneMsg.Local = localPath(req.Dest, req.FileName)
 					case common.TaskDownloadDirType:
 						req := task.Payload.(*common.DownloadDirReq)
 						err = c.DownloadDir(req.Parent, req.Dest, req.Sno)
-						doneMsg.Source = req.Parent
+						doneMsg.Key = req.Parent
+						doneMsg.SpaceNo = req.Sno
+						doneMsg.Local = req.Dest
 					default:
 						err = errors.New("unknown")
 					}
 					errStr := ""
 					if err != nil {
 						log.WithError(err).Error("Execute task failed")
-						code, _ := common.StatusErrFromError(err)
+						code, errMsg := common.StatusErrFromError(err)
 						if code == 300 && retry < 3 {
+							log.WithError(err).Error("Execute task failed, retrying")
+							goto RETRY
+						}
+						if strings.Contains(errMsg, "context deadline exceeded") && retry < 3 {
+							log.WithError(err).Error("Execute task failed, retrying")
+							goto RETRY
+						}
+						if retry < 3 {
 							log.WithError(err).Error("Execute task failed, retrying")
 							goto RETRY
 						}
@@ -370,11 +389,14 @@ func (c *ClientManager) SendProgressMsg() error {
 			wg.Done()
 			log.Infof("Shutdown progress goroutine")
 		}()
+		pingTicker := time.NewTicker(5 * time.Second)
 		for {
 			select {
 			case <-c.quit:
 				return
-			case <-time.After(1 * time.Second):
+			case <-pingTicker.C:
+				c.SendPingMsg()
+			case <-time.After(time.Second):
 				msgList, err := c.PM.GetProgressingMsg([]string{})
 				if err != nil {
 					log.WithError(err).Error("Get progress message failed")
@@ -387,6 +409,19 @@ func (c *ClientManager) SendProgressMsg() error {
 		}
 	}()
 	wg.Wait()
+	return nil
+}
+
+func (c *ClientManager) SendPingMsg() error {
+	req := &mpb.PingReq{
+		Version: common.Version,
+	}
+
+	_, err := c.mclient.Ping(context.Background(), req)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -526,7 +561,8 @@ func (c *ClientManager) UploadDir(parent, dest string, interactive, newVersion, 
 					close(done)
 					ccControl.Done()
 				}()
-				doneMsg := common.MakeSuccDoneMsg(common.TaskUploadFileType, dpair.Name)
+				doneMsg := common.MakeSuccDoneMsg(common.TaskUploadFileType, dpair.Name, sno)
+				doneMsg.Local = dpair.Name
 				err := c.UploadFile(dpair.Name, dpair.Parent, interactive, newVersion, isEncrypt, sno)
 				if err != nil {
 					doneMsg.SetError(1, err)
@@ -578,11 +614,33 @@ func (c *ClientManager) AddTask(tp string, req interface{}) (string, error) {
 	return taskInfo.Key, nil
 }
 
+func serverPath(dest, fileName string) string {
+	_, onlyFileName := filepath.Split(fileName)
+	if strings.HasSuffix(dest, "/") {
+		return dest + onlyFileName
+	}
+	return dest + "/" + onlyFileName
+}
+
+func localPath(dest, fileName string) string {
+	_, onlyFileName := filepath.Split(fileName)
+	if runtime.GOOS == "windows" {
+		return dest + "\\" + onlyFileName
+	}
+	return filepath.Join(dest, onlyFileName)
+}
+
 // UploadFile upload file to provider
 func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersion, isEncrypt bool, sno uint32) error {
 	var err error
 	var password, encryptKey []byte
 	log := c.Log.WithField("upload file", fileName)
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error("!!!!!get panic info, recover it %s", r)
+			debug.PrintStack()
+		}
+	}()
 	if isEncrypt {
 		password, err = c.getSpacePassword(sno)
 		if err != nil {
@@ -607,7 +665,8 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 
 	log.Infof("Check file exists resp code %d", rsp.GetCode())
 	if rsp.GetCode() == 0 {
-		c.PM.SetProgress(common.TaskUploadProgressType, fileName, req.FileSize, req.FileSize)
+		sp := serverPath(dest, fileName)
+		c.PM.SetProgress(common.TaskUploadProgressType, common.ProgressKey(sp, sno), req.FileSize, req.FileSize, sno, fileName)
 		log.Infof("Upload %s success", fileName)
 		return nil
 	}
@@ -634,7 +693,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 				deleteTemporaryFile(log, fileName)
 			}()
 		}
-		partitions, err := c.uploadFileByMultiReplica(originFileName, fileName, req, rsp)
+		partitions, err := c.uploadFileByMultiReplica(originFileName, fileName, req, rsp, sno)
 		if err != nil {
 			return err
 		}
@@ -664,6 +723,8 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 		fileInfos := []common.PartitionFile{}
 
 		realSizeAfterRS := int64(0)
+		sp := serverPath(dest, fileName)
+		uniqKey := common.ProgressKey(sp, sno)
 		for _, fname := range partFiles {
 			fileSlices, err := c.onlyFileSplit(fname, dataShards, verifyShards, isEncrypt, password, sno)
 			if err != nil {
@@ -679,13 +740,13 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 			log.Infof("File %s need split to %d blocks", fname, len(fileSlices))
 			for _, fs := range fileSlices {
 				log.Debugf("Erasure block files %s index %d", fs.FileName, fs.SliceIndex)
-				c.PM.SetPartitionMap(fs.FileName, fileName)
+				c.PM.SetPartitionMap(fs.FileName, uniqKey)
 				realSizeAfterRS += fs.FileSize
 			}
-			c.PM.SetPartitionMap(fname, fileName)
+			c.PM.SetPartitionMap(fname, uniqKey)
 		}
 
-		c.PM.SetProgress(common.TaskUploadProgressType, fileName, 0, uint64(realSizeAfterRS))
+		c.PM.SetProgress(common.TaskUploadProgressType, uniqKey, 0, uint64(realSizeAfterRS), sno, fileName)
 
 		// delete temporary file
 		defer func() {
@@ -829,7 +890,8 @@ func (c *ClientManager) CheckFileExists(fileName, dest string, interactive, newV
 			}
 		}
 		req.FileData = fileData
-		c.PM.SetProgress(common.TaskUploadProgressType, fileName, req.FileSize, req.FileSize)
+		sp := serverPath(dest, fileName)
+		c.PM.SetProgress(common.TaskUploadProgressType, common.ProgressKey(sp, sno), req.FileSize, req.FileSize, sno, fileName)
 		fmt.Printf("Origin filesize %d, encrypted size %d\n", req.FileSize, len(req.FileData))
 	}
 	err = req.SignReq(c.cfg.Node.PriKey)
@@ -1024,7 +1086,15 @@ func (c *ClientManager) uploadFileToReplicaProvider(conn *grpc.ClientConn, pro *
 	return pro.GetNodeId(), nil
 }
 
-func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string, req *mpb.CheckFileExistReq, rsp *mpb.CheckFileExistResp) ([]*mpb.StorePartition, error) {
+func newActionLogFromUpload(fileName string) *tcppb.ActionLog {
+	return &tcppb.ActionLog{
+		Type:      3,
+		BeginTime: common.Now(),
+		Info:      fileName,
+	}
+}
+
+func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string, req *mpb.CheckFileExistReq, rsp *mpb.CheckFileExistResp, sno uint32) ([]*mpb.StorePartition, error) {
 	log := c.Log
 	hash, err := util_hash.Sha1File(fileName)
 	if err != nil {
@@ -1079,55 +1149,77 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 		BlockSeq:    uint32(fileSlices[0].SliceIndex),
 	}
 
-	c.PM.SetPartitionMap(fileName, originFileName)
+	sp := serverPath(req.Parent.GetPath(), fileName)
+	uniqKey := common.ProgressKey(sp, sno)
+	c.PM.SetPartitionMap(fileName, uniqKey)
 
-	providers, err := GetBestReplicaProvider(ufprsp.GetProvider(), ReplicaNum)
+	providers, backupPros, err := GetBestReplicaProvider(ufprsp.GetProvider(), ReplicaNum)
 	if err != nil {
 		return nil, err
 	}
 	if fileName == originFileName {
-		c.PM.SetProgress(common.TaskUploadProgressType, originFileName, 0, uint64(len(providers))*req.FileSize)
+		c.PM.SetProgress(common.TaskUploadProgressType, uniqKey, 0, uint64(len(providers))*req.FileSize, sno, originFileName)
 	} else {
-		c.PM.SetProgress(common.TaskUploadProgressType, originFileName, 0, uint64(int64(len(providers))*fileSize))
+		c.PM.SetProgress(common.TaskUploadProgressType, uniqKey, 0, uint64(int64(len(providers))*fileSize), sno, originFileName)
 	}
 
-	errArr := []error{}
-	var mutex sync.Mutex
-	ccControl := NewCCController(common.CCUploadFileNum)
-	for _, pro := range providers {
-		ccControl.Add()
-		go func(pro *mpb.ReplicaProvider) {
-			server := fmt.Sprintf("%s:%d", pro.Server, pro.Port)
-			conn, err := common.GrpcDial(server)
-			if err != nil {
-				log.Errorf("Rpc dail failed: %v", err)
+	HandlerUpload := func(providers []*mpb.ReplicaProvider, block *mpb.StoreBlock, uploadPara *common.UploadParameter) []error {
+		errArr := []error{}
+		var mutex sync.Mutex
+		ccControl := NewCCController(common.CCUploadFileNum)
+		for _, pro := range providers {
+			ccControl.Add()
+			go func(pro *mpb.ReplicaProvider) {
+				server := fmt.Sprintf("%s:%d", pro.Server, pro.Port)
+				conn, err := common.GrpcDial(server)
+				if err != nil {
+					log.Errorf("Rpc dail failed: %v", err)
+					mutex.Lock()
+					errArr = append(errArr, err)
+					mutex.Unlock()
+					ccControl.Done()
+					return
+				}
+				done := make(chan struct{})
+				go HandleQuit(c.quit, done, ccControl, func() { conn.Close() })
+				defer func() {
+					conn.Close()
+					close(done)
+					ccControl.Done()
+				}()
+				proID, err := c.uploadFileToReplicaProvider(conn, pro, uploadPara)
+				if err != nil {
+					mutex.Lock()
+					errArr = append(errArr, err)
+					mutex.Unlock()
+				}
 				mutex.Lock()
-				errArr = append(errArr, err)
+				block.StoreNodeId = append(block.StoreNodeId, proID)
 				mutex.Unlock()
-				ccControl.Done()
-				return
-			}
-			done := make(chan struct{})
-			go HandleQuit(c.quit, done, ccControl, func() { conn.Close() })
-			defer func() {
-				conn.Close()
-				close(done)
-				ccControl.Done()
-			}()
-			proID, err := c.uploadFileToReplicaProvider(conn, pro, uploadPara)
-			if err != nil {
-				mutex.Lock()
-				errArr = append(errArr, err)
-				mutex.Unlock()
-			}
-			mutex.Lock()
-			block.StoreNodeId = append(block.StoreNodeId, proID)
-			mutex.Unlock()
-		}(pro)
-	}
+			}(pro)
+		}
 
-	ccControl.Wait()
+		ccControl.Wait()
+		return errArr
+	}
+	//al := newActionLogFromUpload(fileName)
+	//defer collectClient.Collect(al)
+	errArr := HandlerUpload(providers, block, uploadPara)
 	if len(errArr) > 0 {
+		log.Errorf("Upload error %v, total %d", errArr[0], len(errArr))
+		if len(backupPros) < len(errArr) {
+			log.Errorf("Not enough bakcup providers, backup provider %d", len(backupPros))
+			errInfo := ""
+			for _, err := range errArr {
+				errInfo += err.Error() + "\n"
+			}
+			//client.SetActionLog(err, al)
+			return nil, errors.New(errInfo)
+		}
+		errArr = HandlerUpload(backupPros[0:len(errArr)], block, uploadPara)
+	}
+	if len(errArr) > 0 {
+		log.Errorf("No solution for upload")
 		return nil, errArr[0]
 	}
 
@@ -1283,6 +1375,8 @@ func (c *ClientManager) startDownloadDir(path, destDir string, sno uint32) error
 	log := c.Log.WithField("download dir", path)
 	errResult := []error{}
 	page := uint32(1)
+	var mutex sync.Mutex
+	ccControl := NewCCController(common.CCDownloadGoNum)
 	for {
 		// list 1 page 100 items order by name
 		retry := 0
@@ -1290,8 +1384,7 @@ func (c *ClientManager) startDownloadDir(path, destDir string, sno uint32) error
 		downFiles, err := c.ListFiles(path, 100, page, "name", true, sno)
 		retry++
 		if err != nil {
-			code, errmsg := common.StatusErrFromError(err)
-			fmt.Printf("code %d, errmsg %s\n", code, errmsg)
+			code, _ := common.StatusErrFromError(err)
 			if code == 300 && retry < 3 {
 				goto RETRY
 			}
@@ -1322,22 +1415,35 @@ func (c *ClientManager) startDownloadDir(path, destDir string, sno uint32) error
 					log.Infof("Only create %s because file size is 0", fileInfo.FileName)
 					SaveFile(destFile, []byte{})
 				} else {
-					doneMsg := common.MakeSuccDoneMsg(common.TaskDownloadFileType, currentFile)
-					err = c.DownloadFile(currentFile, destDir, fileInfo.FileHash, fileInfo.FileSize, sno)
-					if err != nil {
-						doneMsg.SetError(1, err)
-					}
+					ccControl.Add()
+					go func(currentFile, destDir string, fileInfo *DownFile, sno uint32) {
+						done := make(chan struct{})
+						go HandleQuit(c.quit, done, ccControl)
+						defer func() {
+							close(done)
+							ccControl.Done()
+						}()
+						doneMsg := common.MakeSuccDoneMsg(common.TaskDownloadFileType, currentFile, sno)
+						err = c.DownloadFile(currentFile, destDir, fileInfo.FileHash, fileInfo.FileSize, sno)
+						if err != nil {
+							doneMsg.SetError(1, err)
+						}
 
-					c.AddDoneMsg(doneMsg.Serialize())
-					if err != nil {
-						log.Errorf("Download file %s error %v", currentFile, err)
-						errResult = append(errResult, fmt.Errorf("%s %v", currentFile, err))
-						//return err
-					}
+						c.AddDoneMsg(doneMsg.Serialize())
+						if err != nil {
+							log.Errorf("Download file %s error %v", currentFile, err)
+							//errResult = append(errResult, fmt.Errorf("%s %v", currentFile, err))
+							mutex.Lock()
+							errResult = append(errResult, err)
+							mutex.Unlock()
+							//return err
+						}
+					}(currentFile, destDir, fileInfo, sno)
 				}
 			}
 		}
 	}
+	ccControl.Wait()
 	if len(errResult) > 0 {
 		for _, err := range errResult {
 			log.Errorf("Download dir error: %v", err)
@@ -1363,12 +1469,14 @@ func (c *ClientManager) CheckFileExistsInLocal(downFileName string, filehash []b
 
 // DownloadFile download file
 func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fileSize uint64, sno uint32) error {
+	serverFile := downFileName
 	_, fileName := filepath.Split(downFileName)
 	downFileName = filepath.Join(destDir, fileName)
 	log := c.Log.WithField("download file", downFileName)
 	defer func() {
 		if r := recover(); r != nil {
 			log.Error("!!!!!get panic info, recover it %s", r)
+			debug.PrintStack()
 		}
 	}()
 	fileHash, err := hex.DecodeString(filehash)
@@ -1378,9 +1486,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 	exists := c.CheckFileExistsInLocal(downFileName, fileHash)
 	if exists {
 		log.Info("File exists in local")
-		c.PM.SetProgress(common.TaskDownloadProgressType, downFileName, 0, fileSize)
-		c.PM.SetPartitionMap(downFileName, downFileName)
-		c.PM.SetIncrement(downFileName, fileSize)
+		c.PM.SetProgress(common.TaskDownloadProgressType, common.ProgressKey(serverFile, sno), fileSize, fileSize, sno, downFileName)
 		return nil
 	}
 	req := &mpb.RetrieveFileReq{
@@ -1395,7 +1501,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 	if err != nil {
 		return err
 	}
-	c.PM.SetProgress(common.TaskDownloadProgressType, downFileName, 0, req.FileSize)
+	c.PM.SetProgress(common.TaskDownloadProgressType, common.ProgressKey(serverFile, sno), 0, req.FileSize, sno, downFileName)
 
 	ctx := context.Background()
 	log.Infof("Download request file hash %x, size %d", fileHash, fileSize)
@@ -1425,7 +1531,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 			}
 		}
 		SaveFile(downFileName, filedata)
-		c.PM.SetProgress(common.TaskDownloadProgressType, downFileName, req.FileSize, req.FileSize)
+		c.PM.SetProgress(common.TaskDownloadProgressType, common.ProgressKey(serverFile, sno), req.FileSize, req.FileSize, sno, downFileName)
 		log.Info("Download tiny file")
 		return nil
 	}
@@ -1439,9 +1545,9 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 			log.Info("File store as multi-replication")
 			// for progress stats
 			for _, block := range partitions[0].GetBlock() {
-				c.PM.SetPartitionMap(hex.EncodeToString(block.GetHash()), downFileName)
+				c.PM.SetPartitionMap(hex.EncodeToString(block.GetHash()), common.ProgressKey(serverFile, sno))
 			}
-			_, _, _, _, err := c.saveFileByPartition(downFileName, partitions[0], rsp.GetTimestamp(), req.FileHash, req.FileSize, true)
+			_, _, _, _, _, err := c.saveFileByPartition(downFileName, partitions[0], rsp.GetTimestamp(), req.FileHash, req.FileSize, true)
 			if err != nil {
 				return err
 			}
@@ -1462,27 +1568,44 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 	realSizeAfterRS := uint64(0)
 	for i, partition := range partitions {
 		for j, block := range partition.GetBlock() {
-			c.PM.SetPartitionMap(hex.EncodeToString(block.GetHash()), downFileName)
+			c.PM.SetPartitionMap(hex.EncodeToString(block.GetHash()), common.ProgressKey(serverFile, sno))
 			realSizeAfterRS += block.GetSize()
 			log.Infof("Partition %d block %d hash %x size %d checksum %v seq %d", i, j, block.Hash, block.Size, block.Checksum, block.BlockSeq)
 		}
 	}
-	c.PM.SetProgress(common.TaskDownloadProgressType, downFileName, 0, realSizeAfterRS)
+	c.PM.SetProgress(common.TaskDownloadProgressType, common.ProgressKey(serverFile, sno), 0, realSizeAfterRS, sno, downFileName)
 
 	if len(partitions) == 1 {
 		partition := partitions[0]
-		datas, paritys, failedCount, middleFiles, err := c.saveFileByPartition(downFileName, partition, rsp.GetTimestamp(), req.FileHash, req.FileSize, false)
+		datas, paritys, failedCount, middleFiles, allMiddleFiles, err := c.saveFileByPartition(downFileName, partition, rsp.GetTimestamp(), req.FileHash, req.FileSize, false)
 		if failedCount > paritys {
 			log.Error("File cannot be recoved!!!")
 			return err
 		}
+		log.Infof("DataShards %d, parityShards %d, failedCount %d, middlefile %d", datas, paritys, failedCount, len(middleFiles))
 		if err != nil {
 			log.Errorf("Save file by partition error %v, but file still can be recoverd", err)
+			for _, file := range allMiddleFiles {
+				deleted := true
+				for _, wellFile := range middleFiles {
+					if file == wellFile {
+						deleted = false
+					}
+				}
+				if deleted {
+					deleteTemporaryFile(log, file)
+				}
+			}
+		}
+		if len(middleFiles) < datas {
+			err := fmt.Errorf("need %d shards, but only download %d, so cannot reconstrct", datas, len(middleFiles))
+			log.Error(err)
+			return err
 		}
 
 		if len(password) != 0 {
 			for _, file := range middleFiles {
-				fmt.Printf("password:%s\n", string(password))
+				log.Infof("middle file %s", file)
 				if err := aes.DecryptFile(file, password, file); err != nil {
 					return err
 				}
@@ -1491,12 +1614,10 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 
 		// delete middle files
 		defer func() {
-			for _, file := range middleFiles {
+			for _, file := range allMiddleFiles {
 				deleteTemporaryFile(log, file)
 			}
 		}()
-
-		log.Infof("DataShards %d, parityShards %d, failedCount %d", datas, paritys, failedCount)
 
 		_, onlyFileName := filepath.Split(downFileName)
 		tempDownFileName := filepath.Join(c.TempDir, onlyFileName)
@@ -1517,17 +1638,31 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 	partFiles := []string{}
 	for i, partition := range partitions {
 		partFileName := fmt.Sprintf("%s.%s.%d", downFileName, TEMP_NAMESPACE, i)
-		datas, paritys, failedCount, middleFiles, err := c.saveFileByPartition(partFileName, partition, rsp.GetTimestamp(), req.FileHash, req.FileSize, false)
+		log := log.WithField("middle file", partFileName)
+		datas, paritys, failedCount, middleFiles, allMiddleFiles, err := c.saveFileByPartition(partFileName, partition, rsp.GetTimestamp(), req.FileHash, req.FileSize, false)
 		if failedCount > paritys {
 			log.Errorf("Middle file %s cannot be recoved!!!", partFileName)
 			return err
 		}
 		if err != nil {
-			log.Errorf("Save file by partition error %v, but file still can be recoverd", err)
+			log.WithError(err).Error("Save file by partition error, but file still can be recoverd")
+			for _, file := range allMiddleFiles {
+				deleted := true
+				for _, wellFile := range middleFiles {
+					if file == wellFile {
+						deleted = false
+					}
+				}
+				if deleted {
+					deleteTemporaryFile(log, file)
+				}
+			}
 		}
 		if len(password) != 0 {
 			for _, file := range middleFiles {
+				log.Infof("middle file %s", file)
 				if err := aes.DecryptFile(file, password, file); err != nil {
+					log.WithError(err).Error("decrypt file failed")
 					return err
 				}
 			}
@@ -1545,7 +1680,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 
 		partFiles = append(partFiles, tempDownFileName)
 		// delete middle files
-		for _, file := range middleFiles {
+		for _, file := range allMiddleFiles {
 			deleteTemporaryFile(log, file)
 		}
 
@@ -1564,24 +1699,56 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 	return nil
 }
 
-func (c *ClientManager) saveFileByPartition(fileName string, partition *mpb.RetrievePartition, tm uint64, fileHash []byte, fileSize uint64, multiReplica bool) (int, int, int, []string, error) {
+func (c *ClientManager) saveFileByPartition(fileName string, partition *mpb.RetrievePartition, tm uint64, fileHash []byte, fileSize uint64, multiReplica bool) (int, int, int, []string, []string, error) {
 	log := c.Log.WithField("filename", fileName)
 	log.Infof("There is %d blocks", len(partition.GetBlock()))
 	dataShards := 0
 	parityShards := 0
 	failedCount := 0
+	successCount := 0
 	middleFiles := []string{}
+	allMiddleFiles := []string{}
 	errArray := []string{}
 	var mutex sync.Mutex
 	ccControl := NewCCController(common.CCDownloadGoNum)
-
 	for _, block := range partition.GetBlock() {
 		if block.GetChecksum() {
 			parityShards++
 		} else {
 			dataShards++
 		}
+		tempFileName := fileName
+		if !multiReplica {
+			_, onlyFileName := filepath.Split(fileName)
+			tempFileName = filepath.Join(c.TempDir, fmt.Sprintf("%s.%d", onlyFileName, block.GetBlockSeq()))
+		}
+		allMiddleFiles = append(allMiddleFiles, tempFileName)
+	}
 
+	normalFlow := true
+	currQuit := make(chan struct{})
+	go func() {
+		for {
+			select {
+			case <-time.After(30 * time.Second):
+				log.Infof("success %d datashars %d", successCount, dataShards)
+				if successCount >= dataShards {
+					normalFlow = false
+					close(currQuit)
+					return
+				}
+			case <-c.quit:
+				return
+			case <-currQuit:
+				return
+			}
+		}
+	}()
+
+	//al := newActionLogFromUpload(fileName)
+	//defer collectClient.Collect(al)
+
+	for _, block := range partition.GetBlock() {
 		ccControl.Add()
 		go func(log logrus.FieldLogger, block *mpb.RetrieveBlock, fileName string) {
 			node := BestRetrieveNode(block.GetStoreNode())
@@ -1594,9 +1761,11 @@ func (c *ClientManager) saveFileByPartition(fileName string, partition *mpb.Retr
 				errArray = append(errArray, err.Error())
 				mutex.Unlock()
 				ccControl.Done()
+				//client.SetActionLog(err, al)
 				return
 			}
 			done := make(chan struct{})
+			go HandleQuit(currQuit, done, ccControl, func() { conn.Close() })
 			go HandleQuit(c.quit, done, ccControl, func() { conn.Close() })
 			defer func() {
 				close(done)
@@ -1617,27 +1786,32 @@ func (c *ClientManager) saveFileByPartition(fileName string, partition *mpb.Retr
 				log.Error("Retrieve failed")
 				mutex.Lock()
 				failedCount++
-				middleFiles = append(middleFiles, tempFileName)
 				errArray = append(errArray, err.Error())
 				mutex.Unlock()
+				//client.SetActionLog(err, al)
 				return
 			}
 			log.Info("Retrieve success")
 			mutex.Lock()
 			middleFiles = append(middleFiles, tempFileName)
+			successCount++
 			mutex.Unlock()
 			conn.Close()
+
 		}(log, block, fileName)
 	}
 
 	ccControl.Wait()
+	if normalFlow {
+		close(currQuit)
+	}
 
 	if len(errArray) > 0 {
 		fmt.Printf("download goroutine failed %d\n", len(errArray))
 		errRtn := fmt.Errorf("%s", strings.Join(errArray, "\n"))
-		return dataShards, parityShards, failedCount, middleFiles, errRtn
+		return dataShards, parityShards, failedCount, middleFiles, allMiddleFiles, errRtn
 	}
-	return dataShards, parityShards, failedCount, middleFiles, nil
+	return dataShards, parityShards, failedCount, middleFiles, allMiddleFiles, nil
 }
 
 // RemoveFile remove file
@@ -1738,17 +1912,8 @@ func (c *ClientManager) GetSpaceSysFileData(sno uint32) ([]byte, error) {
 }
 
 // GetProgress returns progress rate
-func (c *ClientManager) GetProgress(files []string) (map[string]float64, error) {
+func (c *ClientManager) GetProgress(files []string) (map[string]progress.ProgressCell, error) {
 	return c.PM.GetProgress(files)
-}
-
-// ImportConfig import config file
-func (c *ClientManager) ImportConfig(fileName, clientConfigFile string) error {
-	cfg, err := config.LoadConfig(fileName)
-	if err != nil {
-		return err
-	}
-	return config.SaveClientConfig(clientConfigFile, cfg)
 }
 
 // ExportConfig export config file

@@ -15,15 +15,6 @@ var method = {
             }
         })
     },
-    //订单使用情况
-    usage:function (){
-        $.ajax({
-            url:"/api/v1/usage/amount",
-            success:function(res){
-                console.log(res);
-            }
-        });
-    },
     //获取hashName;
     getParamsUrl:function (){
         var hashName = location.hash.split("#")[1];//路由地址
@@ -55,7 +46,7 @@ var method = {
             }
         });
     },
-
+    //初始化哪个选项
     firstInit:function(){
         clearInterval(refreshTransportTimer);
         let path = method.getParamsUrl().path;
@@ -63,18 +54,22 @@ var method = {
         console.log(path);
         let space_no = 0;
         let a = path.split(":")[0];
+
+        //请求参做个记录
+        $("#thisListAugs").attr("path",path.split(":")[1]);
+
          //左侧选项卡
         $("#frameAsideUl li").removeClass("active");
         if(a == "myspace"){
             space_no = 0;
             // //左侧选项卡
             $("#mySpace").parent().addClass("active");
-            this.init(path,space_no);
+            this.spaceSelect(path,space_no);
         }else if(a == "privite"){
             space_no = 1;
             //左侧选项卡
             $("#privteSpace").parent().addClass("active");
-            this.init(path,space_no);
+            this.spaceSelect(path,space_no);
         }else if(a=="transport"){
             this.transportInit();
         }else if(a=="package"){
@@ -82,13 +77,15 @@ var method = {
         }
         
     },
-    //初始化
-    init:function (path,space_no){
+    //初始化我的空间或 隐藏空间
+    spaceSelect:function (path,space_no){
         path = path.split(":")[1];
         if(path.length == 0){
             path = "/";
         }
         console.log(path);
+        //按钮组隐藏
+        $("#s-button-group").hide();
         if(space_no==0){
             this.myspaceInit(path,space_no);
         }else if(space_no==1){
@@ -107,8 +104,12 @@ var method = {
         $("#priviteCondition").hide();
         //传输列表和我的套餐隐藏
         $(".tabDiv").hide();
-
-        list(path,space_no,1000,1,'modtime',true);  
+        //遍历按哪种类型的排序
+        let sorttype = sessionStorage.getItem("viewtype");
+        $("#viewTypeDrop>span[data-key='"+sorttype+"']").addClass('ugcOHtb').siblings().removeClass('ugcOHtb'); //给类名
+        $("#listContent").html("");
+        list(path,space_no,100,1,sorttype,true);  
+        
     },
     //隐私空间初始化
     priviteInit:function(path,space_no){
@@ -120,7 +121,10 @@ var method = {
         if(sessionStorage['hadImport']){
             $("#priviteCondition").hide();
             $("#diskDivAll").show();
-            list(path,space_no,1000,1,'modtime',true);   
+            let sorttype = sessionStorage.getItem("viewtype");
+            $("#viewTypeDrop>span[data-key='"+sorttype+"']").addClass('ugcOHtb').siblings().removeClass('ugcOHtb'); //给类名
+            $("#listContent").html("");
+            list(path,space_no,100,1,sorttype,true);  
         }else{
             // 内容区隐藏
             $("#diskDivAll").hide();
@@ -194,15 +198,38 @@ var method = {
 
 };
 
-// $("#listBox").scroll(function () { 
-//     let scrollTop = $(this).scrollTop(); 
-//     let winHeight = $(this).height(); 
-//     let contentHeight = $("#listContent").height();
-//     console.log(scrollTop+','+winHeight+","+','+$("#listContent").height());
-//     if (scrollTop + winHeight >= contentHeight) {
-//         alert('到底了');
-//     }
-// });
+//排序选择
+ $("#viewType").mouseenter(function(){
+    $(".viewTypeDrop").show();
+});
+$("#viewTypeDrop>span").click(function(){
+    $("#viewTypeDrop>span").removeClass('ugcOHtb');
+    $(this).addClass('ugcOHtb');
+    let key = $(this).attr("data-key");
+    sessionStorage.setItem("viewtype", key);
+    $("#viewTypeDrop").hide();
+    method.firstInit();
+});
+
+//滚动加载
+$("#listBox").scroll(function () { 
+    let total = parseInt($("#thisListAugs").attr("total")),
+        pagesize = parseInt($("#thisListAugs").attr("pagesize")),
+        pagenum = parseInt($("#thisListAugs").attr("pagenum")),
+        path = $("#thisListAugs").attr("path"),
+        space_no = parseInt($("#thisListAugs").attr("space_no"));
+
+    let scrollTop =Math.round($(this).scrollTop()),
+        winHeight = $(this).height(), 
+        contentHeight = $("#listContent").height();
+
+   if((pagesize*pagenum<total)&&(scrollTop + winHeight>= contentHeight)){
+        let sorttype = sessionStorage.getItem("viewtype");
+        console.log(path,space_no,pagenum,sorttype);
+        list(path,space_no,100,pagenum+1,sorttype,true); 
+        console.log('到底了');
+    }
+});
 //查所有文件类型
 // $.ajax({
 //     url:"/api/v1/service/filetype",
@@ -238,10 +265,23 @@ function list(path,space_no,pagesize,pagenum,sorttype,ascorder){
                       return;
             }
             if(res.code!=0) {alert(res.errmsg);return;}
+            //列表总数
+            $("#listTotalNum").html(res.Data.total);
+            //请求参做个记录
+            $("#thisListAugs").attr({
+                "path":path,
+                "space_no":space_no,
+                "pagesize":pagesize,
+                "pagenum":pagenum,
+                "sorttype":sorttype,
+                "ascorder":ascorder,
+                "total":res.Data.total
+            });
+
             //插入列表内容；
             append(res,path,space_no);
             //插入面包屑导航内容；
-             let html = breadNav(path,space_no);
+            let html = breadNav(path,space_no);
             $("#breadNav").html(html);
 
             //把面包屑最后一个的链接地址给到左侧导航栏，目的是左侧切换时回到原目录，记得以前位置；
@@ -262,19 +302,23 @@ function list(path,space_no,pagesize,pagenum,sorttype,ascorder){
 function append(res,path,space_no){
     let html = '';
     if((res.Data.total<1)||(res.code!=0)){
-        $('.zJMtAEb').html('');
+        $('#listContent').html('');
         $(".no-file-ab").show();
         return false;
     }
-  
 
     $(".no-file-ab").hide();
 
     //let typeArr=["epub", "otf", "woff", "gz", "doc", "eot", "pdf", "ps", "rtf", "cab", "xls", "ppt", "pptx", "xlsx", "docx", "7z", "bz2", "Z", "deb", "elf", "crx", "lz", "exe", "nes", "rar", "rpm", "swf", "sqlite", "tar", "ar", "xz", "zip", "amr", "m4a", "mid", "mp3", "ogg", "flac", "wav", "bmp", "gif", "jpg", "png", "tif", "psd", "jxr", "webp", "cr2", "ico", "mp4", "mpg", "mov", "webm", "flv", "m4v", "mkv", "wmv", "avi"];
    
     $.each(res.Data.files,function(index,obj){
-        let a = obj.extension;
-            k = obj.filesize; 
+        let a;
+        if(obj.folder){
+             a = 'folder';
+        }else{
+             a = obj.extension;
+        }
+        let k = obj.filesize; 
             no = '';                          //文件大小
         if(k&&k<1024){
             k = obj.filesize+' B'
@@ -292,13 +336,13 @@ function append(res,path,space_no){
         }
         if(path=="/"){
             path="";
-        }
-        // onclick="gBtnDownLoad('${obj.filehash}','${obj.filesize}','${obj.filename}','${space_no}','${obj.folder}')"
+        } 
+        
         html+=`<dd class="AuPKyz" onmouseenter = "oprateShow(this)" onmouseleave = "oprateHide(this)">
                     <div data-key="name" class="AuPKyz-li" style="width:44%;">
                         <input class="s-select-check" type="checkbox" name="fileSelect" data-name="${obj.filename}" data-id="${obj.id}" data-path="${path}${'/'+obj.filename}" data-hash="${obj.filehash}" data-size="${obj.filesize}" data-folder=${obj.folder} data-spaceNo="${space_no}">
                         <span class="file-icon my-file-${a}"></span>
-                        <a class="file-name" title="${obj.filename}" href="${no}${path}${'/'+obj.filename}">${obj.filename}</a>
+                        <a class="file-name" title="${obj.filename}" href="${obj.folder?(no+path+'/'+obj.filename):'javascript:;'}">${obj.filename}</a>
                         <div class="oprate">
                             <a class="g-button g-btn-download" href="javascript:;" title="DownLoad"  onclick="gBtnDownLoad('${obj.id}','${obj.filehash}','${obj.filesize}','${path}${'/'+obj.filename}','${space_no}','${obj.folder}')">
                                 <span>
@@ -338,9 +382,10 @@ function append(res,path,space_no){
                     </div>
                 </dd>`;
     });
-    $('.zJMtAEb').html(`<div id="listContent">${html}</div>`);
+    $('#listContent').append(html);
+    //$('#listContent').html(`${html}`);
 
-     // <!--单行选中增加类-->
+    // <!--单行选中增加类-->
     rowSelected(); 
 }
 
@@ -974,7 +1019,7 @@ $("#goInPriviteSpace2").click(function(){
                     sessionStorage.setItem("hadImport",true);
                     $("#priviteCondition").hide();
                     $("#diskDivAll").show();
-                    list('/',1,1000,1,'modtime',true);  
+                    list('/',1,100,1,'modtime',true);  
 
                 }else{
                     alert('Password incorrect!');
@@ -1026,8 +1071,8 @@ var public = {
     //求窗口尺寸大小
     wh:function(){
         let fmh = $(".frame-main").height();
-        $("#listBox").css('height',(fmh-100)+'px');
-        $("#tsMenu").css('height',(fmh-100)+'px');
+        $("#listBox").css('height',(fmh-106)+'px');
+        $("#tsMenu").css('height',(fmh-106)+'px');
     }
 };
 
@@ -1123,7 +1168,7 @@ function pay(orderId){
 }
 
 
-//我的传输入列表方法集
+//我的传输入列表方法集  ${idx.split("\\")[idx.split("\\").length-1]}
 var transportMethod = {
     transportInit:function(){
         $.ajax({
@@ -1138,12 +1183,16 @@ var transportMethod = {
                if((res.code==0)&&(JSON.stringify(res.Data)!="{}")){
                     let html = '';
                     $.each(res.Data,function(idx,obj){
-                        //console.log(idx.split("\\")[idx.split("\\").length-1]);
+                    
                         html +=`<li class="tsList">
-                                    <div class="tsList-l" title="${idx}">${idx.split("\\")[idx.split("\\").length-1]}</div>
+                                    <div class="tsList-l" title="${idx}">
+                                        <span>${obj.type}</span>
+                                        <span>${(idx.split('@')[0]=='0')?"默认空间":"隐私空间"}</span>
+                                        <span> 路径是：${idx.split('@')[1]}</span>
+                                    </div>
                                     <div class="tsList-r">
                                         <div class="tsList-r-Bar">
-                                            <div class="tsList-r-progressBar" data-name="${idx.split("\\")[idx.split("\\").length-1]}" style="width:${obj*100+'%'};">${Math.round(obj*100)+'%'}</div>
+                                            <div class="tsList-r-progressBar" data-name="${idx}" style="width:${obj.rate*100+'%'};">${Math.round(obj.rate*100)+'%'}</div>
                                         </div>
                                     </div>
                                 </li>`;
@@ -1184,7 +1233,12 @@ var packageMethod = {
             }
         });
     },
-    
+    //查询转账情况
+    inquireBalance:function(){
+        let code = $("#samosWalletAddress").val();
+        const {ipcRenderer} = require('electron'); 
+        ipcRenderer.send('explorer',code);
+    },
     
     // 所有订单初始化
     orderAllInit:function(){
@@ -1372,6 +1426,10 @@ $("#samosWalletCopyBtn").click(function(){
         console.log(e.text);
     });
 });
+//转账明细查询
+$("#inquireBalance").click(function(){
+    packageMethod.inquireBalance();
+});
 //刷新钱包金额
 $("#refreshBtn").click(function(){
     packageMethod.queryBalanceInit();
@@ -1394,35 +1452,15 @@ websocket.onclose = function (evt) {
 };
 websocket.onmessage = function (evt) {
     //收到服务器消息，使用evt.data提取
-
     console.log(evt.data);
     let data = JSON.parse(evt.data);
-    if((data.type=="DownloadProgress")||(data.type=="UploadProgress")){
-        if(data.progress!=1){
-            if(data.filename){
-                let filename = data.filename;
-                let name = filename.split('\\')[filename.split('\\').length-1];
-                console.log(name);
-                $(".tsList-r-progressBar[data-name='"+name+"']").css("width",data.progress*100+'%').html(data.progress*100+'%');
-                $("#updownGif").show();
-            }
-        }else{
-            if(data.source){
-                let source = data.source;
-                let s = source.split('\\')[source.split('\\').length-1];
-                $(".tsList-r-progressBar[data-name='"+s+"']").css("width",'100%').html('100%');
-            }
-            method.firstInit();
-            $("#updownGif").hide();
-        }
-       
-        
-    }else if((data.type=="DownloadFile")||(data.type=="UploadFile")){
-        if(data.source){
-            let source = data.source;
-            let s = source.split('\\')[source.split('\\').length-1];
-            $(".tsList-r-progressBar[data-name='"+s+"']").css("width",'100%').html('100%');
-        }
+    if(((data.type=="DownloadProgress")||(data.type=="UploadProgress"))&&(data.progress!=1)){
+        let key = data.key;
+        $(".tsList-r-progressBar[data-name='"+key+"']").css("width",data.progress*100+'%').html(data.progress*100+'%');
+        $("#updownGif").show();
+    }else if((data.type=="DownloadFile")||(data.type=="UploadFile")||(data.progress==1)){
+        let key = data.key;
+        $(".tsList-r-progressBar[data-name='"+key+"']").css("width",'100%').html('100%');
         method.firstInit();
         $("#updownGif").hide();
     }

@@ -142,6 +142,12 @@ func Now() uint64 {
 	return uint64(time.Now().UTC().Unix())
 }
 
+func Max(a, b int) int {
+	if a < b {
+		return b
+	}
+	return a
+}
 func Min(a, b int) int {
 	if a < b {
 		return a
@@ -160,4 +166,8 @@ func GrpcDial(server string) (*grpc.ClientConn, error) {
 	//	fmt.Printf("grpc dial err %v\n", err)
 	//}
 	return grpc.Dial(server, grpc.WithInsecure(), grpc.WithTimeout(3*time.Second), grpc.WithBlock())
+}
+
+func ProgressKey(fileName string, sno uint32) string {
+	return fmt.Sprintf("%d@%s", sno, fileName)
 }

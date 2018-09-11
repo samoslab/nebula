@@ -1,13 +1,11 @@
 package wsservice
 
 import (
-	"fmt"
 	"net/http"
 	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/samoslab/nebula/client/common"
 	"github.com/samoslab/nebula/client/daemon"
 	"github.com/sirupsen/logrus"
 )
@@ -87,7 +85,6 @@ func (c *WSController) answerWriter(ws *websocket.Conn, msgType string) {
 		case msg := <-(*c.cm).GetMsgChan():
 			(*c.cm).DecreaseMsgCount()
 			ws.SetWriteDeadline(time.Now().Add(writeWait))
-			fmt.Printf("send msg:%s\n", msg)
 			if err := ws.WriteMessage(websocket.TextMessage, []byte(msg)); err != nil {
 				return
 			}
@@ -106,6 +103,17 @@ func (c *WSController) ServeWs(w http.ResponseWriter, r *http.Request) {
 
 	msgType := r.FormValue("type")
 
+	log := c.log
+	// may be user hasn't register , so client manster pointer is nil, webservice should not start
+	for {
+		if *c.cm == nil {
+			log.Info("client manager hasn't init, waiting 3 seconds")
+			time.Sleep(3 * time.Second)
+		} else {
+			break
+		}
+	}
+	log.Info("client manager inited, start web socket\n")
 	go c.answerWriter(ws, msgType)
 }
 
@@ -123,7 +131,7 @@ func (c *WSController) Consume() {
 			return
 		case <-fileTicker.C:
 			cnt := (*c.cm).GetMsgCount()
-			if cnt > uint32(common.MsgQueueLen-common.MsgQueueLen+5) {
+			if cnt > 1000 { // if accumulated message count exceed 1000, then consume it
 				for i := 0; i < int(cnt); i++ {
 					select {
 					case msg := <-(*c.cm).GetMsgChan():
@@ -144,7 +152,7 @@ func (c *WSController) Run(addr string) error {
 	http.HandleFunc("/message", c.ServeWs)
 	var wg sync.WaitGroup
 	errC := make(chan error)
-	//go c.Consume()
+	go c.Consume()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -160,7 +168,6 @@ func (c *WSController) Run(addr string) error {
 		wg.Wait()
 		close(done)
 	}()
-	log.Info("wait websocket shutdown")
 	select {
 	case err := <-errC:
 		return err

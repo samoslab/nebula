@@ -298,6 +298,11 @@ ipcMain.on('default', (code) => {
   win.loadURL(defaultURL);
 });
 
+const {shell} = require('electron')
+ipcMain.on('explorer', (event,code) => {
+  shell.openExternal("http://explorer.samos.io/app/address/"+code+"/1")
+}); 
+  
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and require them here.

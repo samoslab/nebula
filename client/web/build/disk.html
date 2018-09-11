@@ -5,7 +5,7 @@
     <title>samos</title>
     <meta content="SkyDrive,samos SkyDrive,Network U disk, network hard disk, free SkyDrive, SkyDrive download, SkyDrive resources, synchronization, cloud storage, external chain sharing, offline Download" name="keywords"/>
     <meta content="samos SkyDrive To provide you with network backup, synchronization and sharing services. Large space, fast speed, safe and stable." name="description"/>
-    <link href="./images/favicon.ico" rel="shortcut icon" type="images/x-icon"/>
+    <link href="./images/favicon.ico" rel="icon"  sizes="any"/>
     <link href="./css/style.css" rel="stylesheet" type="text/css"/>
     <link rel="Shortcut Icon" href="favicon.ico">
     <script>if (typeof module === 'object') {window.module = module; module = undefined;}</script>
@@ -26,7 +26,7 @@
                     <a href="javascript:;" target="_blank" title="samos"></a>
                 </dt>
               
-                <dd class="languageBox">
+                <dd class="languageBox" style="display:none;">
                     <a href="javascript:changeLang('index', 'zh_CN');" class="s-cnen" id="changeToCn">EN</a>
                     <a href="javascript:changeLang('index', 'en');" class="s-cnen" id="changeToEn"  style="display:none;">CN</a>
                 </dd>
@@ -227,6 +227,30 @@
                             <span data-locale="rename">Rename</span>
                         </div>
                     </div>
+                    <div id="viewType" class="viewType">
+                        <div class="viewTypeIcon">
+                            <svg version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
+                                width="30px" height="30px" viewBox="0 0 216 146" enable-background="new 0 0 216 146" xml:space="preserve">
+                                <g>
+                                    <path d="M165.357,104.285H50.643c-1.413,0-2.635,0.517-3.667,1.549c-1.032,1.031-1.548,2.254-1.548,3.666v10.429
+                                        c0,1.412,0.516,2.634,1.548,3.666c1.033,1.032,2.255,1.548,3.667,1.548h114.714c1.412,0,2.634-0.516,3.666-1.548
+                                        c1.031-1.032,1.547-2.254,1.547-3.666V109.5c0-1.412-0.514-2.635-1.547-3.666C167.991,104.802,166.77,104.285,165.357,104.285z"/>
+                                    <path d="M169.023,22.405c-1.032-1.032-2.254-1.548-3.666-1.548H50.643c-1.413,0-2.635,0.516-3.667,1.548
+                                        c-1.032,1.032-1.548,2.254-1.548,3.666V36.5c0,1.412,0.516,2.634,1.548,3.666c1.033,1.032,2.255,1.548,3.667,1.548h114.714
+                                        c1.412,0,2.634-0.516,3.666-1.548c1.031-1.032,1.547-2.254,1.547-3.666V26.071C170.57,24.659,170.055,23.437,169.023,22.405z"/>
+                                    <path d="M165.357,62.571H50.643c-1.413,0-2.635,0.516-3.667,1.548c-1.032,1.032-1.548,2.254-1.548,3.666v10.429
+                                        c0,1.412,0.516,2.636,1.548,3.667c1.033,1.031,2.255,1.548,3.667,1.548h114.714c1.412,0,2.634-0.517,3.666-1.548
+                                        c1.031-1.031,1.547-2.255,1.547-3.667V67.785c0-1.412-0.516-2.634-1.547-3.666C167.991,63.087,166.77,62.571,165.357,62.571z"/>
+                                </g>
+                            </svg>
+
+                        </div>
+                        <div id="viewTypeDrop" class="viewTypeDrop">
+                            <span class="vAFAFF" data-key="name">文件名</span>
+                            <span class="vAFAFF" data-key="size"> 大小</span>
+                            <span class="vAFAFF ugcOHtb" data-key="modtime">修改日期</span>
+                        </div>
+                    </div>
                 </div><!--主内容区头部结束-->
                 <div class="frame-main-content"><!--主内容区列表开始-->
                     <div  class="JDeHdxb"><!--导航开始-->
@@ -246,6 +270,10 @@
                                 <span title="全部文件/新建文件夹(1)/新建文件夹">新建文件夹</span>
                             </li> --> 
                         </ul>
+                        <div id="listTotal" class="listTotal">
+                            <span>共 <em id="listTotalNum">0</em> 个</span>
+                            <input id="thisListAugs" type="hidden"  />
+                        </div>
                     </div><!--导航结束-->
 
                     <div class="file-list-box"><!--列表区开始-->
@@ -275,24 +303,9 @@
                             </div>
                         </div><!--没有文件情况结束-->
                         <div id="listBox" class="zJMtAEb"><!--列表list开始-->
-                            <!--
-                            <dd class="AuPKyz"><!--单行--
-                                <div data-key="name" class="AuPKyz-li" style="width:44%;">
-                                    <input class="s-select-check" type="checkbox" name="fileSelect" data-name="文件名称" data-id="">
-                                    <span class="file-icon"></span>
-                                    <span class="file-name" title="文件名称">文件名称</span>
-                                </div>
-                                <div data-key="size" class="AuPKyz-li" style="width:16%;">
-                                    <span class="text">-</span>
-                                </div>
-                                <div data-key="size" class="AuPKyz-li" style="width:16%;">
-                                    <span class="text">-</span>
-                                </div>
-                                <div data-key="time" class="AuPKyz-li" style="width:23%;">
-                                    <span class="text">-</span>
-                                </div>
-                            </dd><!--单行--
-                            -->
+                            <div id="listContent">
+                                <!---放内容的区域--->
+                            </div>
                         </div><!--列表list结束-->
                     </div><!--列表区结束-->
 
@@ -333,8 +346,8 @@
             <div class="balanceRow">
                 <span data-locale="balance">余额：</span>
                 <span id="balanceNo">0</span><span>samos</span>
-                <input id="refreshBtn" class="btn btn-default" type="button" value="refresh">
                 <input id="topUp" class="btn btn-default" type="button" value="充值" data-target="#myModal" data-toggle="modal" data-locale="rechange">
+                <input id="refreshBtn" class="btn btn-default" type="button" value="refresh">
             </div>
            
 
@@ -417,7 +430,8 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button id="initBalance" type="button" class="btn btn-default" data-dismiss="modal" data-locale="confirm">确定</button>
+                <button id="inquireBalance"  type="button" class="btn btn-default">查询明细</button>
+                <button id="initBalance" type="button" class="btn btn-default" data-dismiss="modal" data-locale="confirm">关闭</button>
             </div>
         </div><!-- /.modal-content -->
     </div><!-- /.modal -->
@@ -434,12 +448,6 @@
     //     // loadProperties('index', l);
     //     // showSwitch(l);
     // })
-
-    //<!--网盘 传输列表 选项卡-->
-    // $(".vyQhNyb0").click(function(){
-    //     $(this).addClass("vyQhNyb").siblings().removeClass("vyQhNyb");
-    //     $("div.tabDiv").hide().eq($(this).index()-1).show();
-    // });
 $(function(){
     //第一步判断是否注册过；未注册回登录页；
     method.login();
@@ -450,7 +458,7 @@ $(function(){
             method.firstInit();
         }else{
             location.hash = 'myspace:';
-            method.init('myspace:');  
+            method.spaceSelect('myspace:');  
         }
         public.wh();        //确定内容区高度
     },false);
@@ -490,6 +498,7 @@ $(function(){
 });
 
 </script>
+
 </body>
 </html>
 
