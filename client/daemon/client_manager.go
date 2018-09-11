@@ -349,6 +349,10 @@ func (c *ClientManager) ExecuteTask() error {
 							log.WithError(err).Error("Execute task failed, retrying")
 							goto RETRY
 						}
+						if retry < 3 {
+							log.WithError(err).Error("Execute task failed, retrying")
+							goto RETRY
+						}
 						errStr = err.Error()
 						doneMsg.SetError(1, err)
 					} else {
@@ -631,6 +635,12 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 	var err error
 	var password, encryptKey []byte
 	log := c.Log.WithField("upload file", fileName)
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error("!!!!!get panic info, recover it %s", r)
+			debug.PrintStack()
+		}
+	}()
 	if isEncrypt {
 		password, err = c.getSpacePassword(sno)
 		if err != nil {
@@ -1192,8 +1202,8 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 		ccControl.Wait()
 		return errArr
 	}
-	al := newActionLogFromUpload(fileName)
-	defer collectClient.Collect(al)
+	//al := newActionLogFromUpload(fileName)
+	//defer collectClient.Collect(al)
 	errArr := HandlerUpload(providers, block, uploadPara)
 	if len(errArr) > 0 {
 		log.Errorf("Upload error %v, total %d", errArr[0], len(errArr))
@@ -1203,7 +1213,7 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 			for _, err := range errArr {
 				errInfo += err.Error() + "\n"
 			}
-			client.SetActionLog(err, al)
+			//client.SetActionLog(err, al)
 			return nil, errors.New(errInfo)
 		}
 		errArr = HandlerUpload(backupPros[0:len(errArr)], block, uploadPara)
@@ -1735,8 +1745,8 @@ func (c *ClientManager) saveFileByPartition(fileName string, partition *mpb.Retr
 		}
 	}()
 
-	al := newActionLogFromUpload(fileName)
-	defer collectClient.Collect(al)
+	//al := newActionLogFromUpload(fileName)
+	//defer collectClient.Collect(al)
 
 	for _, block := range partition.GetBlock() {
 		ccControl.Add()
@@ -1751,7 +1761,7 @@ func (c *ClientManager) saveFileByPartition(fileName string, partition *mpb.Retr
 				errArray = append(errArray, err.Error())
 				mutex.Unlock()
 				ccControl.Done()
-				client.SetActionLog(err, al)
+				//client.SetActionLog(err, al)
 				return
 			}
 			done := make(chan struct{})
@@ -1778,7 +1788,7 @@ func (c *ClientManager) saveFileByPartition(fileName string, partition *mpb.Retr
 				failedCount++
 				errArray = append(errArray, err.Error())
 				mutex.Unlock()
-				client.SetActionLog(err, al)
+				//client.SetActionLog(err, al)
 				return
 			}
 			log.Info("Retrieve success")
