@@ -340,8 +340,12 @@ func (c *ClientManager) ExecuteTask() error {
 					errStr := ""
 					if err != nil {
 						log.WithError(err).Error("Execute task failed")
-						code, _ := common.StatusErrFromError(err)
+						code, errMsg := common.StatusErrFromError(err)
 						if code == 300 && retry < 3 {
+							log.WithError(err).Error("Execute task failed, retrying")
+							goto RETRY
+						}
+						if strings.Contains(errMsg, "context deadline exceeded") && retry < 3 {
 							log.WithError(err).Error("Execute task failed, retrying")
 							goto RETRY
 						}
