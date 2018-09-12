@@ -2,6 +2,7 @@ package wsservice
 
 import (
 	"net/http"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -65,7 +66,14 @@ func (c *WSController) Shutdown() {
 }
 
 func (c *WSController) answerWriter(ws *websocket.Conn, msgType string) {
+
 	log := c.log
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error("!!!!!get panic info, recover it %s", r)
+			debug.PrintStack()
+		}
+	}()
 	pingTicker := time.NewTicker(pingPeriod)
 	defer func() {
 		pingTicker.Stop()
@@ -131,7 +139,7 @@ func (c *WSController) Consume() {
 			return
 		case <-fileTicker.C:
 			cnt := (*c.cm).GetMsgCount()
-			if cnt > 1000 { // if accumulated message count exceed 1000, then consume it
+			if cnt > 900 { // if accumulated message count exceed 1000, then consume it
 				for i := 0; i < int(cnt); i++ {
 					select {
 					case msg := <-(*c.cm).GetMsgChan():
