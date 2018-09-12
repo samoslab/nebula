@@ -727,6 +727,7 @@ $("#upLoadFileBtn").click(function(){
 $("#upLoadFolderBtn").click(function(){
     $("#upLoadFolderIpt").unbind().change(function(){
         let localPath = document.getElementById("upLoadFolderIpt").files[0].path;
+        if(!localPath)return;
         let space_no = '';
         let hashPath = method.getParamsUrl().path;
         let a = hashPath.split(":")[0];
@@ -1185,9 +1186,9 @@ var transportMethod = {
             }),
             success:function(res){
                 console.log(res);
-               if((res.code==0)&&(JSON.stringify(res.Data)!="{}")){
+               if((res.code==0)&&(JSON.stringify(res.Data.progress)!="{}")){
                     let html = '';
-                    $.each(res.Data,function(idx,obj){
+                    $.each(res.Data.progress,function(idx,obj){
                     
                         html +=`<li class="tsList">
                                     <div class="tsList-l" title="${idx}">
@@ -1453,6 +1454,7 @@ websocket.onopen = function (evt) {
     console.log(evt);//已经建立连接
 };
 websocket.onclose = function (evt) {
+    console.log(evt);
     console.log('colose');//已经关闭连接
     if(evt){
         var r=confirm("Sorry,An error in the system requires a reboot!");
