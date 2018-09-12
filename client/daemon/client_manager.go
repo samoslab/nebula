@@ -1912,7 +1912,7 @@ func (c *ClientManager) GetSpaceSysFileData(sno uint32) ([]byte, error) {
 }
 
 // GetProgress returns progress rate
-func (c *ClientManager) GetProgress(files []string) (map[string]progress.ProgressCell, error) {
+func (c *ClientManager) GetProgress(files []string) (progress.ProgressReadable, error) {
 	return c.PM.GetProgress(files)
 }
 
