@@ -1,12 +1,15 @@
 package daemon
 
 import (
+	"fmt"
 	"io/ioutil"
 	"math"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	util_file "github.com/samoslab/nebula/util/file"
 )
 
 const chunkSize int64 = 1024 * 1024
@@ -129,6 +132,9 @@ func FileJoin(filename string, partfiles []string) error {
 // GetDirsAndFiles returns dirs and files in path root
 func GetDirsAndFiles(root string) ([]DirPair, error) {
 	dirs := []DirPair{}
+	if !util_file.Exists(root) {
+		return nil, fmt.Errorf("%s not exists", root)
+	}
 	err := filepath.Walk(root, func(path string, f os.FileInfo, err error) error {
 		parent, _ := filepath.Split(path)
 		if f.IsDir() {

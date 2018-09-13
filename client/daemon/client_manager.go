@@ -92,6 +92,7 @@ type ClientManager struct {
 	TempDir       string
 	PubkeyHash    []byte
 	Root          string
+	mutex         sync.Mutex
 	MsgCount      uint32
 	MsgChan       chan string
 	done          chan struct{}
@@ -194,10 +195,14 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 }
 
 func (c *ClientManager) GetMsgCount() uint32 {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 	return c.MsgCount
 }
 
 func (c *ClientManager) DecreaseMsgCount() {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 	c.MsgCount--
 }
 
@@ -207,6 +212,8 @@ func (c *ClientManager) GetMsgChan() <-chan string {
 
 func (c *ClientManager) AddDoneMsg(msg string) {
 	c.MsgChan <- msg
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
 	c.MsgCount++
 }
 
@@ -313,6 +320,7 @@ func (c *ClientManager) ExecuteTask() error {
 					case common.TaskUploadFileType:
 						req := task.Payload.(*common.UploadReq)
 						err = c.UploadFile(req.Filename, req.Dest, req.Interactive, req.NewVersion, req.IsEncrypt, req.Sno)
+						log.Infof("UploadFile result %v", err)
 						doneMsg.Key = common.ProgressKey(serverPath(req.Dest, req.Filename), req.Sno)
 						doneMsg.SpaceNo = req.Sno
 						doneMsg.Local = req.Filename
@@ -647,7 +655,6 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 			log.WithError(err).Info("Get space password")
 			return err
 		}
-		fmt.Printf("password %s\n", string(password))
 		if len(password) == 0 {
 			log.Info("Space password not set")
 			return fmt.Errorf("Password not set")
@@ -1552,7 +1559,6 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 				return err
 			}
 			if len(password) != 0 {
-				fmt.Printf("password:%s\n", string(password))
 				if err := aes.DecryptFile(downFileName, password, downFileName); err != nil {
 					log.Errorf("Maybe")
 				}

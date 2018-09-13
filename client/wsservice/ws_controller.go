@@ -2,10 +2,12 @@ package wsservice
 
 import (
 	"net/http"
+	"runtime/debug"
 	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/samoslab/nebula/client/common"
 	"github.com/samoslab/nebula/client/daemon"
 	"github.com/sirupsen/logrus"
 )
@@ -21,7 +23,7 @@ const (
 	pingPeriod = (pongWait * 9) / 10
 
 	// consume with this period.
-	ConsumePeriod = 30 * time.Second
+	ConsumePeriod = 10 * time.Second
 )
 
 var (
@@ -65,7 +67,14 @@ func (c *WSController) Shutdown() {
 }
 
 func (c *WSController) answerWriter(ws *websocket.Conn, msgType string) {
+
 	log := c.log
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error("!!!!!get panic info, recover it %s", r)
+			debug.PrintStack()
+		}
+	}()
 	pingTicker := time.NewTicker(pingPeriod)
 	defer func() {
 		pingTicker.Stop()
@@ -125,13 +134,22 @@ func (c *WSController) Consume() {
 		close(c.done)
 	}()
 	for {
+		if *c.cm == nil {
+			log.Info("client manager hasn't init, waiting 3 seconds")
+			time.Sleep(3 * time.Second)
+		} else {
+			break
+		}
+	}
+	for {
 		select {
 		case <-c.quit:
 			log.Info("Shutdown message consumer")
 			return
 		case <-fileTicker.C:
 			cnt := (*c.cm).GetMsgCount()
-			if cnt > 1000 { // if accumulated message count exceed 1000, then consume it
+			log.Infof("msg count %d", cnt)
+			if cnt > uint32(common.MsgQueueLen)-uint32(100) { // if accumulated message count exceed 1000, then consume it
 				for i := 0; i < int(cnt); i++ {
 					select {
 					case msg := <-(*c.cm).GetMsgChan():

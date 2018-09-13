@@ -22,6 +22,9 @@ type ProgressCell struct {
 }
 
 func calRate(current, total uint64) float64 {
+	if total == 0 {
+		return 1.0
+	}
 	rateS := fmt.Sprintf("%0.2f", float64(current)/float64(total))
 	rate, err := strconv.ParseFloat(rateS, 10)
 	if err != nil {
