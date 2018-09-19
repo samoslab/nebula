@@ -421,14 +421,14 @@ $(function(){
             data:JSON.stringify({"space_no":1}),
             success:function(res){
                 console.log(res);
-                if(res.code==1){
+                if(res.code==2){
                     $.cookie("privitePsd", 0, { expires: 365,path: '/' });
                     //未设过
-
                 }else if(res.code==0){
                     $.cookie("privitePsd", 1, { expires: 365,path: '/' });
                     //设过密码
-
+                }else{
+                    alert(res.errmsg);
                 }
             }
         });

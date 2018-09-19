@@ -133,12 +133,13 @@ var method = {
             //隐私空间
             $("#priviteCondition").show();
         }
-
+        //设置密码显示 
         if(!$.cookie("privitePsd")||$.cookie("privitePsd")=='0'){
-            //设置密码显示
+            //未设过 
             $(".priviteConditionContentBox").eq(0).show();
             $(".priviteConditionContentBox").eq(1).hide();
         }else{
+            //设过
             $(".priviteConditionContentBox").eq(1).show();
             $(".priviteConditionContentBox").eq(0).hide();
         }
