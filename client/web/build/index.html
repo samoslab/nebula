@@ -8,71 +8,76 @@
     <link href="./images/favicon.ico" rel="icon"  sizes="any"/>
     <link href="./css/style.css" rel="stylesheet" type="text/css"/>
     <link rel="Shortcut Icon" href="favicon.ico">
-    <!-- <script>if (typeof module === 'object') {window.module = module; module = undefined;}</script> -->
-    <!-- <script src="./js/jquery.min.js"></script> -->
-    <!-- <script>if (window.module) module = window.module;</script> -->
+    <script>if (typeof module === 'object') {window.module = module; module = undefined;}</script>
+    <script src="./js/jquery.min.js"></script>
+    <script>if (window.module) module = window.module;</script>
+    <script src="./js/jquery.i18n.properties.js"></script>
 </head>
 <body>
     <div id="login-container" style="display: none;"><!--登录内容区开始-->
+        <div class="languageBox indexLanguageBox">
+            <a href="javascript:changeLang('index', 'zh_CN');" class="s-cnen" id="changeToCn">CN</a>
+            <a href="javascript:changeLang('index', 'en');" class="s-cnen" id="changeToEn"  style="display:none;">EN</a>
+        </div>
         <div class="ibg-bg index-banner-0"></div>
         <div id="login-header">
             <div class="logo">
-                <a class="pan-logo" href="javascript:;" data-locale="logoName" title="samos network disk">samos network disk</a>
+                <a class="pan-logo" href="javascript:;" data-locale="logoName" title="samos me">samos me</a>
             </div>
         </div>
         <div class="login-main">
             <div class="all-index-banner">
                 <div class="index-body-content">
-                    <p><span class="left-quote"></span><span data-locale="storageBanner1">安全存储</span></p>
-                    <p><span data-locale="storageBanner2">放心优选</span><span class="right-quote"></span></p>
+                    <p><span class="left-quote"></span><span data-locale="storageBanner1">Secure Storage</span></p>
+                    <p><span data-locale="storageBanner2">Carefully selected</span><span class="right-quote"></span></p>
                 </div>
             </div>
             <div class="login-sdk-v4">           
                 <div class="header-login">
                     <!-- 引导 -->
                     <div id="guide" class="guide">
-                        <h2 data-locale="guideTitle">设置 Samos 网盘</h4>
-                        <p data-locale="guideWelcome">欢迎使用Samos网盘，请先创建网盘，如果已有网盘，请点击“导入钱包”按钮，根据提示导入已有的网盘配置文件。</p>
-                        <a class="guide-btn guide-btn-create" href="#/create" data-locale="createDisk">创建网盘</a>
-                        <a class="guide-btn guide-btn-had" href="#/had" data-locale="ownedDisk">已有网盘</a>
+                        <h2 data-locale="guideTitle">Samos me</h4>
+                        <p data-locale="guideWelcome">Welcome to use Samos me，Please create an account first,If you already have one, click 「Import  Config」button to import your existing account.</p>
+                        <a class="guide-btn guide-btn-create" href="#/create" data-locale="createDisk">Create account</a>
+                        <a class="guide-btn guide-btn-had" href="#/had" data-locale="ownedDisk">Existing account</a>
                     </div>
 
                     <!--邮箱-->
                     <div id="guideMail" class="tang-pass-login" style="display:none;">
                         <form id="TANGRAM__PSP_4__form" class="pass-form pass-form-normal">
-                            <p class="pass-form-logo" data-locale="setEmail">设置邮箱</p>
+                            <p class="pass-form-logo" data-locale="setEmail">Set Email</p>
                             <div class="inputLine">
-                                <label for="pass-form-inpt" data-locale="email">邮箱：</label>
-                                <input id="pass-form-inpt" class="pass-form-inpt" type="text" name="email" data-locale="importEmail" placeholder="请输入你的邮箱(用于接收账单)"/>
+                                <label for="pass-form-inpt" data-locale="email">Email：</label>
+                                <input id="pass-form-inpt" class="pass-form-inpt" type="text" name="email"  placeholder="Import Email(for receiving bills)"/>
                             </div>
                             <div class="inputLine">
-                                <label for="pass-form-cf" data-locale="verifyEmail">确认邮箱：</label>
-                                <input id="pass-form-cf" class="pass-form-inpt" type="text" name="email" data-locale="importEmail" placeholder="请输入你的邮箱(用于接收账单)"/>
+                                <label for="pass-form-cf" data-locale="verifyEmail">Verify：</label>
+                                <input id="pass-form-cf" class="pass-form-inpt" type="text" name="email"  placeholder="Import Email(for receiving bills)"/>
                             </div>
-                            <input id="submit-btn" class="submit-btn" type="button" data-locale="sendEmail" value="发送邮件"/>
+                            <div id="submit-btn" class="submit-btn" type="button" data-locale="sendEmail" value="">Send Email</div>
                             <div class="inputLine">
-                                <label for="code-inpt" data-locale="verificationCode">验证码：</label>
-                                <input  id="code-inpt" class="pass-form-inpt" type="text" name="code" data-locale="importCode" placeholder="填写邮箱验证码"/>
+                                <label for="code-inpt" data-locale="verificationCode">Code:</label>
+                                <input  id="code-inpt" class="pass-form-inpt" type="text" name="code"  placeholder="Verification Code"/>
                             </div>
                             <div class="inputLine mailGrounpBtns">
-                                <a class="guide-btn-had" href="#/" data-locale="prviousStep">上一步</a>
-                                <input id="code-submit-btn" class="submit-btn" type="button" data-locale="verify" value="验证"/>
+                                <a class="guide-btn-had" href="#/" data-locale="prviousStep">Previous Step</a>
+                                <div id="code-submit-btn" class="submit-btn verify-btn" type="button" data-locale="verify">Verify</div>
                             </div>
                             
 
-                            <p class="register-infro" data-locale="registerInf">注册说明：输入您的邮箱，我们会给给你的邮箱发送一份邮件，请打开邮箱进行验证。</p>
+                            <p class="register-infro" data-locale="registerInf">Register Inf:Please enter your email address and we will send a verification email to you. </p>
                         </form>
                     </div>
                     <!-- 导入网盘 -->
                     <div id="guideLeadIn" class="leadIn hidden">
-                        <p class="pass-form-logo" data-locale="importConfig">导入网盘配置文件</p>
-                        <p class="register-infro" data-locale="importPath">请在磁盘中选择导出的网盘配置文件</p>
+                        <p class="pass-form-logo" data-locale="importConfig">Import Config.json</p>
+                        <p class="register-infro" data-locale="importPath">Please select the path of the network disk configuration file on the disk.</p>
                         <div class="inputLine">
                             <input id="configFile" class="configFile" type="file" accept="*/*" >
                         </div>
                         <div class="inputLine mailGrounpBtns">
-                            <a class="guide-btn-had" href="#/" data-locale="prviousStep">上一步</a>
-                            <input id="config-submit-btn" class="submit-btn" type="button" data-locale="affirm" value="确认"/>
+                            <a class="guide-btn-had" href="#/" data-locale="prviousStep">Previous Step</a>
+                            <div id="config-submit-btn" class="submit-btn verify-btn" type="button" data-locale="affirm">Affirm</div>
                         </div>
 
                     </div>
@@ -86,15 +91,24 @@
         <img class="load-timg" src="./images/timg.gif">
     </div>
 
-
+<script src="js/common.js"></script>
+<script src="js/i18.js"></script>
+<script src="js/jquery.cookie.js"></script>
 <script>
-    var $ = require("jquery");
+    //var $ = require("jquery");
 
     //loading
     setTimeout(function(){
         $("#loading").hide();
         $("#login-container").show();
     },1000);
+
+    //语言
+    $(document).ready(function () {
+        var l = getLanguage();
+        loadProperties('index', l);
+        showSwitch(l);
+    })
 
     var util = {
         //获取hashName;
@@ -210,6 +224,7 @@
         $("#config-submit-btn").click(function(){
           let filename =  document.getElementById("configFile").files[0].path;
           console.log(filename);
+          if(!filename)return;
             $.ajax({
                 url:"/api/v1/config/import",
                 contentType:"application/json",
@@ -220,6 +235,8 @@
                     if(res.code==0){
                         alert("verify successfully!");
                         util.render();
+                    }else{
+                        alert(res.errmsg);
                     }
                     
                 }
