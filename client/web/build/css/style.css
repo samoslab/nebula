@@ -1268,7 +1268,10 @@ body {
 .packageUl>li:hover{
     cursor: pointer;
 }
-
+.orders{
+    max-height:600px;
+    overflow-y: auto;
+}
 .order-list{
     border:1px solid #666;
     text-align: left;
