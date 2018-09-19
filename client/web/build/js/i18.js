@@ -24,7 +24,7 @@ function setLanguage(lang) {
 function loadProperties(name,type) {
     $.i18n.properties({
         name:name,
-        path:'i18n/',
+        path:'/i18n/',
         mode:'map',
         language:type,
         callback:function(){

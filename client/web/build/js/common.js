@@ -42,6 +42,8 @@ var method = {
                     $("#priviteCondition").hide();
                     $("#diskDivAll").show();
                     that.priviteInit('/',space_no);
+                }else{
+                    alert(res.errmsg);
                 }
             }
         });
@@ -438,6 +440,7 @@ function btngroupshow(){
  //面包屑导航 得到层级 该有的代码；
  function breadNav(path,space_no){
      let a = "";
+     let lan = getLanguage();
     if(space_no==0){
         a = "#myspace:"
     }else if(space_no==1){
@@ -463,7 +466,7 @@ function btngroupshow(){
                 </li>`;
     }
     let allFileHtml =`<li>
-                        <a href="${a}" title="all files"  data-locale="allFileOther">all files</a>
+                        <a href="${a}" title="all files"  data-locale="allFileOther">${(lan=='en')?'all files':'全部文件'}</a>
                     </li>`;
     allFileHtml+=liHtml;
     return allFileHtml;
@@ -1193,8 +1196,8 @@ var transportMethod = {
                         html +=`<li class="tsList">
                                     <div class="tsList-l" title="${idx}">
                                         <span>${obj.type}</span>
-                                        <span>${(idx.split('@')[0]=='0')?"默认空间":"隐私空间"}</span>
-                                        <span> 路径是：${idx.split('@')[1]}</span>
+                                        <span>${(idx.split('@')[0]=='0')?"My Space":"Privacy Space"}</span>
+                                        <span> Path is：${idx.split('@')[1]}</span>
                                     </div>
                                     <div class="tsList-r">
                                         <div class="tsList-r-Bar">
@@ -1249,6 +1252,8 @@ var packageMethod = {
     // 所有订单初始化
     orderAllInit:function(){
         let expired = true;
+        let lan = getLanguage();
+        console.log(lan);
         $.ajax({
             url:"/api/v1/order/all?expired="+expired,
             success:function(res){
@@ -1265,19 +1270,19 @@ var packageMethod = {
                             }
                             html +=` <div class="order-list">
                                         <div class="order-list-head clearfix">
-                                            <span data-locale="createdTime">创建日期：<span>${public.Date(obj.creation)}</span></span>
-                                            <span data-locale="orderNumber">订单号：<span>${obj.id}</span></span>
+                                            <span><span data-locale="createdTime">${(lan=='en')?'createdTime:':'创建时间:'}</span><span>${public.Date(obj.creation)}</span></span>
+                                            <span><span data-locale="orderNumber">${(lan=='en')?'Order Number:':'订单号:'}</span><span>${obj.id}</span></span>
                                             <div  class="order-list-del" onclick="delOrder('${obj.id}')">
                                                 ${obj.paid?'':'&times;'}
                                             </div>
                                         </div>
                                         <div class="order-list-body">
                                             <div class="order-list-name">
-                                                <div class="order-list-t" data-locale="packageName">套餐名字</div>
+                                                <div class="order-list-t" data-locale="packageName">${(lan=='en')?'Package Name':'套餐名称'}</div>
                                                 <div>${obj.package.name}</div>
                                             </div>
                                             <div class="order-list-inf">
-                                                <div class="order-list-t" data-locale="packageInf">套餐信息</div>
+                                                <div class="order-list-t" data-locale="packageInf">${(lan=='en')?'Package information':'套餐信息'}</div>
                                                 <div>
                                                     <span>price:${obj.package.price/1000000};</span>
                                                     <span>volume:${obj.package.volume};</span>
@@ -1288,7 +1293,7 @@ var packageMethod = {
                                                 </div>
                                             </div>
                                             <div class="order-list-inf">
-                                                <div class="order-list-t" data-locale="allInf">总计信息</div>
+                                                <div class="order-list-t" data-locale="allInf">${(lan=='en')?'Total information':'总计'}</div>
                                                 <div>
                                                     <span>price:${obj.totalAmount/1000000};</span>
                                                     <span>volume:${obj.volume};</span>
@@ -1304,15 +1309,15 @@ var packageMethod = {
                                                 </div>
                                             </div>
                                             <div class="order-list-total">
-                                                <div class="order-list-t" datalocale="totalAmount">总额</div>
+                                                <div class="order-list-t" data-locale="totalAmount">${(lan=='en')?'Total Amount':'总额'}</div>
                                                 <div>${obj.totalAmount/1000000}</div>
                                             </div>
                                             <div class="order-list-quanlity">
-                                                <div class="order-list-t" data-locale="amount">数量</div>
+                                                <div class="order-list-t" data-locale="amount">${(lan=='en')?'Amount':'数量'}</div>
                                                 <div>${obj.quanlity}</div>
                                             </div>
                                             <div class="order-list-pay">
-                                                <div class="order-list-t" data-locale="buy">购买</div>
+                                                <div class="order-list-t" data-locale="buy">${(lan=='en')?'Buy':'购买'}</div>
                                                 <div class="${obj.paid?'':'toBuy'}" onclick="${obj.paid?'javascript:;':'pay(\''+obj.id+'\')'}">${obj.paid?'account paid':'buy'}</div>
                                             </div>
                                         </div>

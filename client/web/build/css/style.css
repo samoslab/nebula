@@ -246,6 +246,8 @@ body {
 .login-sdk-v4 .submit-btn{
     width: 100%;
     height: 40px;
+    line-height:40px;
+    text-align: center;
     background: #3582f8;
     border-radius: 4px;
     transition: .3s;
@@ -257,6 +259,10 @@ body {
     font-family: Microsoft YaHei,SimHei,Tahoma;
     font-weight: 100;
     margin-bottom: 20px;
+}
+.login-sdk-v4 .verify-btn{
+    float:right;
+    width:150px;
 }
 .login-sdk-v4 .submit-btn:hover{
     opacity: 0.8;
@@ -473,7 +479,12 @@ body {
     color:#3b8cff;
     border-radius: 10px;
     margin-top:5px;
-
+}
+.indexLanguageBox{
+    position: absolute;
+    right: 0;
+    top: 50px;
+    z-index: 9999;
 }
 
 .frame-aside{
@@ -777,7 +788,7 @@ body {
 }
 .QxJxtg .tvPMvPb li{
     line-height:36px;
-    display: inline-block;
+    float:left;
     cursor:pointer;
 }
 
@@ -1027,6 +1038,14 @@ body {
     line-height:36px;
     padding-left:15px;
 }
+.goInPriviteSpace{
+    flex: 2;
+    height:36px;
+    line-height:36px;
+    text-align: center;
+    background:#ccc;
+    cursor: pointer;
+}
 /*-----------------模态框---------------------------------*/
 .modal-open {
     overflow: hidden;
@@ -1230,13 +1249,11 @@ body {
 .balanceRow>span{
     color:red;
 }
-.balanceRow>input:nth-child(3){
+.balanceRow>div.rechange{
     margin-left:30px;
     padding:5px 20px;
 }
-.balanceRow>input:nth-child(4){
-    margin-left:100px;
-}
+
 .packageUl{
     margin:50px 0;
 }
