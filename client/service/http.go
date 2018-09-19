@@ -652,12 +652,17 @@ func SpaceStatusHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		defer r.Body.Close()
-
-		err := s.cm.CheckSpaceStatus(req.SpacoNo)
 		result, code, errmsg := "ok", 0, ""
+		_, err := s.cm.OM.UsageAmount()
 		if err != nil {
 			result = ""
 			code, errmsg = common.StatusErrFromError(err)
+		} else {
+			err := s.cm.CheckSpaceStatus(req.SpacoNo)
+			if err != nil {
+				result = ""
+				code, errmsg = common.StatusErrFromError(err)
+			}
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)

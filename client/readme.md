@@ -944,6 +944,15 @@ Args:
    space_no: uint32
 
 ```
+Example
+```
+curl -X POST -H "Content-Type:application/json" -d'{}' http://127.0.0.1:7788/api/v1/space/status
+{
+    "errmsg": "not buy any package order",
+    "code": 401,
+    "Data": ""
+}
+```
 
 ## /api/v1/config/import [POST]
 
