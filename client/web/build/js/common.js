@@ -1202,9 +1202,10 @@ var transportMethod = {
                                     </div>
                                     <div class="tsList-r">
                                         <div class="tsList-r-Bar">
-                                            <div class="tsList-r-progressBar" data-name="${idx}" style="width:${obj.rate*100+'%'};">${Math.round(obj.rate*100)+'%'}</div>
+                                            <div class="tsList-r-progressBar" data-name="${idx}" style="width:${Math.round(obj.rate*100)+'%'};"></div>
                                         </div>
                                     </div>
+                                    <div class="tsList-fr">${Math.round(obj.rate*100)+'%'}</div>
                                 </li>`;
                     })
                     $("#tsMenu").html(html);  
@@ -1352,27 +1353,32 @@ var packageMethod = {
                 let html = '';
                 $.each(res.Data,function(idx,obj){
                     html +=` <div class="pan-scheme">
-                                <input id="${'ipt'+obj.id}" value="${obj.id}"  hidden/>
-                                <div class="pan-scheme-item">
-                                    <h2 id="${'name'+obj.id}">${obj.name}</h2>
-                                    <p id="${'volume'+obj.id}">Space capacity:<span>${obj.volume}</span>G</p>
-                                    <p id="${'netflow'+obj.id}">Network flow:<span>${obj.netflow}</span>G</p>
-                                    <p id="${'upNetflow'+obj.id}">Upload:<span>${obj.upNetflow}</span>G</p>
-                                    <p id="${'downNetflow'+obj.id}">Download:<span>${obj.downNetflow}</span>G</p>
-                                    <p id="${'validDays'+obj.id}">Term of validity:<span>${obj.validDays}</span>days</p>
+                                <div class="pan-scheme-content">
+                                    <input id="${'ipt'+obj.id}" value="${obj.id}"  hidden/>
+                                    <div class="pan-scheme-item">
+                                        <h2 id="${'name'+obj.id}">${obj.name}</h2>
+                                        <p id="${'volume'+obj.id}"><span class="fl">Space capacity:</span><span class="fr">${obj.volume}G</span></p>
+                                        <p id="${'netflow'+obj.id}"><span class="fl">Network flow:</span><span class="fr">${obj.netflow}G</span></p>
+                                        <p id="${'upNetflow'+obj.id}"><span class="fl">Upload:</span><span class="fr">${obj.upNetflow}G</span></p>
+                                        <p id="${'downNetflow'+obj.id}"><span class="fl">Download:</span><span class="fr">${obj.downNetflow}G</span></p>
+                                        <p id="${'validDays'+obj.id}"><span class="fl">Term of validity:</span><span class="fr">${obj.validDays}days</span></p>
+                                    </div>
+                                    <div class="pan-select">
+                                        <span class="fl">select</span>
+                                        <span class="fr">
+                                            <select id="${'Select'+obj.id}">
+                                                <option>1</option>
+                                                <option>2</option>
+                                                <option>3</option>
+                                                <option>4</option>
+                                                <option>5</option>
+                                            </select>copys
+                                        </span>
+                                    </div>
+                                    <div class="pan-price"><span class="fl">Amount payable：</span><span id="${'Price'+obj.id}" class="fr pan-color" data-price ="${obj.price/1000000}">${obj.price/1000000} samos</span></div>
+                                    <div id="${obj.id}" type="button" class="pan-buy-btn" onclick="addCar('${obj.id}',1)">buy</div>
                                 </div>
-                                <div class="pan-select">select
-                                    <select id="${'Select'+obj.id}">
-                                        <option>1</option>
-                                        <option>2</option>
-                                        <option>3</option>
-                                        <option>4</option>
-                                        <option>5</option>
-                                    </select>copys
-                                </div>
-                                <div class="pan-price">Amount payable：<span id="${'Price'+obj.id}" data-price ="${obj.price/1000000}">${obj.price/1000000}</span> samos</div>
-                                <div id="${obj.id}" type="button" class="pan-buy-btn" onclick="addCar('${obj.id}',1)">buy</div>
-                                </div>`;    
+                            </div>`;    
                 });
                 $('#pan-buy-menu').html(html);
                 // <!--份数选择-->
@@ -1481,8 +1487,7 @@ websocket.onmessage = function (evt) {
         let key = data.key;
         $(".tsList-r-progressBar[data-name='"+key+"']").css("width",data.progress*100+'%').html(data.progress*100+'%');
         $("#updownGif").show();
-    //}else if((data.type=="DownloadFile")||(data.type=="UploadFile")||(data.progress==1)){
-    }else if((data.type=="DownloadFile")||(data.type=="UploadFile")){
+    }else if((data.type=="DownloadFile")||(data.type=="UploadFile")||(data.progress==1)){
         let key = data.key;
         $(".tsList-r-progressBar[data-name='"+key+"']").css("width",'100%').html('100%');
         method.firstInit();
