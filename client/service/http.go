@@ -652,12 +652,17 @@ func SpaceStatusHandler(s *HTTPServer) http.HandlerFunc {
 		}
 
 		defer r.Body.Close()
-
-		err := s.cm.CheckSpaceStatus(req.SpacoNo)
 		result, code, errmsg := "ok", 0, ""
+		_, err := s.cm.OM.UsageAmount()
 		if err != nil {
 			result = ""
 			code, errmsg = common.StatusErrFromError(err)
+		} else {
+			err := s.cm.CheckSpaceStatus(req.SpacoNo)
+			if err != nil {
+				result = ""
+				code, errmsg = common.StatusErrFromError(err)
+			}
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
@@ -675,10 +680,6 @@ func SpaceStatusHandler(s *HTTPServer) http.HandlerFunc {
 func ConfigImportHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
-		if !s.CanBeWork() {
-			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
-			return
-		}
 		log := s.log
 		w.Header().Set("Accept", "application/json")
 
@@ -705,11 +706,21 @@ func ConfigImportHandler(s *HTTPServer) http.HandlerFunc {
 			return
 		}
 
-		err := s.cm.ImportConfig(req.FileName, s.cfg.ConfigFile)
+		err := config.ImportConfig(req.FileName, s.cfg.ConfigFile)
 		result, code, errmsg := "ok", 0, ""
 		if err != nil {
 			result = ""
 			code, errmsg = common.StatusErrFromError(err)
+		} else {
+			if s.cm == nil {
+				cm, err := InitClientManager(log, s.cfg)
+				if err != nil {
+					code = 1
+					errmsg = err.Error()
+				} else {
+					s.cm = cm
+				}
+			}
 		}
 
 		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)

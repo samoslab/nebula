@@ -92,11 +92,10 @@ function startSamos() {
     exe = (() => {
       switch (process.platform) {
         case 'darwin':
-       //expath = path.join(path.dirname(appPath), '../../../../../../../client/nebula-client');
-       expath =  path.join(appPath, '../../Resources/app/nebula-client');
-
-    	console.log(expath);
-    	return expath;
+          var expath = path.join(path.dirname(appPath), '../../../../../../../client/nebula-client');
+        //expath =  path.join(appPath, '../../Resources/app/nebula-client');
+    	    console.log(expath);
+    	    return expath;
         case 'win32':
           // Use only the relative path on windows due to short path length
           // limits
@@ -297,6 +296,9 @@ ipcMain.on('filemanage', (code) => {
 ipcMain.on('default', (code) => {
   win.loadURL(defaultURL);
 });
+
+
+ipcMain.on('close', e=> win.close());
 
 const {shell} = require('electron')
 ipcMain.on('explorer', (event,code) => {

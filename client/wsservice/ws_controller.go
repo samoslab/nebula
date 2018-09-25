@@ -1,8 +1,8 @@
 package wsservice
 
 import (
-	"fmt"
 	"net/http"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -23,7 +23,7 @@ const (
 	pingPeriod = (pongWait * 9) / 10
 
 	// consume with this period.
-	ConsumePeriod = 30 * time.Second
+	ConsumePeriod = 10 * time.Second
 )
 
 var (
@@ -67,7 +67,14 @@ func (c *WSController) Shutdown() {
 }
 
 func (c *WSController) answerWriter(ws *websocket.Conn, msgType string) {
+
 	log := c.log
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error("!!!!!get panic info, recover it %s", r)
+			debug.PrintStack()
+		}
+	}()
 	pingTicker := time.NewTicker(pingPeriod)
 	defer func() {
 		pingTicker.Stop()
@@ -87,7 +94,6 @@ func (c *WSController) answerWriter(ws *websocket.Conn, msgType string) {
 		case msg := <-(*c.cm).GetMsgChan():
 			(*c.cm).DecreaseMsgCount()
 			ws.SetWriteDeadline(time.Now().Add(writeWait))
-			fmt.Printf("send msg:%s\n", msg)
 			if err := ws.WriteMessage(websocket.TextMessage, []byte(msg)); err != nil {
 				return
 			}
@@ -128,13 +134,22 @@ func (c *WSController) Consume() {
 		close(c.done)
 	}()
 	for {
+		if *c.cm == nil {
+			log.Info("client manager hasn't init, waiting 3 seconds")
+			time.Sleep(3 * time.Second)
+		} else {
+			break
+		}
+	}
+	for {
 		select {
 		case <-c.quit:
 			log.Info("Shutdown message consumer")
 			return
 		case <-fileTicker.C:
 			cnt := (*c.cm).GetMsgCount()
-			if cnt > uint32(common.MsgQueueLen-common.MsgQueueLen+5) {
+			log.Infof("msg count %d", cnt)
+			if cnt > uint32(common.MsgQueueLen)-uint32(100) { // if accumulated message count exceed 1000, then consume it
 				for i := 0; i < int(cnt); i++ {
 					select {
 					case msg := <-(*c.cm).GetMsgChan():
@@ -155,7 +170,7 @@ func (c *WSController) Run(addr string) error {
 	http.HandleFunc("/message", c.ServeWs)
 	var wg sync.WaitGroup
 	errC := make(chan error)
-	//go c.Consume()
+	go c.Consume()
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -171,7 +186,6 @@ func (c *WSController) Run(addr string) error {
 		wg.Wait()
 		close(done)
 	}()
-	log.Info("wait websocket shutdown")
 	select {
 	case err := <-errC:
 		return err

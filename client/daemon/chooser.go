@@ -36,7 +36,7 @@ func createBackupProvicer(backupPros []*SortablePro) map[string][]*SortablePro {
 	return backProMap
 }
 
-func GetBestReplicaProvider(pros []*mpb.ReplicaProvider, needNum int) ([]*mpb.ReplicaProvider, error) {
+func GetBestReplicaProvider(pros []*mpb.ReplicaProvider, needNum int) ([]*mpb.ReplicaProvider, []*mpb.ReplicaProvider, error) {
 	type SortablePro struct {
 		Pro   *mpb.ReplicaProvider
 		Delay int
@@ -74,10 +74,10 @@ func GetBestReplicaProvider(pros []*mpb.ReplicaProvider, needNum int) ([]*mpb.Re
 	}
 
 	if len(wellPros) < MinReplicaNum {
-		return nil, fmt.Errorf("Replica provider only %d", len(wellPros))
+		return nil, nil, fmt.Errorf("Replica provider only %d", len(wellPros))
 	}
 
-	return wellPros[0:common.Min(needNum, len(wellPros))], nil
+	return wellPros[0:common.Min(needNum, len(wellPros))], wellPros[common.Min(needNum, len(wellPros)):len(wellPros)], nil
 }
 
 type SortablePro struct {

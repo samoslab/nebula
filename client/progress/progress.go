@@ -16,17 +16,25 @@ type ProgressCell struct {
 	Current    uint64  `json:"-"`
 	Time       uint64  `json:"-"`
 	Rate       float64 `json:"rate"`
+	Local      string  `json:"local"`
 	LastReaded bool    `json:"-"`
 	SpaceNo    int     `json:"spaco_no"`
 }
 
 func calRate(current, total uint64) float64 {
+	if total == 0 {
+		return 1.0
+	}
 	rateS := fmt.Sprintf("%0.2f", float64(current)/float64(total))
 	rate, err := strconv.ParseFloat(rateS, 10)
 	if err != nil {
 		rate = 0.0
 	}
 	return rate
+}
+
+type ProgressReadable struct {
+	Progress map[string]ProgressCell `json:"progress"`
 }
 
 // ProgressManager progress stats
@@ -45,8 +53,8 @@ func NewProgressManager() *ProgressManager {
 }
 
 // SetProgress set current progress file size
-func (pm *ProgressManager) SetProgress(tp, fileName string, currentSize, totalSize uint64, sno uint32) {
-	pm.Progress[fileName] = ProgressCell{Type: tp, Total: totalSize, Current: currentSize, Rate: calRate(currentSize, totalSize), Time: common.Now(), SpaceNo: int(sno)}
+func (pm *ProgressManager) SetProgress(tp, fileName string, currentSize, totalSize uint64, sno uint32, local string) {
+	pm.Progress[fileName] = ProgressCell{Type: tp, Total: totalSize, Current: currentSize, Rate: calRate(currentSize, totalSize), Time: common.Now(), SpaceNo: int(sno), Local: local}
 }
 
 // SetPartitionMap set progress file map
@@ -80,9 +88,11 @@ func match(fileMap map[string]struct{}, file string) bool {
 }
 
 // GetProgress return progress data
-func (pm *ProgressManager) GetProgress(files []string) (map[string]ProgressCell, error) {
+func (pm *ProgressManager) GetProgress(files []string) (ProgressReadable, error) {
+	pm.Mutex.Lock()
+	defer pm.Mutex.Unlock()
 	if len(files) == 0 {
-		return pm.Progress, nil
+		return ProgressReadable{Progress: pm.Progress}, nil
 	}
 	mp := map[string]struct{}{}
 	for _, file := range files {
@@ -95,7 +105,7 @@ func (pm *ProgressManager) GetProgress(files []string) (map[string]ProgressCell,
 		}
 		a[k] = v
 	}
-	return a, nil
+	return ProgressReadable{Progress: a}, nil
 }
 
 // GetProgress return progress data
@@ -111,7 +121,7 @@ func (pm *ProgressManager) GetProgressingMsg(files []string) ([]string, error) {
 		}
 		// skip already sended
 		if !v.Sended && !v.LastReaded {
-			msg := common.MakeSuccProgressMsg(v.Type, k, v.Rate, v.SpaceNo)
+			msg := common.MakeSuccProgressMsg(v.Type, k, v.Rate, v.SpaceNo, v.Local)
 			result = append(result, msg.Serialize())
 			v.LastReaded = true
 			if int(v.Rate) == 1 {

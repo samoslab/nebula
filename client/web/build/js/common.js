@@ -1,4 +1,4 @@
-var refreshTransportTimer = null;
+//var refreshTransportTimer = null;
 var method = {
      //判断是否注册过邮箱！
      login:function(){
@@ -42,30 +42,36 @@ var method = {
                     $("#priviteCondition").hide();
                     $("#diskDivAll").show();
                     that.priviteInit('/',space_no);
+                }else{
+                    alert(res.errmsg);
                 }
             }
         });
     },
-
+    //初始化哪个选项
     firstInit:function(){
-        clearInterval(refreshTransportTimer);
+        //clearInterval(refreshTransportTimer);
         let path = method.getParamsUrl().path;
         location.hash = path;
         console.log(path);
         let space_no = 0;
         let a = path.split(":")[0];
+
+        //请求参做个记录
+        $("#thisListAugs").attr("path",path.split(":")[1]);
+
          //左侧选项卡
         $("#frameAsideUl li").removeClass("active");
         if(a == "myspace"){
             space_no = 0;
             // //左侧选项卡
             $("#mySpace").parent().addClass("active");
-            this.init(path,space_no);
+            this.spaceSelect(path,space_no);
         }else if(a == "privite"){
             space_no = 1;
             //左侧选项卡
             $("#privteSpace").parent().addClass("active");
-            this.init(path,space_no);
+            this.spaceSelect(path,space_no);
         }else if(a=="transport"){
             this.transportInit();
         }else if(a=="package"){
@@ -73,8 +79,8 @@ var method = {
         }
         
     },
-    //初始化
-    init:function (path,space_no){
+    //初始化我的空间或 隐藏空间
+    spaceSelect:function (path,space_no){
         path = path.split(":")[1];
         if(path.length == 0){
             path = "/";
@@ -103,7 +109,8 @@ var method = {
         //遍历按哪种类型的排序
         let sorttype = sessionStorage.getItem("viewtype");
         $("#viewTypeDrop>span[data-key='"+sorttype+"']").addClass('ugcOHtb').siblings().removeClass('ugcOHtb'); //给类名
-        list(path,space_no,1000,1,sorttype,true);  
+        $("#listContent").html("");
+        list(path,space_no,100,1,sorttype,true);  
         
     },
     //隐私空间初始化
@@ -118,19 +125,21 @@ var method = {
             $("#diskDivAll").show();
             let sorttype = sessionStorage.getItem("viewtype");
             $("#viewTypeDrop>span[data-key='"+sorttype+"']").addClass('ugcOHtb').siblings().removeClass('ugcOHtb'); //给类名
-            list(path,space_no,1000,1,sorttype,true);  
+            $("#listContent").html("");
+            list(path,space_no,100,1,sorttype,true);  
         }else{
             // 内容区隐藏
             $("#diskDivAll").hide();
             //隐私空间
             $("#priviteCondition").show();
         }
-
+        //设置密码显示 
         if(!$.cookie("privitePsd")||$.cookie("privitePsd")=='0'){
-            //设置密码显示
+            //未设过 
             $(".priviteConditionContentBox").eq(0).show();
             $(".priviteConditionContentBox").eq(1).hide();
         }else{
+            //设过
             $(".priviteConditionContentBox").eq(1).show();
             $(".priviteConditionContentBox").eq(0).hide();
         }
@@ -158,7 +167,7 @@ var method = {
     },
     //增加文件夹确定事件
     addFolderCf:function(initPath,path,space_no){
-        let name = $(".zJMtAEb dd:eq(0) .renameInput").val();
+        let name = $("#listContent dd:eq(0) .renameInput").val();
         let html = ``;
 
         $.ajax({
@@ -175,10 +184,10 @@ var method = {
             success:function(res){
                 console.log(res);
                 if(res.Data == true){
-                    $(".zJMtAEb dd:eq(0) .appendFileName").html(name).attr('href',`${'#'+initPath+'/'+name}`);
-                    $(".zJMtAEb dd:eq(0) .oprate").attr('style','');
+                    $("#listContent dd:eq(0) .appendFileName").html(name).attr('href',`${'#'+initPath+'/'+name}`);
+                    $("#listContent dd:eq(0) .oprate").attr('style','');
                     $(".renameSpan").hide();
-                    $(".zJMtAEb dd:eq(0) .s-select-check").attr({
+                    $("#listContent dd:eq(0) .s-select-check").attr({
                         "data-path":`${path}${path=='/'?'':'/'}${name}`,
                         "data-name":name
                     });
@@ -204,15 +213,26 @@ $("#viewTypeDrop>span").click(function(){
     $("#viewTypeDrop").hide();
     method.firstInit();
 });
-// $("#listBox").scroll(function () { 
-//     let scrollTop = $(this).scrollTop(); 
-//     let winHeight = $(this).height(); 
-//     let contentHeight = $("#listContent").height();
-//     console.log(scrollTop+','+winHeight+","+','+$("#listContent").height());
-//     if (scrollTop + winHeight >= contentHeight) {
-//         alert('到底了');
-//     }
-// });
+
+//滚动加载
+$("#listBox").scroll(function () { 
+    let total = parseInt($("#thisListAugs").attr("total")),
+        pagesize = parseInt($("#thisListAugs").attr("pagesize")),
+        pagenum = parseInt($("#thisListAugs").attr("pagenum")),
+        path = $("#thisListAugs").attr("path"),
+        space_no = parseInt($("#thisListAugs").attr("space_no"));
+
+    let scrollTop =Math.round($(this).scrollTop()),
+        winHeight = $(this).height(), 
+        contentHeight = $("#listContent").height();
+
+   if((pagesize*pagenum<total)&&(scrollTop + winHeight>= contentHeight)){
+        let sorttype = sessionStorage.getItem("viewtype");
+        console.log(path,space_no,pagenum,sorttype);
+        list(path,space_no,100,pagenum+1,sorttype,true,true); 
+        console.log('到底了');
+    }
+});
 //查所有文件类型
 // $.ajax({
 //     url:"/api/v1/service/filetype",
@@ -227,7 +247,7 @@ $("#viewTypeDrop>span").click(function(){
 // });
 
 //请求列表
-function list(path,space_no,pagesize,pagenum,sorttype,ascorder){
+function list(path,space_no,pagesize,pagenum,sorttype,ascorder,apd){
     $.ajax({
         url:"/api/v1/store/list",
         method:'POST',
@@ -248,11 +268,23 @@ function list(path,space_no,pagesize,pagenum,sorttype,ascorder){
                       return;
             }
             if(res.code!=0) {alert(res.errmsg);return;}
+            //列表总数
             $("#listTotalNum").html(res.Data.total);
+            //请求参做个记录
+            $("#thisListAugs").attr({
+                "path":path,
+                "space_no":space_no,
+                "pagesize":pagesize,
+                "pagenum":pagenum,
+                "sorttype":sorttype,
+                "ascorder":ascorder,
+                "total":res.Data.total
+            });
+
             //插入列表内容；
-            append(res,path,space_no);
+            append(res,path,space_no,apd);
             //插入面包屑导航内容；
-             let html = breadNav(path,space_no);
+            let html = breadNav(path,space_no);
             $("#breadNav").html(html);
 
             //把面包屑最后一个的链接地址给到左侧导航栏，目的是左侧切换时回到原目录，记得以前位置；
@@ -270,10 +302,10 @@ function list(path,space_no,pagesize,pagenum,sorttype,ascorder){
  }
 
  //列表中插入所有list
-function append(res,path,space_no){
+function append(res,path,space_no,apd){
     let html = '';
     if((res.Data.total<1)||(res.code!=0)){
-        $('.zJMtAEb').html('');
+        $('#listContent').html('');
         $(".no-file-ab").show();
         return false;
     }
@@ -308,7 +340,7 @@ function append(res,path,space_no){
         if(path=="/"){
             path="";
         } 
-        // onclick="gBtnDownLoad('${obj.filehash}','${obj.filesize}','${obj.filename}','${space_no}','${obj.folder}')" 
+        
         html+=`<dd class="AuPKyz" onmouseenter = "oprateShow(this)" onmouseleave = "oprateHide(this)">
                     <div data-key="name" class="AuPKyz-li" style="width:44%;">
                         <input class="s-select-check" type="checkbox" name="fileSelect" data-name="${obj.filename}" data-id="${obj.id}" data-path="${path}${'/'+obj.filename}" data-hash="${obj.filehash}" data-size="${obj.filesize}" data-folder=${obj.folder} data-spaceNo="${space_no}">
@@ -346,35 +378,41 @@ function append(res,path,space_no){
                         <span class="text">${k}</span>
                     </div>
                     <div data-key="type" class="AuPKyz-li" style="width:16%;">
-                        <span class="text">${(obj.filetype!='unknown')?obj.filetype:'folder'}</span>
+                        <span class="text">${(obj.folder==true)?'folder':obj.filetype}</span>
                     </div>
                     <div data-key="time" class="AuPKyz-li" style="width:23%;">
                         <span class="text">${public.Date(obj.modtime)}</span>
                     </div>
                 </dd>`;
     });
-    $('.zJMtAEb').html(`<div id="listContent">${html}</div>`);
+    if(apd){
+        $('#listContent').append(html);
+    }else{
+        $('#listContent').html(html);
+    }
+    //$('#listContent').append(html);
+   // $('#listContent').html(html);
+    //$('#listContent').html(`${html}`);
 
-     // <!--单行选中增加类-->
+    // <!--单行选中增加类-->
     rowSelected(); 
 }
 
 
 //<!--列表是否选中是否显示按钮组 全选中的情况下 全选按钮也选中  如若选中数量大于1个禁止重命名按按钮点击事件-->
 function btngroupshow(){
-    if($(".zJMtAEb input[name='fileSelect']:checked").size()!=0){
+    if($("#listContent input[name='fileSelect']:checked").size()!=0){
         $("#s-button-group").show();
     }else{
         $("#s-button-group").hide();
     }
-    if($(".zJMtAEb input[name='fileSelect']:checked").size()==$(".zJMtAEb input[name='fileSelect']").length){
+    if($("#listContent input[name='fileSelect']:checked").size()==$("#listContent input[name='fileSelect']").length){
         $("#s-selectAll").prop('checked','checked');
         $(".AuPKyz").addClass("activeSelect");
     }else{
         $("#s-selectAll").prop('checked',false);
-        //$(".zJMtAEb input[name='fileSelect']:checked").addClass("activeSelect");
     }
-    if($(".zJMtAEb input[name='fileSelect']:checked").size()!=1){
+    if($("#listContent input[name='fileSelect']:checked").size()!=1){
         $("#renameBtn").css('opacity',0.5);
         $("#renameBtn").click(function(event){
             event.preventDefault();
@@ -386,7 +424,7 @@ function btngroupshow(){
 
  // <!--单行选中增加类-->
  function rowSelected(){
-    $(".zJMtAEb input[name='fileSelect']").each(function(){
+    $("#listContent input[name='fileSelect']").each(function(){
         $(this).change(function(){
          //$(".s-select-check").change(function(){
              if($(this).is(":checked")){
@@ -403,6 +441,7 @@ function btngroupshow(){
  //面包屑导航 得到层级 该有的代码；
  function breadNav(path,space_no){
      let a = "";
+     let lan = getLanguage();
     if(space_no==0){
         a = "#myspace:"
     }else if(space_no==1){
@@ -428,7 +467,7 @@ function btngroupshow(){
                 </li>`;
     }
     let allFileHtml =`<li>
-                        <a href="${a}" title="all files"  data-locale="allFileOther">all files</a>
+                        <a href="${a}" title="all files"  data-locale="allFileOther">${(lan=='en')?'all files':'全部文件'}</a>
                     </li>`;
     allFileHtml+=liHtml;
     return allFileHtml;
@@ -443,24 +482,24 @@ var rename = {
         $("#file-rename-box .renameInput").val(name);
 
         // <!--非选中的input 和 全选按钮禁止点击-->
-        $(".zJMtAEb input[name='fileSelect']").not(':checked').attr('disabled','disabled');
+        $("#listContent input[name='fileSelect']").not(':checked').attr('disabled','disabled');
         $("#s-selectAll").attr("disabled","disabled");
     },
     // <!--重命名div隐藏-->
     renameDivHide:function (){
         $("#file-rename-box .renameInput").val('');
-        $(".zJMtAEb input[name='fileSelect']").not(':checked').attr('disabled',false);
+        $("#listContent input[name='fileSelect']").not(':checked').attr('disabled',false);
         $("#s-selectAll").attr("disabled",false);
         $("#file-rename-box").hide();
     },
     //重命名确定
     renameCf:function(){
         let renameInputV= $("#file-rename-box .renameInput").val();
-        $(".zJMtAEb input[name='fileSelect']:checked").siblings(".file-name").html(renameInputV).attr("title",renameInputV);
-        $(".zJMtAEb input[name='fileSelect']:checked").attr("data-name",renameInputV);
-        //let dataId = $(".zJMtAEb input[name='fileSelect']:checked").attr("data-id");
-        let dataPath = $(".zJMtAEb input[name='fileSelect']:checked").attr("data-path");
-        let spaceNo =  Number($(".zJMtAEb input[name='fileSelect']:checked").attr("data-spaceno"));
+        $("#listContent input[name='fileSelect']:checked").siblings(".file-name").html(renameInputV).attr("title",renameInputV);
+        $("#listContent input[name='fileSelect']:checked").attr("data-name",renameInputV);
+        //let dataId = $("#listContent input[name='fileSelect']:checked").attr("data-id");
+        let dataPath = $("#listContent input[name='fileSelect']:checked").attr("data-path");
+        let spaceNo =  Number($("#listContent input[name='fileSelect']:checked").attr("data-spaceno"));
         console.log(dataPath);
 
         let b = dataPath.lastIndexOf('/');
@@ -483,7 +522,7 @@ var rename = {
                     //重命名成功，隐藏重命名组件
                     rename.renameDivHide();
                       //重命名后给input赋值；
-                    $(".zJMtAEb input[name='fileSelect']:checked").attr("data-path",c+renameInputV);
+                    $("#listContent input[name='fileSelect']:checked").attr("data-path",c+renameInputV);
                 }else if(res.code!=0){
                     alert(res.errmsg);
                 }
@@ -494,11 +533,11 @@ var rename = {
 
 // <!--重命名点击事件-->
 $("#renameBtn").click(function(){
-    if($(".zJMtAEb input[name='fileSelect']:checked").size()==1){
+    if($("#listContent input[name='fileSelect']:checked").size()==1){
         //选中行到顶部的距离
-        let a = $(".zJMtAEb input[name='fileSelect']:checked").parents(".AuPKyz").position().top;
+        let a = $("#listContent input[name='fileSelect']:checked").parents(".AuPKyz").position().top;
          // <!--要改的文件名字给input value-->
-        let name = $(".zJMtAEb input[name='fileSelect']:checked").attr("data-name");
+        let name = $("#listContent input[name='fileSelect']:checked").attr("data-name");
         rename.rename(a,name);
     }
 
@@ -521,7 +560,7 @@ $('.renameInput').keyup(function(event){
 //oprate显示隐藏
 function oprateShow(x){
     //行选中数
-    if($(".zJMtAEb input[name='fileSelect']:checked").size()<=1){
+    if($("#listContent input[name='fileSelect']:checked").size()<=1){
         $(x).find("div:first-child .oprate").show();
     }
 }
@@ -662,7 +701,7 @@ $("#upLoadFileBtn").click(function(){
         //选择的文件
         let local = document.getElementById("upLoadFileIpt").files;
         for(let i=0;i<local.length;i++){
-            //每个选择文件的路
+            //每个选择文件的路径
             let localPath = local[i].path;
             $.ajax({
                 url:"/api/v1/task/upload",
@@ -692,6 +731,7 @@ $("#upLoadFileBtn").click(function(){
 $("#upLoadFolderBtn").click(function(){
     $("#upLoadFolderIpt").unbind().change(function(){
         let localPath = document.getElementById("upLoadFolderIpt").files[0].path;
+        if(!localPath)return;
         let space_no = '';
         let hashPath = method.getParamsUrl().path;
         let a = hashPath.split(":")[0];
@@ -736,7 +776,7 @@ $("#upLoadFolderBtn").click(function(){
 $("#downLoadBtn").click(function(){
     $("#downLoadIpt").unbind().change(function(){
         let localPath = document.getElementById("downLoadIpt").files[0].path;
-        let selectedArr = $(".zJMtAEb input[name='fileSelect']:checked");
+        let selectedArr = $("#listContent input[name='fileSelect']:checked");
        $("#downLoadIpt1")[0].reset();
         $.each(selectedArr,function(index,obj){
             let filehash = $(obj).attr("data-hash");
@@ -798,7 +838,7 @@ $("#downLoadBtn").click(function(){
 $("#deleteBtn").click(function(){
     let a =confirm("Confirm to delete the selected file?");
     if(a==true){
-        let inputArr = $(".zJMtAEb input[name='fileSelect']:checked");
+        let inputArr = $("#listContent input[name='fileSelect']:checked");
         let arr=[];
         for(i=0;i<inputArr.length;i++){
             let json = {};
@@ -903,13 +943,13 @@ function trigger(){
                         <span class="text">--</span>
                     </div>
                 </dd>`;
-    $('.zJMtAEb').prepend(row);
+    $('#listContent').prepend(row);
    
     //取消点击事件，避免重复点击；
     $("#addFolderBtn").removeAttr("onclick");
 
     $(".rename-cancel").click(function(){
-        $('.zJMtAEb dd').remove('.zJMtAEb dd:eq(0)');
+        $('#listContent dd').remove('#listContent dd:eq(0)');
         $("#addFolderBtn").attr("onclick",'trigger()');
    });
    $(".rename-cfm").click(function(){
@@ -989,7 +1029,7 @@ $("#goInPriviteSpace2").click(function(){
                     sessionStorage.setItem("hadImport",true);
                     $("#priviteCondition").hide();
                     $("#diskDivAll").show();
-                    list('/',1,1000,1,'modtime',true);  
+                    list('/',1,100,1,'modtime',true);  
 
                 }else{
                     alert('Password incorrect!');
@@ -1138,7 +1178,7 @@ function pay(orderId){
 }
 
 
-//我的传输入列表方法集
+//我的传输入列表方法集  ${idx.split("\\")[idx.split("\\").length-1]}
 var transportMethod = {
     transportInit:function(){
         $.ajax({
@@ -1150,17 +1190,22 @@ var transportMethod = {
             }),
             success:function(res){
                 console.log(res);
-               if((res.code==0)&&(JSON.stringify(res.Data)!="{}")){
+               if((res.code==0)&&(JSON.stringify(res.Data.progress)!="{}")){
                     let html = '';
-                    $.each(res.Data,function(idx,obj){
-                        //console.log(idx.split("\\")[idx.split("\\").length-1]);
+                    $.each(res.Data.progress,function(idx,obj){
+                    
                         html +=`<li class="tsList">
-                                    <div class="tsList-l" title="${idx}">${idx.split("\\")[idx.split("\\").length-1]}</div>
+                                    <div class="tsList-l" title="${idx}">
+                                        <span>${obj.type}</span>
+                                        <span>${(idx.split('@')[0]=='0')?"My Space":"Privacy Space"}</span>
+                                        <span> Path is：${idx.split('@')[1]}</span>
+                                    </div>
                                     <div class="tsList-r">
                                         <div class="tsList-r-Bar">
-                                            <div class="tsList-r-progressBar" data-name="${idx.split("\\")[idx.split("\\").length-1]}" style="width:${obj*100+'%'};">${Math.round(obj*100)+'%'}</div>
+                                            <div class="tsList-r-progressBar" data-name="${idx}" style="width:${Math.round(obj.rate*100)+'%'};"></div>
                                         </div>
                                     </div>
+                                    <div class="tsList-fr">${Math.round(obj.rate*100)+'%'}</div>
                                 </li>`;
                     })
                     $("#tsMenu").html(html);  
@@ -1209,6 +1254,8 @@ var packageMethod = {
     // 所有订单初始化
     orderAllInit:function(){
         let expired = true;
+        let lan = getLanguage();
+        console.log(lan);
         $.ajax({
             url:"/api/v1/order/all?expired="+expired,
             success:function(res){
@@ -1225,19 +1272,19 @@ var packageMethod = {
                             }
                             html +=` <div class="order-list">
                                         <div class="order-list-head clearfix">
-                                            <span data-locale="createdTime">创建日期：<span>${public.Date(obj.creation)}</span></span>
-                                            <span data-locale="orderNumber">订单号：<span>${obj.id}</span></span>
+                                            <span><span data-locale="createdTime">${(lan=='en')?'createdTime:':'创建时间:'}</span><span>${public.Date(obj.creation)}</span></span>
+                                            <span><span data-locale="orderNumber">${(lan=='en')?'Order Number:':'订单号:'}</span><span>${obj.id}</span></span>
                                             <div  class="order-list-del" onclick="delOrder('${obj.id}')">
                                                 ${obj.paid?'':'&times;'}
                                             </div>
                                         </div>
                                         <div class="order-list-body">
                                             <div class="order-list-name">
-                                                <div class="order-list-t" data-locale="packageName">套餐名字</div>
+                                                <div class="order-list-t" data-locale="packageName">${(lan=='en')?'Package Name':'套餐名称'}</div>
                                                 <div>${obj.package.name}</div>
                                             </div>
                                             <div class="order-list-inf">
-                                                <div class="order-list-t" data-locale="packageInf">套餐信息</div>
+                                                <div class="order-list-t" data-locale="packageInf">${(lan=='en')?'Package information':'套餐信息'}</div>
                                                 <div>
                                                     <span>price:${obj.package.price/1000000};</span>
                                                     <span>volume:${obj.package.volume};</span>
@@ -1248,7 +1295,7 @@ var packageMethod = {
                                                 </div>
                                             </div>
                                             <div class="order-list-inf">
-                                                <div class="order-list-t" data-locale="allInf">总计信息</div>
+                                                <div class="order-list-t" data-locale="allInf">${(lan=='en')?'Total information':'总计'}</div>
                                                 <div>
                                                     <span>price:${obj.totalAmount/1000000};</span>
                                                     <span>volume:${obj.volume};</span>
@@ -1264,15 +1311,15 @@ var packageMethod = {
                                                 </div>
                                             </div>
                                             <div class="order-list-total">
-                                                <div class="order-list-t" datalocale="totalAmount">总额</div>
+                                                <div class="order-list-t" data-locale="totalAmount">${(lan=='en')?'Total Amount':'总额'}</div>
                                                 <div>${obj.totalAmount/1000000}</div>
                                             </div>
                                             <div class="order-list-quanlity">
-                                                <div class="order-list-t" data-locale="amount">数量</div>
+                                                <div class="order-list-t" data-locale="amount">${(lan=='en')?'Amount':'数量'}</div>
                                                 <div>${obj.quanlity}</div>
                                             </div>
                                             <div class="order-list-pay">
-                                                <div class="order-list-t" data-locale="buy">购买</div>
+                                                <div class="order-list-t" data-locale="buy">${(lan=='en')?'Buy':'购买'}</div>
                                                 <div class="${obj.paid?'':'toBuy'}" onclick="${obj.paid?'javascript:;':'pay(\''+obj.id+'\')'}">${obj.paid?'account paid':'buy'}</div>
                                             </div>
                                         </div>
@@ -1306,27 +1353,32 @@ var packageMethod = {
                 let html = '';
                 $.each(res.Data,function(idx,obj){
                     html +=` <div class="pan-scheme">
-                                <input id="${'ipt'+obj.id}" value="${obj.id}"  hidden/>
-                                <div class="pan-scheme-item">
-                                    <h2 id="${'name'+obj.id}">${obj.name}</h2>
-                                    <p id="${'volume'+obj.id}">Space capacity:<span>${obj.volume}</span>G</p>
-                                    <p id="${'netflow'+obj.id}">Network flow:<span>${obj.netflow}</span>G</p>
-                                    <p id="${'upNetflow'+obj.id}">Upload:<span>${obj.upNetflow}</span>G</p>
-                                    <p id="${'downNetflow'+obj.id}">Download:<span>${obj.downNetflow}</span>G</p>
-                                    <p id="${'validDays'+obj.id}">Term of validity:<span>${obj.validDays}</span>days</p>
+                                <div class="pan-scheme-content">
+                                    <input id="${'ipt'+obj.id}" value="${obj.id}"  hidden/>
+                                    <div class="pan-scheme-item">
+                                        <h2 id="${'name'+obj.id}">${obj.name}</h2>
+                                        <p id="${'volume'+obj.id}"><span class="fl">Space capacity:</span><span class="fr">${obj.volume}G</span></p>
+                                        <p id="${'netflow'+obj.id}"><span class="fl">Network flow:</span><span class="fr">${obj.netflow}G</span></p>
+                                        <p id="${'upNetflow'+obj.id}"><span class="fl">Upload:</span><span class="fr">${obj.upNetflow}G</span></p>
+                                        <p id="${'downNetflow'+obj.id}"><span class="fl">Download:</span><span class="fr">${obj.downNetflow}G</span></p>
+                                        <p id="${'validDays'+obj.id}"><span class="fl">Term of validity:</span><span class="fr">${obj.validDays}days</span></p>
+                                    </div>
+                                    <div class="pan-select">
+                                        <span class="fl">select</span>
+                                        <span class="fr">
+                                            <select id="${'Select'+obj.id}">
+                                                <option>1</option>
+                                                <option>2</option>
+                                                <option>3</option>
+                                                <option>4</option>
+                                                <option>5</option>
+                                            </select>copys
+                                        </span>
+                                    </div>
+                                    <div class="pan-price"><span class="fl">Amount payable：</span><span id="${'Price'+obj.id}" class="fr pan-color" data-price ="${obj.price/1000000}">${obj.price/1000000} samos</span></div>
+                                    <div id="${obj.id}" type="button" class="pan-buy-btn" onclick="addCar('${obj.id}',1)">buy</div>
                                 </div>
-                                <div class="pan-select">select
-                                    <select id="${'Select'+obj.id}">
-                                        <option>1</option>
-                                        <option>2</option>
-                                        <option>3</option>
-                                        <option>4</option>
-                                        <option>5</option>
-                                    </select>copys
-                                </div>
-                                <div class="pan-price">Amount payable：<span id="${'Price'+obj.id}" data-price ="${obj.price/1000000}">${obj.price/1000000}</span> samos</div>
-                                <div id="${obj.id}" type="button" class="pan-buy-btn" onclick="addCar('${obj.id}',1)">buy</div>
-                                </div>`;    
+                            </div>`;    
                 });
                 $('#pan-buy-menu').html(html);
                 // <!--份数选择-->
@@ -1414,39 +1466,30 @@ websocket.onopen = function (evt) {
     console.log(evt);//已经建立连接
 };
 websocket.onclose = function (evt) {
+    console.log(evt);
     console.log('colose');//已经关闭连接
+    if(evt){
+        var r=confirm("Sorry,An error in the system requires a reboot!");
+        if (r==true){
+            const {ipcRenderer} = require('electron'); 
+            ipcRenderer.send('close');
+        }else{
+           alert("You pressed Cancel! Please restart!");
+        }
+    }
 };
 websocket.onmessage = function (evt) {
     //收到服务器消息，使用evt.data提取
-
     console.log(evt.data);
+    if(!evt.data)return;
     let data = JSON.parse(evt.data);
-    if((data.type=="DownloadProgress")||(data.type=="UploadProgress")){
-        if(data.progress!=1){
-            if(data.filename){
-                let filename = data.filename;
-                let name = filename.split('\\')[filename.split('\\').length-1];
-                console.log(name);
-                $(".tsList-r-progressBar[data-name='"+name+"']").css("width",data.progress*100+'%').html(data.progress*100+'%');
-                $("#updownGif").show();
-            }
-        }else{
-            if(data.source){
-                let source = data.source;
-                let s = source.split('\\')[source.split('\\').length-1];
-                $(".tsList-r-progressBar[data-name='"+s+"']").css("width",'100%').html('100%');
-            }
-            method.firstInit();
-            $("#updownGif").hide();
-        }
-       
-        
-    }else if((data.type=="DownloadFile")||(data.type=="UploadFile")){
-        if(data.source){
-            let source = data.source;
-            let s = source.split('\\')[source.split('\\').length-1];
-            $(".tsList-r-progressBar[data-name='"+s+"']").css("width",'100%').html('100%');
-        }
+    if(((data.type=="DownloadProgress")||(data.type=="UploadProgress"))&&(data.progress!=1)){
+        let key = data.key;
+        $(".tsList-r-progressBar[data-name='"+key+"']").css("width",data.progress*100+'%').html(data.progress*100+'%');
+        $("#updownGif").show();
+    }else if((data.type=="DownloadFile")||(data.type=="UploadFile")||(data.progress==1)){
+        let key = data.key;
+        $(".tsList-r-progressBar[data-name='"+key+"']").css("width",'100%').html('100%');
         method.firstInit();
         $("#updownGif").hide();
     }
@@ -1456,12 +1499,16 @@ websocket.onmessage = function (evt) {
 websocket.onerror = function (evt) {
 //产生异常
     console.log(evt);
+    if(evt){
+        var r=confirm("Sorry,An error in the system requires a reboot!");
+        if (r==true){
+            const {ipcRenderer} = require('electron'); 
+            ipcRenderer.send('close');
+        }else{
+            alert("You pressed Cancel! Please restart!");
+        }
+    }
 }; 
-
-
-
-
-
 
 
 
