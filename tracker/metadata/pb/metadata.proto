@@ -89,7 +89,8 @@ message CheckFileExistResp{
     FileStoreType storeType=3; // suggest store type, ErasureCode or MultiReplica
     uint32 dataPieceCount=4;  // 0 if not ErasureCode
     uint32 verifyPieceCount=5; // 0 if not ErasureCode
-    uint32 replicaCount=6;  // 0 if not MultiReplica
+    uint32 replicaCount=6;  // 0 if not MultiReplica    
+    uint32 chunkSize=7;
 }
 
 enum FileStoreType{
@@ -180,6 +181,12 @@ message StoreBlock{
     uint32 blockSeq=3;
     bool checksum=4;
     repeated bytes storeNodeId=5;
+    uint32 chunkSize=6;
+    string paramStr=7;
+    bytes generator=8;
+    bytes pubKey=9;
+    bytes random=10;
+    repeated bytes phi=11;
 }
 
 message UploadFileDoneResp{

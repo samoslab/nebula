@@ -3,7 +3,9 @@ package impl
 import (
 	"bytes"
 	"io"
+	"math/big"
 	"os"
+	"sort"
 	"time"
 
 	"golang.org/x/net/context"
@@ -68,22 +70,24 @@ func logWarnAndSetActionLog(err error, al *tcppb.ActionLog) {
 
 func newActionLogFromStoreReq(req *pb.StoreReq) *tcppb.ActionLog {
 	return &tcppb.ActionLog{Type: 1,
-		Ticket:    req.Ticket,
-		FileHash:  req.FileKey,
-		FileSize:  req.FileSize,
-		BlockHash: req.BlockKey,
-		BlockSize: req.BlockSize,
-		BeginTime: now()}
+		Ticket:       req.Ticket,
+		FileHash:     req.FileKey,
+		FileSize:     req.FileSize,
+		BlockHash:    req.BlockKey,
+		BlockSize:    req.BlockSize,
+		FromProvider: req.FromProvider,
+		BeginTime:    now()}
 }
 
 func newActionLogFromRetrieveReq(req *pb.RetrieveReq) *tcppb.ActionLog {
 	return &tcppb.ActionLog{Type: 2,
-		Ticket:    req.Ticket,
-		FileHash:  req.FileKey,
-		FileSize:  req.FileSize,
-		BlockHash: req.BlockKey,
-		BlockSize: req.BlockSize,
-		BeginTime: now()}
+		Ticket:       req.Ticket,
+		FileHash:     req.FileKey,
+		FileSize:     req.FileSize,
+		BlockHash:    req.BlockKey,
+		BlockSize:    req.BlockSize,
+		FromProvider: req.FromProvider,
+		BeginTime:    now()}
 }
 
 func (self *ProviderService) StoreSmall(ctx context.Context, req *pb.StoreReq) (resp *pb.StoreResp, err error) {
@@ -559,5 +563,100 @@ func (self *ProviderService) CheckAvailable(ctx context.Context, req *pb.CheckAv
 		}
 	}
 	total, max := config.AvailableVolume()
-	return &pb.CheckAvailableResp{Total: total, MaxFileSize: max}, nil
+	return &pb.CheckAvailableResp{Total: total, MaxFileSize: max, Version: 1}, nil
+}
+
+func (self *ProviderService) CheckFile(ctx context.Context, req *pb.CheckFileReq) (resp *pb.CheckFileResp, err error) {
+	if !skip_check_auth {
+		if err = req.CheckAuth(self.node.PubKeyBytes); err != nil {
+			err = status.Errorf(codes.Unauthenticated, "check auth failed,  error: %s", err)
+			log.Warnln(err)
+			return
+		}
+	}
+	found, smallFile, storageIdx, subPath := self.querySubPath(req.Key)
+	if !found {
+		err = status.Errorf(codes.NotFound, "file not exist, key: %x", req.Key)
+		log.Warnln(err)
+		return
+	}
+	keys := make([]uint32, 0, len(req.ChunkSeq))
+	for k, _ := range req.ChunkSeq {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
+	res := big.NewInt(0)
+	if smallFile {
+		storage := config.GetStorage(storageIdx)
+		data, er := storage.SmallFileDb.Get(req.Key, nil)
+		if er != nil {
+			err = status.Errorf(codes.Internal, "read small file error, blockKey: %x error: %s", req.Key, er)
+			log.Warnln(err)
+			return
+		}
+		length := int64(len(data))
+		for _, k := range keys {
+			start := int64(k-1) * int64(req.ChunkSize)
+			if start >= length {
+				err = status.Errorf(codes.OutOfRange, "seq out of range, blockKey: %x", req.Key)
+				log.Warnln(err)
+				return
+			}
+			end := start + int64(req.ChunkSize)
+			if end > length {
+				end = length
+			}
+			bm := new(big.Int)
+			bm.SetBytes(data[start:end])
+			bv := new(big.Int)
+			bv.SetBytes(req.ChunkSeq[k])
+			bm.Mul(bm, bv)
+			res.Add(res, bm)
+		}
+	} else {
+		path := config.GetStoragePath(storageIdx, subPath)
+		fileInfo, er := os.Stat(path)
+		if er != nil {
+			err = status.Errorf(codes.Internal, "stat file failed, key: %x error: %s", req.Key, er)
+			log.Warnln(err)
+			return
+		}
+		fileSize := int64(fileInfo.Size())
+		file, er := os.Open(path)
+		if er != nil {
+			err = status.Errorf(codes.Internal, "open file failed, key: %x error: %s", req.Key, er)
+			log.Warnln(err)
+			return
+		}
+		defer file.Close()
+		buf := make([]byte, req.ChunkSize)
+		for _, k := range keys {
+			start := int64(k-1) * int64(req.ChunkSize)
+			if start >= fileSize {
+				err = status.Errorf(codes.OutOfRange, "seq out of range, blockKey: %x", req.Key)
+				log.Warnln(err)
+				return
+			}
+			file.Seek(start, 0)
+			bytesRead, er := file.Read(buf)
+			if er != nil && er != io.EOF {
+				err = status.Errorf(codes.Internal, "read file failed, key: %x error: %s", req.Key, er)
+				log.Warnln(err)
+				return
+			}
+			if bytesRead > 0 {
+				bm := new(big.Int)
+				bm.SetBytes(buf[:bytesRead])
+				bv := new(big.Int)
+				bv.SetBytes(req.BlockSeq[k])
+				bm.Mul(bm, bv)
+				res.Add(res, bm)
+			} else {
+				err = status.Errorf(codes.Internal, "read file get nothing, key: %x", req.Key)
+				log.Warnln(err)
+				return
+			}
+		}
+	}
+	return &pb.CheckFileResp{Result: res.Bytes()}, nil
 }

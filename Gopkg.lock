@@ -8,6 +8,12 @@
   version = "v0.3.0"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/Nik-U/pbc"
+  packages = ["."]
+  revision = "12f3f0abc76db4319de8036959dc3a6d060838fe"
+
+[[projects]]
   name = "github.com/boltdb/bolt"
   packages = ["."]
   revision = "2f1ce7a837dcb8da3ec595b1dac9d0632f0f99e8"
@@ -314,6 +320,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "6604abff3071d3bba54f4e7b92e005b786905df610f66e886a797d13ed3aaf79"
+  inputs-digest = "d2f70136a04f2745aadb569636973052307b814ceafa1c90b2939bfb2a202a7e"
   solver-name = "gps-cdcl"
   solver-version = 1

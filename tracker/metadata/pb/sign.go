@@ -141,6 +141,14 @@ func (self *UploadFileDoneReq) hash() []byte {
 			for _, by := range b.StoreNodeId {
 				hasher.Write(by)
 			}
+			hasher.Write(util_bytes.FromUint32(b.ChunkSize))
+			hasher.Write([]byte(b.ParamStr))
+			hasher.Write(b.Generator)
+			hasher.Write(b.PubKey)
+			hasher.Write(b.Random)
+			for _, phi := range b.Phi {
+				hasher.Write(phi)
+			}
 		}
 	}
 	if self.Interactive {
