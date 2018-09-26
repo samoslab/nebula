@@ -351,14 +351,15 @@
                 <div class="close" data-dismiss="modal" aria-hidden="true">
                     &times;
                 </div>
-                <h4 class="modal-title" id="myModalLabel" data-locale="rechange">
+                <h4 class="modal-title text-center" id="myModalLabel" data-locale="rechange">
                    充值
                 </h4>
             </div>
             <div class="modal-body">
-                <div class="payIllustrate">
+                <div class="payIllustrate text-center">
                     <span data-locale="wallet">Please open the wallet and transfer to the following address,</span>
-                    <input id="samosWalletAddress" value="" /><input id="samosWalletCopyBtn" class="samosWalletCopyBtn" data-clipboard-text="ddd"  type="button" value="copy"/>
+                    <input id="samosWalletAddress" class="modelInput modelInputAdd" value="" />
+                    <input id="samosWalletCopyBtn" class="modelInput modelCopyBtn" data-clipboard-text="ddd"  type="button" value="copy"/>
                     <p class="qrcodeP" data-locale="qrcodeP">或打开钱包，扫描二维码：</p>
                     <div id="qrcode" class="qrcode"></div>
                 </div>

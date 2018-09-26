@@ -45,38 +45,37 @@
                     <!--邮箱-->
                     <div id="guideMail" class="tang-pass-login" style="display:none;">
                         <form id="TANGRAM__PSP_4__form" class="pass-form pass-form-normal">
-                            <p class="pass-form-logo" data-locale="setEmail">Set Email</p>
+                            <p class="pass-form-logo"><a class="pass-form-logo-row" href="#/"></a><span data-locale="setEmail">Set Email</span></p>
                             <div class="inputLine">
-                                <label for="pass-form-inpt" data-locale="email">Email：</label>
-                                <input id="pass-form-inpt" class="pass-form-inpt" type="text" name="email"  placeholder="Import Email(for receiving bills)"/>
+                                <label for="pass-form-inpt" data-locale="email">Email</label>
+                                <input id="pass-form-inpt" class="pass-form-inpt" type="text" name="email" autofocus="autofocus" placeholder="Import Email(for receiving bills)"/>
                             </div>
                             <div class="inputLine">
-                                <label for="pass-form-cf" data-locale="verifyEmail">Verify：</label>
+                                <label for="pass-form-cf" data-locale="verifyEmail">Verify</label>
                                 <input id="pass-form-cf" class="pass-form-inpt" type="text" name="email"  placeholder="Import Email(for receiving bills)"/>
                             </div>
                             <div id="submit-btn" class="submit-btn" type="button" data-locale="sendEmail" value="">Send Email</div>
                             <div class="inputLine">
-                                <label for="code-inpt" data-locale="verificationCode">Code:</label>
+                                <label for="code-inpt" data-locale="verificationCode">Code</label>
                                 <input  id="code-inpt" class="pass-form-inpt" type="text" name="code"  placeholder="Verification Code"/>
                             </div>
+                            <p class="register-infro" data-locale="registerInf">Register Inf:Please enter your email address and we will send a verification email to you. </p>
                             <div class="inputLine mailGrounpBtns">
-                                <a class="guide-btn-had" href="#/" data-locale="prviousStep">Previous Step</a>
                                 <div id="code-submit-btn" class="submit-btn verify-btn" type="button" data-locale="verify">Verify</div>
                             </div>
                             
 
-                            <p class="register-infro" data-locale="registerInf">Register Inf:Please enter your email address and we will send a verification email to you. </p>
+                           
                         </form>
                     </div>
                     <!-- 导入网盘 -->
                     <div id="guideLeadIn" class="leadIn hidden">
-                        <p class="pass-form-logo" data-locale="importConfig">Import Config.json</p>
+                        <p class="pass-form-logo"><a class="pass-form-logo-row" href="#/"></a><span data-locale="importConfig">Import Config.json</span></p>
                         <p class="register-infro" data-locale="importPath">Please select the path of the network disk configuration file on the disk.</p>
                         <div class="inputLine">
                             <input id="configFile" class="configFile" type="file" accept="*/*" >
                         </div>
                         <div class="inputLine mailGrounpBtns">
-                            <a class="guide-btn-had" href="#/" data-locale="prviousStep">Previous Step</a>
                             <div id="config-submit-btn" class="submit-btn verify-btn" type="button" data-locale="affirm">Affirm</div>
                         </div>
 
@@ -244,6 +243,13 @@
         });
 
     });
+</script>
+<script>
+    //求窗口尺寸大小
+    window.onload = window.onresize=function(){
+        let fmh = $(window).height();
+        $("#login-container").css('height',fmh+'px');
+    };
 </script>
 </body>
 </html>
