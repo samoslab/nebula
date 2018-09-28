@@ -179,3 +179,18 @@ func (self *SwitchPublicReq) SignReq(priKey *rsa.PrivateKey) (err error) {
 func (self *SwitchPublicReq) VerifySign(pubKey *rsa.PublicKey) error {
 	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, self.hash(), self.Sign)
 }
+func (self *PrivateAliveReq) hash() []byte {
+	hasher := sha256.New()
+	hasher.Write(self.NodeId)
+	hasher.Write(util_bytes.FromUint64(self.Timestamp))
+	return hasher.Sum(nil)
+}
+
+func (self *PrivateAliveReq) SignReq(priKey *rsa.PrivateKey) (err error) {
+	self.Sign, err = rsa.SignPKCS1v15(rand.Reader, priKey, crypto.SHA256, self.hash())
+	return
+}
+
+func (self *PrivateAliveReq) VerifySign(pubKey *rsa.PublicKey) error {
+	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, self.hash(), self.Sign)
+}

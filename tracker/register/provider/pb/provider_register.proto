@@ -22,6 +22,8 @@ service ProviderRegisterService {
     rpc SwitchPrivate(SwitchPrivateReq)returns (SwitchPrivateResp){}
 
     rpc SwitchPublic(SwitchPublicReq)returns (SwitchPublicResp){}
+
+    rpc PrivateAlive(PrivateAliveReq)returns(PrivateAliveResp){}
 }
 message GetPublicKeyReq {
     uint32 version =1;
@@ -166,4 +168,14 @@ message SwitchPublicReq{
 message SwitchPublicResp{
     uint32 code = 1;//0:success, other value: failed
     string errMsg=2;
+}
+
+message PrivateAliveReq{
+    uint32 version=1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    bytes sign = 4;
+}
+
+message PrivateAliveResp{
 }

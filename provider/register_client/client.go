@@ -3,10 +3,12 @@ package register_client
 import (
 	"context"
 	"crypto/rsa"
+	"fmt"
 	"time"
 
 	"github.com/samoslab/nebula/provider/node"
 	pb "github.com/samoslab/nebula/tracker/register/provider/pb"
+	"google.golang.org/grpc"
 )
 
 func GetPublicKey(client pb.ProviderRegisterServiceClient) (pubKey []byte, publicKeyHash []byte, ip string, err error) {
@@ -155,6 +157,27 @@ func SwitchPublic(client pb.ProviderRegisterServiceClient, publicKeyHash []byte,
 		return 9999, "", err
 	}
 	return resp.Code, resp.ErrMsg, nil
+}
+
+func PrivateAlive(trackerServer string) error {
+	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
+	if err != nil {
+		fmt.Printf("RPC Dial tracker %s failed: %s\n", trackerServer, err.Error())
+		return err
+	}
+	defer conn.Close()
+	prsc := pb.NewProviderRegisterServiceClient(conn)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	node := node.LoadFormConfig()
+	req := &pb.PrivateAliveReq{NodeId: node.NodeId,
+		Timestamp: uint64(time.Now().Unix())}
+	req.SignReq(node.PriKey)
+	_, err = prsc.PrivateAlive(ctx, req)
+	if err != nil {
+		fmt.Printf("PrivateAlive failed: %s\n", err.Error())
+	}
+	return err
 }
 
 func GetTrackerServer(client pb.ProviderRegisterServiceClient) (server map[string]uint32, err error) {

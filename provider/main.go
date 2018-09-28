@@ -257,10 +257,11 @@ func daemon(configDir string, trackerServer string, collectorServer string, task
 	providerServer := impl.NewProviderService()
 	go startServer(listen, grpcServer, providerServer)
 	defer grpcServer.GracefulStop()
+	cronRunner := cron.New()
 	if config.GetProviderConfig().Private {
 		fmt.Println("Starting samos private network node.")
+		cronRunner.AddFunc("@every 5m", func() { client.PrivateAlive(trackerServer) })
 	}
-	cronRunner := cron.New()
 	if !disableAutoRefreshIpFlag && !config.GetProviderConfig().Ddns && !config.GetProviderConfig().Private {
 		refreshIp(trackerServer, port, true)
 		cronRunner.AddFunc("37 */2 * * * *", func() {
