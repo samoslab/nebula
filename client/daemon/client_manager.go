@@ -32,6 +32,7 @@ import (
 	mpb "github.com/samoslab/nebula/tracker/metadata/pb"
 	"github.com/samoslab/nebula/util/aes"
 	util_file "github.com/samoslab/nebula/util/file"
+	"github.com/samoslab/nebula/util/filecheck"
 	util_hash "github.com/samoslab/nebula/util/hash"
 	rsalong "github.com/samoslab/nebula/util/rsa"
 	"github.com/sirupsen/logrus"
@@ -796,7 +797,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 
 		partitions := []*mpb.StorePartition{}
 		for i, partInfo := range fileInfos {
-			partition, err := c.uploadFileBatchByErasure(ufpr, rspPartitions[i], partInfo, dataShards)
+			partition, err := c.uploadFileBatchByErasure(ufpr, rspPartitions[i], partInfo, dataShards, rsp.GetChunkSize())
 			if err != nil {
 				return err
 			}
@@ -997,7 +998,7 @@ func (c *ClientManager) onlyFileSplit(fileName string, dataNum, verifyNum int, i
 
 }
 
-func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, rspPartition *mpb.ErasureCodePartition, partFile common.PartitionFile, dataShards int) (*mpb.StorePartition, error) {
+func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, rspPartition *mpb.ErasureCodePartition, partFile common.PartitionFile, dataShards int, chunkSize uint32) (*mpb.StorePartition, error) {
 	log := c.Log
 	partition := &mpb.StorePartition{}
 	partition.Block = []*mpb.StoreBlock{}
@@ -1019,14 +1020,14 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 			OriginFileSize: partFile.OriginFileSize,
 		}
 		ccControl.Add()
-		go func(pro *mpb.BlockProviderAuth, tm uint64, uploadPara *common.UploadParameter) {
+		go func(pro *mpb.BlockProviderAuth, tm uint64, uploadPara *common.UploadParameter, chunkSize uint32) {
 			done := make(chan struct{})
 			go HandleQuit(c.quit, done, ccControl)
 			defer func() {
 				close(done)
 				ccControl.Done()
 			}()
-			block, err := c.uploadFileToErasureProvider(pro, tm, uploadParas)
+			block, err := c.uploadFileToErasureProvider(pro, tm, uploadParas, chunkSize)
 			mutex.Lock()
 			defer mutex.Unlock()
 			if err != nil {
@@ -1035,7 +1036,7 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 				return
 			}
 			partition.Block = append(partition.Block, block)
-		}(pro, rspPartition.GetTimestamp(), uploadParas)
+		}(pro, rspPartition.GetTimestamp(), uploadParas, chunkSize)
 	}
 	ccControl.Wait()
 	if len(errResult) != 0 {
@@ -1044,7 +1045,7 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 	return partition, nil
 }
 
-func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, tm uint64, uploadPara *common.UploadParameter) (*mpb.StoreBlock, error) {
+func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, tm uint64, uploadPara *common.UploadParameter, chunkSize uint32) (*mpb.StoreBlock, error) {
 	log := c.Log
 	server := fmt.Sprintf("%s:%d", pro.GetServer(), pro.GetPort())
 	uploadPara.Provider = server
@@ -1055,6 +1056,20 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 	}
 	defer conn.Close()
 	pclient := pb.NewProviderServiceClient(conn)
+
+	t1 := time.Now()
+	fmt.Printf("chunksize %d\n", chunkSize)
+	var paraStr string
+	var generator, pubKey, random []byte
+	var phi [][]byte
+	if chunkSize > 0 {
+		paraStr, generator, pubKey, random, phi, err = filecheck.GenMetadata(uploadPara.HF.FileName, chunkSize)
+		if err != nil {
+			return nil, err
+		}
+	}
+	t2 := time.Now()
+	fmt.Printf("gen metadata time elapased %+v\n", t2.Sub(t1).Seconds())
 
 	ha := pro.GetHashAuth()[0]
 	err = client.StorePiece(log, pclient, uploadPara, ha.GetAuth(), ha.GetTicket(), tm, c.PM)
@@ -1067,6 +1082,12 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 		Hash:        uploadPara.HF.FileHash,
 		Size:        uint64(uploadPara.HF.FileSize),
 		BlockSeq:    uint32(uploadPara.HF.SliceIndex),
+		ChunkSize:   chunkSize,
+		ParamStr:    paraStr,
+		Generator:   generator,
+		PubKey:      pubKey,
+		Random:      random,
+		Phi:         phi,
 	}
 	block.StoreNodeId = append(block.StoreNodeId, []byte(pro.GetNodeId()))
 	log.Debugf("Upload %s to provider %s success", uploadPara.HF.FileName, server)
@@ -1148,12 +1169,32 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 		HF:             fileSlices[0],
 	}
 
+	t1 := time.Now()
+	fmt.Printf("chunksize %d, filename %s\n", rsp.GetChunkSize(), fileName)
+	var paraStr string
+	var generator, pubKey, random []byte
+	var phi [][]byte
+	if rsp.GetChunkSize() > 0 {
+		paraStr, generator, pubKey, random, phi, err = filecheck.GenMetadata(fileName, rsp.GetChunkSize())
+		if err != nil {
+			return nil, err
+		}
+	}
+	t2 := time.Now()
+	fmt.Printf("gen metadata time elapased %+v\n", t2.Sub(t1).Seconds())
+
 	block := &mpb.StoreBlock{
 		Checksum:    false,
 		StoreNodeId: [][]byte{},
 		Hash:        fileSlices[0].FileHash,
 		Size:        uint64(fileSlices[0].FileSize),
 		BlockSeq:    uint32(fileSlices[0].SliceIndex),
+		ChunkSize:   rsp.GetChunkSize(),
+		ParamStr:    paraStr,
+		Generator:   generator,
+		PubKey:      pubKey,
+		Random:      random,
+		Phi:         phi,
 	}
 
 	sp := serverPath(req.Parent.GetPath(), fileName)
@@ -1697,6 +1738,10 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 			deleteTemporaryFile(log, file)
 		}
 	}()
+
+	for _, f := range partFiles {
+		log.Infof("Part file %s for join", f)
+	}
 
 	if err := FileJoin(downFileName, partFiles); err != nil {
 		log.Errorf("File %s join failed, part files %+v", downFileName, partFiles)
