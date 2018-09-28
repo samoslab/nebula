@@ -1057,25 +1057,50 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 	defer conn.Close()
 	pclient := pb.NewProviderServiceClient(conn)
 
-	t1 := time.Now()
-	fmt.Printf("chunksize %d\n", chunkSize)
 	var paraStr string
 	var generator, pubKey, random []byte
 	var phi [][]byte
+	errRes := make(chan error)
+	done := make(chan struct{})
+	taskNum := 1
 	if chunkSize > 0 {
-		paraStr, generator, pubKey, random, phi, err = filecheck.GenMetadata(uploadPara.HF.FileName, chunkSize)
+		taskNum++
+		go func() {
+			paraStr, generator, pubKey, random, phi, err = filecheck.GenMetadata(uploadPara.HF.FileName, chunkSize)
+			if err != nil {
+				errRes <- err
+			} else {
+				done <- struct{}{}
+			}
+		}()
+	}
+
+	go func() {
+		ha := pro.GetHashAuth()[0]
+		err = client.StorePiece(log, pclient, uploadPara, ha.GetAuth(), ha.GetTicket(), tm, c.PM)
 		if err != nil {
-			return nil, err
+			errRes <- err
+		} else {
+			done <- struct{}{}
+		}
+	}()
+
+	doneNum := 0
+
+	for {
+		select {
+		case err := <-errRes:
+			log.Errorf("upload failed %v", err)
+			time.Sleep(time.Second)
+			return nil, nil
+		case <-done:
+			doneNum++
+			if doneNum >= taskNum {
+				break
+			}
 		}
 	}
-	t2 := time.Now()
-	fmt.Printf("gen metadata time elapased %+v\n", t2.Sub(t1).Seconds())
 
-	ha := pro.GetHashAuth()[0]
-	err = client.StorePiece(log, pclient, uploadPara, ha.GetAuth(), ha.GetTicket(), tm, c.PM)
-	if err != nil {
-		return nil, err
-	}
 	block := &mpb.StoreBlock{
 		StoreNodeId: [][]byte{},
 		Checksum:    uploadPara.Checksum,
@@ -1174,6 +1199,7 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 	var paraStr string
 	var generator, pubKey, random []byte
 	var phi [][]byte
+
 	if rsp.GetChunkSize() > 0 {
 		paraStr, generator, pubKey, random, phi, err = filecheck.GenMetadata(fileName, rsp.GetChunkSize())
 		if err != nil {
