@@ -1,0 +1,106 @@
+syntax = "proto3";
+package task.pb;
+
+service ProviderTaskService {
+
+    rpc TaskList(TaskListReq)returns(TaskListResp){}
+
+    rpc GetOppositeInfo(GetOppositeInfoReq)returns(GetOppositeInfoResp){}
+
+    rpc GetProveInfo(GetProveInfoReq)returns(GetProveInfoResp){}
+
+    rpc FinishProve(FinishProveReq)returns(FinishProveResp){}
+
+    rpc FinishTask(FinishTaskReq)returns(FinishTaskResp){}
+}
+
+
+message TaskListReq{
+    bytes nodeId=1;
+    uint64 timestamp=2;
+    bytes sign=3;
+}
+
+message TaskListResp{
+    repeated Task task=1;
+}
+
+enum TaskType {
+    REPLICATE = 0;
+    SEND = 1;
+    REMOVE = 2;
+    PROVE = 3;
+}
+
+message Task{
+    bytes id=1;
+    uint64 creation=2;
+    TaskType type=3;
+    bytes fileId=4;
+	bytes fileHash = 5;
+	uint64 fileSize=6;
+	bytes blockHash=7;//nil if equals fileHash
+	uint64 blockSize=8;//nil if equals fileSize
+    repeated string oppositeId=9;
+    bytes proofId=10;
+}
+
+message GetOppositeInfoReq{
+    bytes nodeId=1;
+    uint64 timestamp=2;
+    bytes sign=3;
+    bytes taskId=4;
+}
+
+message GetOppositeInfoResp{
+    uint64 timestamp=1;
+    repeated OppositeInfo info=2;
+}
+
+message OppositeInfo{
+    string nodeId=1;
+    string host=2;
+    uint32 port=3;
+	bytes auth = 4;
+	string ticket = 5;
+}
+
+message GetProveInfoReq{
+    bytes nodeId=1;
+    uint64 timestamp=2;
+    bytes sign=3;
+    bytes taskId=4;
+    bytes proofId=5;
+}
+
+message GetProveInfoResp{
+    uint32 chunkSize=1;
+	map<uint32, bytes> chunkSeq = 2;
+}
+
+message FinishProveReq{
+    bytes nodeId=1;
+    uint64 timestamp=2;
+    bytes sign=3;
+    bytes taskId=4;
+    bytes proofId=5;
+    uint64 finishedTime=6;
+    bytes result=7;
+    string remark=8;
+}
+
+message FinishProveResp{
+}
+
+message FinishTaskReq{
+    bytes nodeId=1;
+    uint64 timestamp=2;
+    bytes sign=3;
+    bytes taskId=4;
+    uint64 finishedTime=5;
+    bool success=6;
+    string remark=7;
+}
+
+message FinishTaskResp{
+}

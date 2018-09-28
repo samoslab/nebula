@@ -2,6 +2,8 @@ package impl
 
 import (
 	"bytes"
+	"encoding/base64"
+	"fmt"
 	"io"
 	"math/big"
 	"os"
@@ -10,15 +12,20 @@ import (
 
 	"golang.org/x/net/context"
 
+	gosync "github.com/lrita/gosync"
 	client "github.com/samoslab/nebula/provider/collector_client"
 	"github.com/samoslab/nebula/provider/config"
 	"github.com/samoslab/nebula/provider/node"
 	pb "github.com/samoslab/nebula/provider/pb"
+	provider_client "github.com/samoslab/nebula/provider/provider_client"
+	task_client "github.com/samoslab/nebula/provider/task_client"
 	tcppb "github.com/samoslab/nebula/tracker/collector/provider/pb"
+	ttpb "github.com/samoslab/nebula/tracker/task/pb"
 	util_hash "github.com/samoslab/nebula/util/hash"
 	log "github.com/sirupsen/logrus"
 	"github.com/syndtr/goleveldb/leveldb"
 	leveldb_errors "github.com/syndtr/goleveldb/leveldb/errors"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -29,9 +36,10 @@ const small_file_limit = 512 * 1024
 var skip_check_auth = false
 
 type ProviderService struct {
-	node       *node.Node
-	nodeIdHash []byte
-	providerDb *leveldb.DB
+	node        *node.Node
+	nodeIdHash  []byte
+	providerDb  *leveldb.DB
+	taskRunning gosync.Mutex
 }
 
 func NewProviderService() *ProviderService {
@@ -46,6 +54,7 @@ func NewProviderService() *ProviderService {
 	if err != nil {
 		log.Fatalf("open Provider DB failed:%s", err)
 	}
+	ps.taskRunning = gosync.NewMutex()
 	return ps
 }
 
@@ -70,24 +79,22 @@ func logWarnAndSetActionLog(err error, al *tcppb.ActionLog) {
 
 func newActionLogFromStoreReq(req *pb.StoreReq) *tcppb.ActionLog {
 	return &tcppb.ActionLog{Type: 1,
-		Ticket:       req.Ticket,
-		FileHash:     req.FileKey,
-		FileSize:     req.FileSize,
-		BlockHash:    req.BlockKey,
-		BlockSize:    req.BlockSize,
-		FromProvider: req.FromProvider,
-		BeginTime:    now()}
+		Ticket:    req.Ticket,
+		FileHash:  req.FileKey,
+		FileSize:  req.FileSize,
+		BlockHash: req.BlockKey,
+		BlockSize: req.BlockSize,
+		BeginTime: now()}
 }
 
 func newActionLogFromRetrieveReq(req *pb.RetrieveReq) *tcppb.ActionLog {
 	return &tcppb.ActionLog{Type: 2,
-		Ticket:       req.Ticket,
-		FileHash:     req.FileKey,
-		FileSize:     req.FileSize,
-		BlockHash:    req.BlockKey,
-		BlockSize:    req.BlockSize,
-		FromProvider: req.FromProvider,
-		BeginTime:    now()}
+		Ticket:    req.Ticket,
+		FileHash:  req.FileKey,
+		FileSize:  req.FileSize,
+		BlockHash: req.BlockKey,
+		BlockSize: req.BlockSize,
+		BeginTime: now()}
 }
 
 func (self *ProviderService) StoreSmall(ctx context.Context, req *pb.StoreReq) (resp *pb.StoreResp, err error) {
@@ -556,6 +563,9 @@ func (self *ProviderService) querySubPath(key []byte) (found bool, smallFile boo
 
 func (self *ProviderService) CheckAvailable(ctx context.Context, req *pb.CheckAvailableReq) (resp *pb.CheckAvailableResp, err error) {
 	if !skip_check_auth {
+		if len(req.NodeIdHash) > 0 && !bytes.Equal(req.NodeIdHash, self.nodeIdHash) {
+			return nil, status.Errorf(codes.FailedPrecondition, "not the target node")
+		}
 		if err = req.CheckAuth(self.node.PubKeyBytes); err != nil {
 			err = status.Errorf(codes.Unauthenticated, "check auth failed,  error: %s", err)
 			log.Warnln(err)
@@ -566,50 +576,132 @@ func (self *ProviderService) CheckAvailable(ctx context.Context, req *pb.CheckAv
 	return &pb.CheckAvailableResp{Total: total, MaxFileSize: max, Version: 1}, nil
 }
 
-func (self *ProviderService) CheckFile(ctx context.Context, req *pb.CheckFileReq) (resp *pb.CheckFileResp, err error) {
-	if !skip_check_auth {
-		if err = req.CheckAuth(self.node.PubKeyBytes); err != nil {
-			err = status.Errorf(codes.Unauthenticated, "check auth failed,  error: %s", err)
-			log.Warnln(err)
-			return
-		}
-	}
-	found, smallFile, storageIdx, subPath := self.querySubPath(req.Key)
-	if !found {
-		err = status.Errorf(codes.NotFound, "file not exist, key: %x", req.Key)
-		log.Warnln(err)
+func (self *ProviderService) ProcessTask(taskServer string) {
+	if self.taskRunning.TryLock() {
+		defer self.taskRunning.UnLock()
+	} else {
 		return
 	}
-	keys := make([]uint32, 0, len(req.ChunkSeq))
-	for k, _ := range req.ChunkSeq {
+	conn, err := grpc.Dial(taskServer, grpc.WithInsecure())
+	if err != nil {
+		fmt.Printf("RPC Dial taskServer %s failed: %s\n", taskServer, err.Error())
+		return
+	}
+	defer conn.Close()
+	ptsc := ttpb.NewProviderTaskServiceClient(conn)
+	taskList, err := task_client.TaskList(ptsc)
+	if err != nil {
+		fmt.Printf("Get task list failed: %s\n", err.Error())
+		return
+	}
+	if len(taskList) == 0 {
+		return
+	}
+	for _, ta := range taskList {
+		switch ta.Type {
+		case ttpb.TaskType_REMOVE:
+			// TODO not implement for safety
+		case ttpb.TaskType_PROVE:
+			if len(ta.ProofId) == 0 {
+				fmt.Printf("Task [%x] info error, none proof id\n", ta.Id)
+				continue
+			}
+			chunkSize, chunkSeq, err := task_client.GetProveInfo(ptsc, ta.Id, ta.ProofId)
+			if err != nil {
+				fmt.Printf("Get task [%x] prove [%x] info failed: %s\n", ta.Id, ta.ProofId, err.Error())
+				continue
+			}
+			result, err := self.taskProve(ta.BlockHash, ta.BlockSize, chunkSize, chunkSeq)
+			var remark string
+			if err != nil {
+				remark = err.Error()
+			}
+			if err = task_client.FinishProve(ptsc, ta.Id, ta.ProofId, uint64(time.Now().Unix()), result, remark); err != nil {
+				fmt.Printf("Finish prove task [%x] failed: %s\n", ta.Id, err.Error())
+			}
+		case ttpb.TaskType_SEND:
+			if len(ta.OppositeId) != 1 {
+				fmt.Printf("Task [%x] info error, SEND task haven't single opposite id\n", ta.Id)
+				continue
+			}
+			resp, err := task_client.GetOppositeInfo(ptsc, ta.Id)
+			if err != nil {
+				fmt.Printf("Get task [%x] opposite info failed: %s\n", ta.Id, err.Error())
+				continue
+			}
+			if len(resp.Info) != 1 {
+				fmt.Printf("Get task [%x] opposite info error, SEND task haven't single opposite info\n", ta.Id)
+				continue
+			}
+			var remark string
+			success := true
+			if err = self.taskSend(ta.FileHash, ta.FileSize, ta.BlockHash, ta.BlockSize, resp.Timestamp, resp.Info[0]); err != nil {
+				remark = err.Error()
+				success = false
+				fmt.Printf("taskSend failed, blockKey: %x, error: %s", ta.BlockHash, remark)
+			}
+			if err = task_client.FinishTask(ptsc, ta.Id, uint64(time.Now().Unix()), success, remark); err != nil {
+				fmt.Printf("Finish send task [%x] failed: %s\n", ta.Id, err.Error())
+			}
+		case ttpb.TaskType_REPLICATE:
+			if len(ta.OppositeId) == 0 {
+				fmt.Printf("Task [%x] info error, REPLICATE task haven't opposite id\n", ta.Id)
+				continue
+			}
+			resp, err := task_client.GetOppositeInfo(ptsc, ta.Id)
+			if err != nil {
+				fmt.Printf("Get task [%x] opposite info failed: %s\n", ta.Id, err.Error())
+				continue
+			}
+			if len(resp.Info) == 0 {
+				fmt.Printf("Get task [%x] opposite info error, REPLICATE task haven't opposite info\n", ta.Id)
+				continue
+			}
+			var remark string
+			success := true
+			if err = self.taskReplicate(ta.FileHash, ta.FileSize, ta.BlockHash, ta.BlockSize, resp.Timestamp, resp.Info); err != nil {
+				remark = err.Error()
+				success = false
+				fmt.Printf("taskReplicate failed, blockKey: %x, error: %s", ta.BlockHash, remark)
+			}
+			if err = task_client.FinishTask(ptsc, ta.Id, uint64(time.Now().Unix()), success, remark); err != nil {
+				fmt.Printf("Finish send task [%x] failed: %s\n", ta.Id, err.Error())
+			}
+		}
+	}
+}
+
+func (self *ProviderService) taskProve(blockHash []byte, blockSize uint64, chunkSize uint32, chunkSeq map[uint32][]byte) (result []byte, err error) {
+	found, smallFile, storageIdx, subPath := self.querySubPath(blockHash)
+	if !found {
+		return nil, fmt.Errorf("file not exist")
+	}
+	keys := make([]uint32, 0, len(chunkSeq))
+	for k, _ := range chunkSeq {
 		keys = append(keys, k)
 	}
 	sort.Slice(keys, func(i, j int) bool { return keys[i] < keys[j] })
 	res := big.NewInt(0)
 	if smallFile {
 		storage := config.GetStorage(storageIdx)
-		data, er := storage.SmallFileDb.Get(req.Key, nil)
+		data, er := storage.SmallFileDb.Get(blockHash, nil)
 		if er != nil {
-			err = status.Errorf(codes.Internal, "read small file error, blockKey: %x error: %s", req.Key, er)
-			log.Warnln(err)
-			return
+			return nil, fmt.Errorf("read small file error, error: %s", er)
 		}
 		length := int64(len(data))
 		for _, k := range keys {
-			start := int64(k-1) * int64(req.ChunkSize)
+			start := int64(k-1) * int64(chunkSize)
 			if start >= length {
-				err = status.Errorf(codes.OutOfRange, "seq out of range, blockKey: %x", req.Key)
-				log.Warnln(err)
-				return
+				return nil, fmt.Errorf("seq out of range")
 			}
-			end := start + int64(req.ChunkSize)
+			end := start + int64(chunkSize)
 			if end > length {
 				end = length
 			}
 			bm := new(big.Int)
 			bm.SetBytes(data[start:end])
 			bv := new(big.Int)
-			bv.SetBytes(req.ChunkSeq[k])
+			bv.SetBytes(chunkSeq[k])
 			bm.Mul(bm, bv)
 			res.Add(res, bm)
 		}
@@ -617,46 +709,225 @@ func (self *ProviderService) CheckFile(ctx context.Context, req *pb.CheckFileReq
 		path := config.GetStoragePath(storageIdx, subPath)
 		fileInfo, er := os.Stat(path)
 		if er != nil {
-			err = status.Errorf(codes.Internal, "stat file failed, key: %x error: %s", req.Key, er)
-			log.Warnln(err)
-			return
+			return nil, fmt.Errorf("stat file failed, error: %s", er)
 		}
 		fileSize := int64(fileInfo.Size())
 		file, er := os.Open(path)
 		if er != nil {
-			err = status.Errorf(codes.Internal, "open file failed, key: %x error: %s", req.Key, er)
-			log.Warnln(err)
-			return
+			return nil, fmt.Errorf("open file failed, error: %s", er)
 		}
 		defer file.Close()
-		buf := make([]byte, req.ChunkSize)
+		buf := make([]byte, chunkSize)
 		for _, k := range keys {
-			start := int64(k-1) * int64(req.ChunkSize)
+			start := int64(k-1) * int64(chunkSize)
 			if start >= fileSize {
-				err = status.Errorf(codes.OutOfRange, "seq out of range, blockKey: %x", req.Key)
-				log.Warnln(err)
-				return
+				return nil, fmt.Errorf("seq out of range")
 			}
 			file.Seek(start, 0)
 			bytesRead, er := file.Read(buf)
 			if er != nil && er != io.EOF {
-				err = status.Errorf(codes.Internal, "read file failed, key: %x error: %s", req.Key, er)
-				log.Warnln(err)
-				return
+				return nil, fmt.Errorf("read file failed, error: %s", er)
 			}
 			if bytesRead > 0 {
 				bm := new(big.Int)
 				bm.SetBytes(buf[:bytesRead])
 				bv := new(big.Int)
-				bv.SetBytes(req.BlockSeq[k])
+				bv.SetBytes(chunkSeq[k])
 				bm.Mul(bm, bv)
 				res.Add(res, bm)
 			} else {
-				err = status.Errorf(codes.Internal, "read file get nothing, key: %x", req.Key)
-				log.Warnln(err)
-				return
+				return nil, fmt.Errorf("read file get nothing, start position: %d", start)
 			}
 		}
 	}
-	return &pb.CheckFileResp{Result: res.Bytes()}, nil
+	return res.Bytes(), nil
+}
+
+func (self *ProviderService) taskSend(fileHash []byte, fileSize uint64, blockHash []byte, blockSize uint64, timestamp uint64, oppositeInfo *ttpb.OppositeInfo) (err error) {
+	found, smallFile, storageIdx, subPath := self.querySubPath(blockHash)
+	if !found {
+		return fmt.Errorf("file not exist")
+	}
+	providerAddr := fmt.Sprintf("%s:%d", oppositeInfo.Host, oppositeInfo.Port)
+	conn, err := grpc.Dial(providerAddr, grpc.WithInsecure())
+	if err != nil {
+		return fmt.Errorf("RPC Dial taskServer %s failed: %s", providerAddr, err.Error())
+	}
+	defer conn.Close()
+	psc := pb.NewProviderServiceClient(conn)
+	if smallFile {
+		storage := config.GetStorage(storageIdx)
+		data, er := storage.SmallFileDb.Get(blockHash, nil)
+		if er != nil {
+			return fmt.Errorf("read small file error, error: %s", er)
+		}
+		if len(data) != int(blockSize) {
+			return fmt.Errorf("file length not same")
+		}
+		if !bytes.Equal(util_hash.Sha1(data), blockHash) {
+			return fmt.Errorf("hash verify failed")
+		}
+		return provider_client.StoreSmall(psc, data, oppositeInfo.Auth, timestamp, oppositeInfo.Ticket, fileHash, fileSize, blockHash, blockSize)
+	} else {
+		path := config.GetStoragePath(storageIdx, subPath)
+		fileInfo, er := os.Stat(path)
+		if er != nil {
+			return fmt.Errorf("stat file failed, error: %s", er)
+		}
+		if fileInfo.Size() != int64(blockSize) {
+			return fmt.Errorf("file length not same")
+		}
+		hash, err := util_hash.Sha1File(path)
+		if err != nil {
+			return fmt.Errorf("sha1 sum file error: %s", err)
+		}
+		if !bytes.Equal(hash, blockHash) {
+			return fmt.Errorf("hash verify failed")
+		}
+		return provider_client.Store(psc, path, oppositeInfo.Auth, timestamp, oppositeInfo.Ticket, fileHash, fileSize, blockHash, blockSize)
+	}
+}
+
+func (self *ProviderService) taskReplicate(fileHash []byte, fileSize uint64, blockHash []byte, blockSize uint64, timestamp uint64, oppositeInfo []*ttpb.OppositeInfo) (err error) {
+	found, smallFile, storageIdx, subPath := self.querySubPath(blockHash)
+	var storage *config.Storage
+	if found {
+		if smallFile {
+			storage := config.GetStorage(storageIdx)
+			data, er := storage.SmallFileDb.Get(blockHash, nil)
+			if er != nil {
+				return fmt.Errorf("read small file error, error: %s", er)
+			}
+			if len(data) == int(blockSize) && bytes.Equal(util_hash.Sha1(data), blockHash) {
+				return nil
+			}
+		} else {
+			path := config.GetStoragePath(storageIdx, subPath)
+			fileInfo, er := os.Stat(path)
+			if er != nil {
+				return fmt.Errorf("stat file failed, error: %s", er)
+			}
+			if fileInfo.Size() == int64(blockSize) {
+				hash, err := util_hash.Sha1File(path)
+				if err != nil {
+					return fmt.Errorf("sha1 sum file error: %s", err)
+				}
+				if bytes.Equal(hash, blockHash) {
+					return nil
+				}
+			}
+		}
+		storage = config.GetStorage(storageIdx)
+	} else {
+		storage = config.GetWriteStorage(blockSize)
+	}
+	smallFile = (blockSize < small_file_limit)
+	providers := testPing(oppositeInfo)
+	errs := make([]error, 0, 8)
+	for _, pro := range providers {
+		providerAddr := fmt.Sprintf("%s:%d", pro.Host, pro.Port)
+		conn, err := grpc.Dial(providerAddr, grpc.WithInsecure())
+		if err != nil {
+			errs = append(errs, fmt.Errorf("RPC Dial taskServer %s failed: %s", providerAddr, err.Error()))
+			continue
+		}
+		defer conn.Close()
+		psc := pb.NewProviderServiceClient(conn)
+		if smallFile {
+			data, err := provider_client.RetrieveSmall(psc, pro.Auth, timestamp, pro.Ticket, fileHash, fileSize, blockHash, blockSize)
+			if err != nil {
+				errs = append(errs, fmt.Errorf("retrieve small file failed, provider id: %s, block key: %x error: %s", pro.NodeId, blockHash, err))
+				continue
+			}
+			if len(data) != int(blockSize) {
+				errs = append(errs, fmt.Errorf("file length wrong, provider id: %s, block key: %x", pro.NodeId, blockHash))
+				continue
+			}
+			if !bytes.Equal(blockHash, util_hash.Sha1(data)) {
+				errs = append(errs, fmt.Errorf("check data hash failed, provider id: %s, block key: %x", pro.NodeId, blockHash))
+				continue
+			}
+			if err = storage.SmallFileDb.Put(blockHash, data, nil); err != nil {
+				return fmt.Errorf("save to small file db failed, error: %s", err)
+			}
+			if err = self.providerDb.Put(blockHash, []byte{storage.Index}, nil); err != nil {
+				return fmt.Errorf("save to provider db failed, error: %s", err)
+			}
+		} else {
+			tempFilePath := storage.TempFilePath(blockHash)
+			file, err := os.OpenFile(
+				tempFilePath,
+				os.O_WRONLY|os.O_TRUNC|os.O_CREATE,
+				0600)
+			if err != nil {
+				return fmt.Errorf("open temp write file failed, error: %s", err)
+			}
+			defer file.Close()
+			if err = provider_client.Retrieve(psc, tempFilePath, pro.Auth, timestamp, pro.Ticket, fileHash, fileSize, blockHash, blockSize); err != nil {
+				errs = append(errs, fmt.Errorf("retrieve file failed, provider id: %s, block key: %x error: %s", pro.NodeId, blockHash, err))
+				continue
+			}
+			fileInfo, err := os.Stat(tempFilePath)
+			if err != nil {
+				return fmt.Errorf("stat temp file failed, error: %s", err)
+			}
+			if blockSize != uint64(fileInfo.Size()) {
+				errs = append(errs, fmt.Errorf("file length wrong, provider id: %s, block key: %x", pro.NodeId, blockHash))
+				continue
+			}
+			hash, err := util_hash.Sha1File(tempFilePath)
+			if err != nil {
+				return fmt.Errorf("sha1 sum file %s failed, error: %s", tempFilePath, err)
+			}
+			if !bytes.Equal(hash, blockHash) {
+				errs = append(errs, fmt.Errorf("check data hash failed, provider id: %s, block key: %x", pro.NodeId, blockHash))
+				continue
+			}
+			if err = file.Close(); err != nil {
+				return fmt.Errorf("close temp file failed, tempFilePath: %s error: %s", tempFilePath, err)
+			}
+			if found {
+				path := config.GetStoragePath(storageIdx, subPath)
+				if err = os.Remove(path); err != nil {
+					return fmt.Errorf("remove old file failed, path: %s error: %s", path, err)
+				}
+			}
+			if err := self.saveFile(blockHash, blockSize, tempFilePath, storage); err != nil {
+				return fmt.Errorf("save file failed, tempFilePath: %s error: %s", tempFilePath, err)
+			}
+		}
+		return nil
+	}
+	var errMsg string
+	for _, err := range errs {
+		errMsg += err.Error()
+		if len(errMsg) > 255 {
+			break
+		}
+		errMsg += "\n"
+	}
+	if len(errMsg) == 0 {
+		errMsg = "all opposite provider ping timeout"
+	}
+	return fmt.Errorf(errMsg)
+}
+
+type OppositeProvider struct {
+	*ttpb.OppositeInfo
+	lantency int64
+}
+
+func testPing(oppositeInfo []*ttpb.OppositeInfo) []*OppositeProvider {
+	result := make([]*OppositeProvider, 0, len(oppositeInfo))
+	timeout := 3
+	for _, oi := range oppositeInfo {
+		nodeIdHash, latency, err := provider_client.Ping(oi.Host, oi.Port, timeout)
+		nodeId, err := base64.StdEncoding.DecodeString(oi.NodeId)
+		if err != nil || !bytes.Equal(util_hash.Sha1(nodeId), nodeIdHash) {
+			continue
+		}
+		result = append(result, &OppositeProvider{OppositeInfo: oi, lantency: latency})
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].lantency < result[j].lantency })
+	return result
 }

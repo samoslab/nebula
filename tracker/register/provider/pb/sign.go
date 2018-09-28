@@ -31,6 +31,9 @@ func (self *RegisterReq) hash() []byte {
 		hasher.Write(util_bytes.FromUint64(val))
 	}
 	hasher.Write(self.PublicKeyHash)
+	if self.ConfirmInner {
+		hasher.Write([]byte{1})
+	}
 	return hasher.Sum(nil)
 }
 
@@ -138,5 +141,41 @@ func (self *RefreshIpReq) SignReq(priKey *rsa.PrivateKey) (err error) {
 }
 
 func (self *RefreshIpReq) VerifySign(pubKey *rsa.PublicKey) error {
+	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, self.hash(), self.Sign)
+}
+
+func (self *SwitchPrivateReq) hash() []byte {
+	hasher := sha256.New()
+	hasher.Write(self.NodeId)
+	hasher.Write(util_bytes.FromUint64(self.Timestamp))
+	return hasher.Sum(nil)
+}
+
+func (self *SwitchPrivateReq) SignReq(priKey *rsa.PrivateKey) (err error) {
+	self.Sign, err = rsa.SignPKCS1v15(rand.Reader, priKey, crypto.SHA256, self.hash())
+	return
+}
+
+func (self *SwitchPrivateReq) VerifySign(pubKey *rsa.PublicKey) error {
+	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, self.hash(), self.Sign)
+}
+
+func (self *SwitchPublicReq) hash() []byte {
+	hasher := sha256.New()
+	hasher.Write(self.NodeId)
+	hasher.Write(util_bytes.FromUint64(self.Timestamp))
+	hasher.Write(self.PublicKeyHash)
+	hasher.Write(util_bytes.FromUint32(self.Port))
+	hasher.Write(self.HostEnc)
+	hasher.Write(self.DynamicDomainEnc)
+	return hasher.Sum(nil)
+}
+
+func (self *SwitchPublicReq) SignReq(priKey *rsa.PrivateKey) (err error) {
+	self.Sign, err = rsa.SignPKCS1v15(rand.Reader, priKey, crypto.SHA256, self.hash())
+	return
+}
+
+func (self *SwitchPublicReq) VerifySign(pubKey *rsa.PublicKey) error {
 	return rsa.VerifyPKCS1v15(pubKey, crypto.SHA256, self.hash(), self.Sign)
 }

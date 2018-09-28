@@ -34,5 +34,5 @@ message ActionLog{
     uint64 endTime=9; //unit: ns
     uint64 transportSize=10;
     string info=11;// error info
-    bool fromProvider=12;
+    bool asClient=12;
 }

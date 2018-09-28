@@ -48,14 +48,12 @@ service ProviderService {
 	//codes.InvalidArgument, "check data size failed, read length %d != request length %d, blockKey: %x"
 	//codes.DataLoss, "hash verify failed, blockKey: %x error: %s"
 	rpc RetrieveSmall(RetrieveReq) returns (RetrieveResp){}//fileSize must less than 512KB
-
+	// deprecated
 	rpc Remove(RemoveReq) returns (RemoveResp){}
-
+	// deprecated
 	rpc GetFragment(GetFragmentReq) returns (GetFragmentResp){}
 
 	rpc CheckAvailable(CheckAvailableReq) returns (CheckAvailableResp){}
-	
-	rpc CheckFile(CheckFileReq) returns (CheckFileResp){}
 }
 
 
@@ -77,7 +75,6 @@ message StoreReq {
 	uint64 fileSize=7;
 	bytes blockKey=8;//nil if equals fileKey
 	uint64 blockSize=9;//nil if equals fileSize
-	bool fromProvider=10;
 }
 
 message StoreResp{
@@ -93,7 +90,6 @@ message RetrieveReq {
 	uint64 fileSize=6;
 	bytes blockKey=7;//nil if equals fileKey
 	uint64 blockSize=8;//nil if equals fileSize
-	bool fromProvider=9;
 }
 
 message RetrieveResp {
@@ -129,24 +125,11 @@ message CheckAvailableReq{
 	uint32 version =1;
 	bytes auth =2;
 	uint64 timestamp=3;
+	bytes nodeIdHash=4;
 }
 
 message CheckAvailableResp{
 	uint64 total=1;
 	uint64 maxFileSize=2;
 	uint32 version=3;
-}
-
-message CheckFileReq{
-	uint32 version =1;
-	bytes auth = 2;
-	uint64 timestamp=3;
-	bytes key = 4;
-	uint64 size=5;
-	uint32 chunkSize=6;
-	map<uint32, bytes> chunkSeq = 7;
-}
-
-message CheckFileResp{
-	bytes result=1;
 }

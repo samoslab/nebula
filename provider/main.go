@@ -18,6 +18,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/eiannone/keyboard"
 	"github.com/robfig/cron"
 	collector "github.com/samoslab/nebula/provider/collector_client"
 	"github.com/samoslab/nebula/provider/config"
@@ -54,14 +55,16 @@ func main() {
 	}
 
 	daemonCommand := flag.NewFlagSet("daemon", flag.ExitOnError)
-	daemonConfigDirFlag := daemonCommand.String("configDir", defaultConfigDirFlag, "config director")
+	daemonConfigDirFlag := daemonCommand.String("configDir", defaultConfigDirFlag, "config directory")
 	daemonTrackerServerFlag := daemonCommand.String("trackerServer", "tracker.store.samos.io:6677", "tracker server address, eg: tracker.store.samos.io:6677")
 	daemonCollectorServerFlag := daemonCommand.String("collectorServer", "collector.store.samos.io:6688", "collector server address, eg: collector.store.samos.io:6688")
+	daemonTaskServerFlag := daemonCommand.String("taskServer", "task.store.samos.io:6688", "task server address, eg: task.store.samos.io:6699")
 	listenFlag := daemonCommand.String("listen", ":6666", "listen address and port, eg: 111.111.111.111:6666 or :6666")
 	disableAutoRefreshIpFlag := daemonCommand.Bool("disableAutoRefreshIp", false, "disable auto refresh provider ip or enable auto refresh provider ip")
+	quietFlag := daemonCommand.Bool("quiet", false, "not print dot when running")
 
 	registerCommand := flag.NewFlagSet("register", flag.ExitOnError)
-	registerConfigDirFlag := registerCommand.String("configDir", defaultConfigDirFlag, "config director")
+	registerConfigDirFlag := registerCommand.String("configDir", defaultConfigDirFlag, "config directory")
 	registerTrackerServerFlag := registerCommand.String("trackerServer", "tracker.store.samos.io:6677", "tracker server address, eg: tracker.store.samos.io:6677")
 	registerListenFlag := registerCommand.String("listen", ":6666", "listen address and port, eg: 111.111.111.111:6666 or :6666")
 	walletAddressFlag := registerCommand.String("walletAddress", "", "Samos wallet address to accept earnings")
@@ -77,19 +80,31 @@ func main() {
 	dynamicDomainFlag := registerCommand.String("dynamicDomain", "", "dynamic domain for client to connect, eg: mydomain.xicp.net")
 
 	verifyEmailCommand := flag.NewFlagSet("verifyEmail", flag.ExitOnError)
-	verifyEmailConfigDirFlag := verifyEmailCommand.String("configDir", defaultConfigDirFlag, "config director")
+	verifyEmailConfigDirFlag := verifyEmailCommand.String("configDir", defaultConfigDirFlag, "config directory")
 	verifyEmailTrackerServerFlag := verifyEmailCommand.String("trackerServer", "tracker.store.samos.io:6677", "tracker server address, eg: tracker.store.samos.io:6677")
 	verifyCodeFlag := verifyEmailCommand.String("verifyCode", "", "verify code from verify email")
 
 	resendVerifyCodeCommand := flag.NewFlagSet("resendVerifyCode", flag.ExitOnError)
-	resendVerifyCodeConfigDirFlag := resendVerifyCodeCommand.String("configDir", defaultConfigDirFlag, "config director")
+	resendVerifyCodeConfigDirFlag := resendVerifyCodeCommand.String("configDir", defaultConfigDirFlag, "config directory")
 	resendVerifyCodeTrackerServerFlag := resendVerifyCodeCommand.String("trackerServer", "tracker.store.samos.io:6677", "tracker server address, eg: tracker.store.samos.io:6677")
 
 	addStorageCommand := flag.NewFlagSet("addStorage", flag.ExitOnError)
-	addStorageConfigDirFlag := addStorageCommand.String("configDir", defaultConfigDirFlag, "config director")
+	addStorageConfigDirFlag := addStorageCommand.String("configDir", defaultConfigDirFlag, "config directory")
 	addStorageTrackerServerFlag := addStorageCommand.String("trackerServer", "tracker.store.samos.io:6677", "tracker server address, eg: tracker.store.samos.io:6677")
 	pathFlag := addStorageCommand.String("path", "", "add storage path")
 	volumeFlag := addStorageCommand.String("volume", "", "add storage volume size, unit TB or GB, eg: 2TB or 500GB")
+
+	switchPrivateCommand := flag.NewFlagSet("switchPrivate", flag.ExitOnError)
+	switchPrivateConfigDirFlag := switchPrivateCommand.String("configDir", defaultConfigDirFlag, "config directory")
+	switchPrivateTrackerServerFlag := switchPrivateCommand.String("trackerServer", "tracker.store.samos.io:6677", "tracker server address, eg: tracker.store.samos.io:6677")
+
+	switchPublicCommand := flag.NewFlagSet("switchPublic", flag.ExitOnError)
+	switchPublicConfigDirFlag := switchPublicCommand.String("configDir", defaultConfigDirFlag, "config directory")
+	switchPublicTrackerServerFlag := switchPublicCommand.String("trackerServer", "tracker.store.samos.io:6677", "tracker server address, eg: tracker.store.samos.io:6677")
+	switchPublicListenFlag := switchPublicCommand.String("listen", ":6666", "listen address and port, eg: 111.111.111.111:6666 or :6666")
+	switchPublicPortFlag := switchPublicCommand.Uint("port", 6666, "outer network port for client to connect, eg:6666")
+	switchPublicHostFlag := switchPublicCommand.String("host", "", "outer ip or domain for client to connect, eg: 123.123.123.123")
+	switchPublicDynamicDomainFlag := switchPublicCommand.String("dynamicDomain", "", "dynamic domain for client to connect, eg: mydomain.xicp.net")
 	if len(os.Args) == 1 {
 		fmt.Printf("usage: %s <command> [<args>]\n", os.Args[0])
 		fmt.Println("The most commonly used commands are: ")
@@ -99,17 +114,21 @@ func main() {
 		verifyEmailCommand.PrintDefaults()
 		fmt.Println(" resendVerifyCode [-configDir config-dir] [-trackerServer tracker-server-and-port]")
 		resendVerifyCodeCommand.PrintDefaults()
-		fmt.Println(" daemon [-configDir config-dir] [-trackerServer tracker-server-and-port] [-listen listen-address-and-port] [-disableAutoRefreshIp]")
+		fmt.Println(" daemon [-configDir config-dir] [-trackerServer tracker-server-and-port] [-listen listen-address-and-port] [-disableAutoRefreshIp] [-quiet]")
 		daemonCommand.PrintDefaults()
 		fmt.Println(" addStorage [-configDir config-dir] [-trackerServer tracker-server-and-port] -path storage-path -volume storage-volume")
 		addStorageCommand.PrintDefaults()
+		fmt.Println(" switchPrivate [-configDir config-dir] [-trackerServer tracker-server-and-port] ")
+		switchPrivateCommand.PrintDefaults()
+		fmt.Println(" switchPublic [-configDir config-dir] [-trackerServer tracker-server-and-port] [-listen listen-address-and-port] [-host outer-host] [-dynamicDomain dynamic-domain] [-port outer-port]")
+		switchPublicCommand.PrintDefaults()
 		os.Exit(101)
 	}
 
 	switch os.Args[1] {
 	case "daemon":
 		daemonCommand.Parse(os.Args[2:])
-		daemon(*daemonConfigDirFlag, *daemonTrackerServerFlag, *daemonCollectorServerFlag, *listenFlag, *disableAutoRefreshIpFlag)
+		daemon(*daemonConfigDirFlag, *daemonTrackerServerFlag, *daemonCollectorServerFlag, *daemonTaskServerFlag, *listenFlag, *disableAutoRefreshIpFlag, *quietFlag)
 	case "register":
 		registerCommand.Parse(os.Args[2:])
 		register(*registerConfigDirFlag, *registerTrackerServerFlag, *registerListenFlag, *walletAddressFlag, *billEmailFlag, *availabilityFlag,
@@ -123,6 +142,12 @@ func main() {
 	case "resendVerifyCode":
 		resendVerifyCodeCommand.Parse(os.Args[2:])
 		resendVerifyCode(*resendVerifyCodeConfigDirFlag, *resendVerifyCodeTrackerServerFlag)
+	case "switchPrivate":
+		switchPrivateCommand.Parse(os.Args[2:])
+		switchPrivate(*switchPrivateConfigDirFlag, *switchPrivateTrackerServerFlag)
+	case "switchPublic":
+		switchPublicCommand.Parse(os.Args[2:])
+		switchPublic(*switchPublicConfigDirFlag, *switchPublicTrackerServerFlag, *switchPublicListenFlag, *switchPublicPortFlag, *switchPublicHostFlag, *switchPublicDynamicDomainFlag)
 	default:
 		fmt.Printf("%q is not valid command.\n", os.Args[1])
 		os.Exit(102)
@@ -196,7 +221,7 @@ func resendVerifyCode(configDir string, trackerServer string) {
 	fmt.Println("resendVerifyCode success, you can verify bill email.")
 }
 
-func daemon(configDir string, trackerServer string, collectorServer string, listen string, disableAutoRefreshIpFlag bool) {
+func daemon(configDir string, trackerServer string, collectorServer string, taskServer string, listen string, disableAutoRefreshIpFlag bool, quietFlag bool) {
 	err := config.LoadConfig(configDir)
 	if err != nil {
 		if err == config.NoConfErr {
@@ -229,29 +254,37 @@ func daemon(configDir string, trackerServer string, collectorServer string, list
 		}
 	}
 	grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(520 * 1024))
-	go startServer(listen, grpcServer)
+	providerServer := impl.NewProviderService()
+	go startServer(listen, grpcServer, providerServer)
 	defer grpcServer.GracefulStop()
-	if !disableAutoRefreshIpFlag && !config.GetProviderConfig().Ddns {
+	if config.GetProviderConfig().Private {
+		fmt.Println("Starting samos private network node.")
+	}
+	cronRunner := cron.New()
+	if !disableAutoRefreshIpFlag && !config.GetProviderConfig().Ddns && !config.GetProviderConfig().Private {
 		refreshIp(trackerServer, port, true)
-		cronRunner := cron.New()
 		cronRunner.AddFunc("37 */2 * * * *", func() {
 			refreshIp(trackerServer, port, false)
 		})
-		cronRunner.Start()
-		defer cronRunner.Stop()
 	}
+	if !quietFlag {
+		fmt.Println("Node is running.")
+		cronRunner.AddFunc("0 * * * * *", func() { fmt.Print(".") })
+	}
+	cronRunner.AddFunc("@every 3m", func() { providerServer.ProcessTask(taskServer) })
+	cronRunner.Start()
+	defer cronRunner.Stop()
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan
 }
 
-func startServer(listen string, grpcServer *grpc.Server) {
+func startServer(listen string, grpcServer *grpc.Server, providerServer *impl.ProviderService) {
 	lis, err := net.Listen("tcp", listen)
 	if err != nil {
 		fmt.Printf("failed to listen: %s, error: %s\n", listen, err.Error())
 		os.Exit(3)
 	}
-	providerServer := impl.NewProviderService()
 	defer providerServer.Close()
 	pb.RegisterProviderServiceServer(grpcServer, providerServer)
 	grpcServer.Serve(lis)
@@ -483,8 +516,10 @@ func doRegister(configDir string, trackerServer string, listen string, walletAdd
 		fmt.Printf("Parse PublicKey failed: %s\n", err.Error())
 		os.Exit(54)
 	}
+	success := false
+	privateNetwork := false
 	for times := 0; times < 5; times++ {
-		code, errMsg, err := client.Register(prsc, publicKeyHash, encrypt(pubKey, no.NodeId),
+		code, errMsg, err := client.RegisterPublic(prsc, publicKeyHash, encrypt(pubKey, no.NodeId),
 			encrypt(pubKey, no.PubKeyBytes), encrypt(pubKey, no.EncryptKey["0"]), encrypt(pubKey, []byte(pc.WalletAddress)),
 			encrypt(pubKey, []byte(pc.BillEmail)), mainStorageVolume, upBandwidth, downBandwidth,
 			testUpBandwidth, testDownBandwidth, availability, port, encrypt(pubKey, []byte(host)), encrypt(pubKey, []byte(dynamicDomain)), extraStorageSlice, no.PriKey)
@@ -492,7 +527,13 @@ func doRegister(configDir string, trackerServer string, listen string, walletAdd
 			fmt.Println("Register failed: " + err.Error())
 			os.Exit(55)
 		}
-		if code != 0 {
+		if code == 0 {
+			if len(host) == 0 && len(dynamicDomain) > 0 {
+				pc.Ddns = true
+			}
+			success = true
+			break
+		} else {
 			if code == 300 {
 				fmt.Println(errMsg)
 				fmt.Println("Retrying...")
@@ -516,18 +557,78 @@ func doRegister(configDir string, trackerServer string, listen string, walletAdd
 				if len(host) == 0 {
 					h = dynamicDomain
 				}
-				fmt.Printf("Register failed, ping %s:%d failed, You may not have a public network ip, error message: %s\n", h, port, errMsg)
+				err := keyboard.Open()
+				if err != nil {
+					fmt.Printf("Prepare read from keyboard error: %s\n", err.Error())
+					os.Exit(56)
+				}
+				defer keyboard.Close()
+				fmt.Printf("Ping %s:%d failed, You may not have a public network ip, error message: %s\n", h, port, errMsg)
+				fmt.Printf("If you want to register as a private network node, press Y and press another key to terminate the registration process. [Y/N]")
+				char, _, err := keyboard.GetKey()
+				if err != nil {
+					fmt.Printf("Read from keyboard error: %s\n", err.Error())
+					os.Exit(57)
+				}
+				if char == 'y' || char == 'Y' {
+					privateNetwork = true
+					break
+				} else {
+					fmt.Println("Register failed")
+					os.Exit(58)
+				}
 			} else {
 				fmt.Printf("Error Code: %d, error message:%s\n", code, errMsg)
+				os.Exit(59)
 			}
-			os.Exit(56)
 		}
-		if len(host) == 0 && len(dynamicDomain) > 0 {
-			pc.Ddns = true
+	}
+	if privateNetwork {
+		for times := 0; times < 5; times++ {
+			code, errMsg, err := client.RegisterPrivate(prsc, publicKeyHash, encrypt(pubKey, no.NodeId),
+				encrypt(pubKey, no.PubKeyBytes), encrypt(pubKey, no.EncryptKey["0"]), encrypt(pubKey, []byte(pc.WalletAddress)),
+				encrypt(pubKey, []byte(pc.BillEmail)), mainStorageVolume, upBandwidth, downBandwidth,
+				testUpBandwidth, testDownBandwidth, availability, extraStorageSlice, no.PriKey)
+			if err != nil {
+				fmt.Println("Register failed: " + err.Error())
+				os.Exit(55)
+			}
+			if code == 0 {
+				pc.Private = true
+				success = true
+				break
+			} else {
+				if code == 300 {
+					fmt.Println(errMsg)
+					fmt.Println("Retrying...")
+					continue
+				}
+				if code == 500 {
+					pubKeyBytes, publicKeyHash, _, err = client.GetPublicKey(prsc)
+					if err != nil {
+						fmt.Printf("GetPublicKey failed: %s\n", err.Error())
+						os.Exit(53)
+					}
+					pubKey, err = x509.ParsePKCS1PublicKey(pubKeyBytes)
+					if err != nil {
+						fmt.Printf("Parse PublicKey failed: %s\n", err.Error())
+						os.Exit(54)
+					}
+					continue
+				}
+				fmt.Printf("Error Code: %d, error message:%s\n", code, errMsg)
+				os.Exit(59)
+			}
 		}
+	}
+	if success {
 		path := config.CreateProviderConfig(configDir, pc)
 		fmt.Println("Register success, please recieve verify code email to verify bill email and backup your config file: " + path)
-		return
+		if privateNetwork {
+			fmt.Println("Notice: registered as a private network node")
+		}
+	} else {
+		fmt.Println("Registration failed, the maximum number of retries was reached")
 	}
 }
 
@@ -617,12 +718,192 @@ func addStorage(configDir string, trackerServer string, path string, volumeStr s
 			os.Exit(8)
 		}
 	}
+	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
+	if err != nil {
+		fmt.Printf("RPC Dial failed: %s\n", err.Error())
+		os.Exit(9)
+	}
+	defer conn.Close()
+	prsc := trp_pb.NewProviderRegisterServiceClient(conn)
+	success, err := client.AddExtraStorage(prsc, volume)
+	if err != nil {
+		fmt.Printf("resendVerifyCode failed: %s\n", err.Error())
+		os.Exit(10)
+	}
+	if !success {
+		fmt.Println("resendVerifyCode failed, please retry")
+		os.Exit(11)
+	}
 	idx := byte(len(pc.ExtraStorage) + 1)
 	pc.ExtraStorage = append(pc.ExtraStorage, config.ExtraStorageInfo{Path: path,
 		Volume: volume,
 		Index:  idx})
 	config.SaveProviderConfig()
-	fmt.Println("add storage success")
+	fmt.Println("Add storage success, please backup your config file: " + config.GetConfigFullPath(configDir))
+}
+
+func switchPrivate(configDir string, trackerServer string) {
+	err := config.LoadConfig(configDir)
+	if err != nil {
+		if err == config.NoConfErr {
+			fmt.Printf("Config file is not ready, please run \"%s register\" to register first\n", os.Args[0])
+			os.Exit(200)
+		} else if err == config.ConfVerifyErr {
+			fmt.Println("Config file wrong, can not switchPrivate.")
+			os.Exit(201)
+		}
+		fmt.Println("failed to load config, can not switchPrivate: " + err.Error())
+		os.Exit(202)
+	}
+	pc := config.GetProviderConfig()
+	err = keyboard.Open()
+	if err != nil {
+		fmt.Printf("Prepare read from keyboard error: %s\n", err.Error())
+		os.Exit(1)
+	}
+	defer keyboard.Close()
+	fmt.Printf("The rewards obtained after switching to the private network node will be greatly reduced. Press Y if you want to switch, press the other keys to cancel the switch. [Y/N]")
+	char, _, err := keyboard.GetKey()
+	if err != nil {
+		fmt.Printf("Read from keyboard error: %s\n", err.Error())
+		os.Exit(2)
+	}
+	if char == 'y' || char == 'Y' {
+		conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
+		if err != nil {
+			fmt.Printf("RPC Dial failed: %s\n", err.Error())
+			os.Exit(9)
+		}
+		defer conn.Close()
+		prsc := trp_pb.NewProviderRegisterServiceClient(conn)
+		success, err := client.SwitchPrivate(prsc)
+		if err != nil {
+			fmt.Printf("resendVerifyCode failed: %s\n", err.Error())
+			os.Exit(10)
+		}
+		if !success {
+			fmt.Println("resendVerifyCode failed, please retry")
+			os.Exit(11)
+		}
+		pc.Private = true
+		config.SaveProviderConfig()
+		fmt.Println("Switch to private network node success, please backup your config file: " + config.GetConfigFullPath(configDir))
+	} else {
+		fmt.Println("Switch has been canceled")
+	}
+}
+
+func switchPublic(configDir string, trackerServer string, listen string, port uint, host string,
+	dynamicDomain string) {
+	if port < 1 || port > 65535 {
+		fmt.Println("port must between 1 and 65535.")
+		os.Exit(1)
+	}
+	err := config.LoadConfig(configDir)
+	if err != nil {
+		if err == config.NoConfErr {
+			fmt.Printf("Config file is not ready, please run \"%s register\" to register first\n", os.Args[0])
+			os.Exit(200)
+		} else if err == config.ConfVerifyErr {
+			fmt.Println("Config file wrong, can not switchPublic.")
+			os.Exit(201)
+		}
+		fmt.Println("failed to load config, can not switchPublic: " + err.Error())
+		os.Exit(202)
+	}
+	pc := config.GetProviderConfig()
+	// connect to router
+	igd, err := upnp.Discover()
+	if err != nil {
+		fmt.Println("use upnp get router failed: " + err.Error())
+	} else {
+		err = igd.Forward(uint16(port), "Samos storage")
+		if err != nil {
+			fmt.Println("use upnp port mapping failed: " + err.Error())
+		}
+		// discover external IP
+		externalIp, err := igd.ExternalIP()
+		if err != nil {
+			fmt.Println("use upnp get outer ip failed: " + err.Error())
+		} else {
+			fmt.Println("use upnp get outer ip is: " + externalIp)
+		}
+	}
+	nodeId, _, _, _, _, err := config.ParseNode()
+	if err != nil {
+		fmt.Println("Parse nodeId error: " + err.Error())
+		os.Exit(2)
+	}
+	grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(520 * 1024))
+	go startPingServer(listen, grpcServer, util_hash.Sha1(nodeId))
+	defer grpcServer.GracefulStop()
+	time.Sleep(time.Duration(5) * time.Second) //for loadbalance health check
+	conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
+	if err != nil {
+		fmt.Printf("RPC Dial failed: %s\n", err.Error())
+		os.Exit(3)
+	}
+	defer conn.Close()
+	prsc := trp_pb.NewProviderRegisterServiceClient(conn)
+	pubKeyBytes, publicKeyHash, clientIp, err := client.GetPublicKey(prsc)
+	if err != nil {
+		fmt.Printf("GetPublicKey failed: %s\n", err.Error())
+		os.Exit(4)
+	}
+	if host == "" && dynamicDomain == "" {
+		fmt.Println("not specify host and dynamic domain, will use: " + clientIp)
+		host = clientIp
+	}
+	pubKey, err := x509.ParsePKCS1PublicKey(pubKeyBytes)
+	if err != nil {
+		fmt.Printf("Parse PublicKey failed: %s\n", err.Error())
+		os.Exit(5)
+	}
+	for times := 0; times < 5; times++ {
+		code, errMsg, err := client.SwitchPublic(prsc, publicKeyHash, uint32(port), encrypt(pubKey, []byte(host)), encrypt(pubKey, []byte(dynamicDomain)))
+		if err != nil {
+			fmt.Println("SwitchPublic failed: " + err.Error())
+			os.Exit(6)
+		}
+		if code == 0 {
+			pc.Ddns = (len(host) == 0 && len(dynamicDomain) > 0)
+			pc.Private = false
+			config.SaveProviderConfig()
+			fmt.Println("Switch to public network node success, please backup your config file: " + config.GetConfigFullPath(configDir))
+			return
+		} else {
+			if code == 300 {
+				fmt.Println(errMsg)
+				fmt.Println("Retrying...")
+				continue
+			}
+			if code == 500 {
+				pubKeyBytes, publicKeyHash, _, err = client.GetPublicKey(prsc)
+				if err != nil {
+					fmt.Printf("GetPublicKey failed: %s\n", err.Error())
+					os.Exit(7)
+				}
+				pubKey, err = x509.ParsePKCS1PublicKey(pubKeyBytes)
+				if err != nil {
+					fmt.Printf("Parse PublicKey failed: %s\n", err.Error())
+					os.Exit(8)
+				}
+				continue
+			}
+			if code == 27 {
+				h := host
+				if len(host) == 0 {
+					h = dynamicDomain
+				}
+				fmt.Printf("SwitchPublic failed, ping %s:%d failed, You may not have a public network ip, error message: %s\n", h, port, errMsg)
+				os.Exit(9)
+			} else {
+				fmt.Printf("Error Code: %d, error message:%s\n", code, errMsg)
+				os.Exit(10)
+			}
+		}
+	}
+	fmt.Println("SwitchPublic failed, the maximum number of retries was reached")
 }
 
 func newProviderConfig(no *node.Node, walletAddress string, billEmail string,
