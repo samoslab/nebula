@@ -24,6 +24,9 @@ a {
 .text-left{
     text-align: left;
 }
+.text-center{
+    text-align: center;
+}
 .text-right{
     text-align: right;
 }
@@ -45,7 +48,7 @@ body {
 }
 #login-container{
     position: relative;
-    height: 550px;
+    min-height: 550px;
     width: 100%;
     min-width: 1102px;
     overflow: hidden;
@@ -62,7 +65,7 @@ body {
     transition: background 1s;
 }
 .index-banner-0{
-    background: url(../images/bg1.png) no-repeat center center;
+    background: url(../images/bg0.png) no-repeat center center;
 }
 #login-header {
     position: absolute;
@@ -77,8 +80,8 @@ body {
     height: 35px;
     margin: 10px 0 0 25px;
     overflow: hidden;
-    width: 240px;
-    display: block;
+    width: 310px;
+    display: none;
 }
 #login-header .pan-logo{
     display: none;
@@ -94,10 +97,10 @@ body {
     margin: 0 auto;
     clear: both;
     width: 1102px;
-    height: 90%;
+    height: 95%;
     position: relative;
     overflow: hidden;
-    top: 10%;
+    top: 5%;
 }
 .all-index-banner {
     position: absolute;
@@ -136,25 +139,26 @@ body {
 .login-sdk-v4 {
     height: 100%;
     border-radius: 3px;
-    width: 352px;
+    width: 430px;
     display: table-cell;
     vertical-align: middle;
 }
 .login-sdk-v4 .header-login {
     border-radius: 3px;
-    background: #fff;
+    /* background: #fff; */
+    color:#fff;
 }
 .header-login {
     position: relative;
     width: 100%;
     min-height: 396px;
     z-index: 999;
-    background: #fff;
-    border-radius: 4px;
+    /* background: #fff; */
+    /* border-radius: 4px; */
     vertical-align: middle;
-    -webkit-box-shadow: rgba(0,0,0,0.3) 0 0 50px;
+    /* -webkit-box-shadow: rgba(0,0,0,0.3) 0 0 50px;
     -moz-box-shadow: #000 0 0 50px;
-    box-shadow: rgba(0,0,0,0.3) 0 0 50px;
+    box-shadow: rgba(0,0,0,0.3) 0 0 50px; */
 }
 
 .guide{
@@ -163,16 +167,17 @@ body {
     padding:0 20px;
 }
 .guide>h2{
-    text-align: center;
+    /* text-align: center; */
     padding:50px 0 30px;
+    font-size:40px;
 }
 .guide>p{
-    font-size: 14px;
-    color:#999;
+    font-size: 16px;
+    color:#fff;
     line-height: 1.7rem;
 }
 .guide .guide-btn{
-    width: 245px;
+    width: 185px;
     height: 40px;
     line-height: 40px;
     text-align: center;
@@ -183,34 +188,37 @@ body {
     border:1px solid;
     border-radius: 3px;
     box-sizing: border-box;
-    display: block;
+    display: inline-block;
+    color:#fff;
+    font-weight: bold;
+    font-size:16px;
 }
 .guide .guide-btn-create{
-    background:rgba(26, 188, 156, 1);
-    border-color: rgba(26, 188, 156, 1);
+    /* background:rgba(26, 188, 156, 1);
+    border-color: rgba(26, 188, 156, 1); */
     color:#fff;
     margin-top:30px;
 }
 .guide .guide-btn-create:hover{
-    background:rgba(26, 188, 156, .7);
-    border-color: rgba(26, 188, 156, .7);
+    /* background:rgba(26, 188, 156, .7);
+    border-color: rgba(26, 188, 156, .7); */
     cursor: pointer;
 }
 .guide .guide-btn-had,.mailGrounpBtns .guide-btn-had{
-    background:rgba(247, 247, 247, 1);
+    /* background:rgba(247, 247, 247, 1);
     border-color:rgba(215, 221, 228, 1);
-    color:#999;
+    color:#999; */
 }
 .guide .guide-btn-had:hover,.mailGrounpBtns .guide-btn-had:hover{
-    background:rgba(247, 247, 247, .7);
-    border-color:rgba(215, 221, 228, .7);
+    /* background:rgba(247, 247, 247, .7);
+    border-color:rgba(215, 221, 228, .7); */
     cursor: pointer;
 }
 
 
 
 
-#login-container #login-middle {
+ #login-middle {
     width: 352px;
     height: 100%;
     display: table-cell;
@@ -218,70 +226,89 @@ body {
 }
 .login-sdk-v4 .tang-pass-login .pass-form {
     padding: 0 20px;
+    color: #fff;
+}
+.pass-form-logo-row{
+    margin-top: 26px;
+    width: 22px;
+    height: 22px;
+    position: absolute;
+    left: 35px;
+    border-right: 3px solid #fff;
+    border-top: 3px solid #fff;
+    -webkit-transform: translate(0,-50%) rotate(-135deg);
+    transform: translate(0,-50%) rotate(-135deg);
+    cursor: pointer;
+}
+.pass-form-logo-row:hover{
+    opacity: 0.8;
 }
 .login-sdk-v4 p.pass-form-logo {
-    font-size: 20px;
-    text-align: center;
-    padding:30px 0 20px;
-    font-weight: 100;
-    color: #333;
+    font-size: 36px;
+    padding:30px 0 40px 50px;
+    font-weight: 500;
     background: 0;
 }
 .inputLine{
     margin-bottom:20px;
 }
 .inputLine>label{
-    width:70px;
+    width:50px;
+    font-size:16px;
     text-align:right;
     display: inline-block;
+    vertical-align: middle;
+    margin-right: 10px;
 }
 .pass-form-inpt{
     position: relative;
     z-index: 17;
-    height: 30px;
-    width: 230px;
-    border: 1px solid #dedede;
+    width: 325px;
     font-size: 14px;
-    color: #666;
-    transition: .3s;
-    line-height: 30px;
-    background-color: #fefefe;
+    color: #fff;
+    line-height: 50px;
     padding-left: 16px!important;
     border-radius: 4px;
     -webkit-border-radius: 4px;
+    background: #3f3ffd;
+    border: none;
+    height: 52px;
+}
+.pass-form-inpt::-webkit-input-placeholder{
+    color:#fff;
+}
+.pass-form-inpt:focus{
+    outline-color: #fff;
+    outline-width:2px solid #fff;
 }
 .login-sdk-v4 .tang-pass-login .pass-form p.register-infro,.leadIn .register-infro{
-    color: #666;
     text-decoration: none;
     font-size: 14px;
 }
 .login-sdk-v4 .submit-btn{
     width: 100%;
-    height: 40px;
-    line-height:40px;
+    height: 50px;
+    line-height:50px;
     text-align: center;
-    background: #3582f8;
+    /* background: #3582f8; */
+    border:2px solid #fff;
     border-radius: 4px;
     transition: .3s;
     font-size: 16px;
-    border: 0;
     color: #fff;
     cursor: pointer;
     text-decoration: none;
     font-family: Microsoft YaHei,SimHei,Tahoma;
-    font-weight: 100;
     margin-bottom: 20px;
 }
 .login-sdk-v4 .verify-btn{
-    float:right;
-    width:150px;
+    width: 220px;
+    margin: 40px auto;
 }
 .login-sdk-v4 .submit-btn:hover{
     opacity: 0.8;
 }
-.mailGrounpBtns{
-    height:40px;
-}
+
 .mailGrounpBtns>a,.mailGrounpBtns>input.submit-btn{
     display: inline-block;
     width:46%;
@@ -307,18 +334,17 @@ body {
     padding:0 20px;
 }
 .configFile{
+    margin: 30px 0 10px;
+}
+
+.configDiv{
+    height:46px;
     margin-top:30px;
+    position: relative;
 }
-
-
-
-@media screen and (min-width: 1400px){
-    #login-container {
-        height: 720px;
-        min-width: 1200px;
-    }
+#config-submit-btn{
+    margin:0;
 }
-
 /*---------------------网盘购买工作区---------------------------------------*/
 .pan-buy{
     width:960px;
@@ -453,6 +479,10 @@ body {
     border-radius: 10px;
     margin-top:5px;
 }
+#login-container .languageBox>a{
+    border:1px solid #fff;
+    color:#fff;
+}
 .indexLanguageBox{
     position: absolute;
     right: 0;
@@ -533,7 +563,7 @@ body {
     float:right;
 }
 .fOHAbxb .updownGif img{
-    width:32px;
+    width:45px;
 }
 .fOHAbxb .active a{
     /* color: #3b8cff; */
@@ -546,7 +576,9 @@ body {
     bottom: 150px;
     left:0;
 }
-
+.useCondition{
+    margin-top:20px;
+}
 .usage{
     margin-bottom:20px;
     padding:0 25px;
@@ -1254,11 +1286,31 @@ body {
 }
 .qrcodeP{
     line-height: 3rem;
+    margin-top:15px;
 }
 .qrcode{
     width:256px;
     height:256px;
-    margin:50px auto;
+    margin:10px auto;
+}
+.payIllustrate{
+    font-size:18px;
+    color:#808080;
+    line-height: 3rem;
+}
+.modelInput{
+    height:30px;
+    line-height:30px;
+}
+.modelCopyBtn{
+    padding:0 20px;
+    background:#0000ff;
+    border:none;
+    color:#fff;
+}
+.modelCopyBtn:active,.modelCopyBtn:focus{
+    border:none;
+    outline: none;
 }
 
 /*-------------------我的套餐-----------------------------*/

@@ -1205,7 +1205,7 @@ var transportMethod = {
                                             <div class="tsList-r-progressBar" data-name="${idx}" style="width:${Math.round(obj.rate*100)+'%'};"></div>
                                         </div>
                                     </div>
-                                    <div class="tsList-fr">${Math.round(obj.rate*100)+'%'}</div>
+                                    <div class="tsList-fr"></div>
                                 </li>`;
                     })
                     $("#tsMenu").html(html);  
@@ -1485,11 +1485,13 @@ websocket.onmessage = function (evt) {
     let data = JSON.parse(evt.data);
     if(((data.type=="DownloadProgress")||(data.type=="UploadProgress"))&&(data.progress!=1)){
         let key = data.key;
-        $(".tsList-r-progressBar[data-name='"+key+"']").css("width",data.progress*100+'%').html(data.progress*100+'%');
+        $(".tsList-r-progressBar[data-name='"+key+"']").css("width",data.progress*100+'%');
+        $(".tsList-r-progressBar[data-name='"+key+"']").parents().siblings('.tsList-fr').html(Math.round(data.progress*100)+'%');
         $("#updownGif").show();
     }else if((data.type=="DownloadFile")||(data.type=="UploadFile")||(data.progress==1)){
         let key = data.key;
-        $(".tsList-r-progressBar[data-name='"+key+"']").css("width",'100%').html('100%');
+        $(".tsList-r-progressBar[data-name='"+key+"']").css("width",'100%');
+        $(".tsList-r-progressBar[data-name='"+key+"']").parents().siblings('.tsList-fr').html('100%');
         method.firstInit();
         $("#updownGif").hide();
     }
