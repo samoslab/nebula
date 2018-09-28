@@ -181,8 +181,11 @@ func (self *SwitchPublicReq) VerifySign(pubKey *rsa.PublicKey) error {
 }
 func (self *PrivateAliveReq) hash() []byte {
 	hasher := sha256.New()
+	hasher.Write(util_bytes.FromUint32(self.Version))
 	hasher.Write(self.NodeId)
 	hasher.Write(util_bytes.FromUint64(self.Timestamp))
+	hasher.Write(util_bytes.FromUint64(self.Total))
+	hasher.Write(util_bytes.FromUint64(self.MaxFileSize))
 	return hasher.Sum(nil)
 }
 

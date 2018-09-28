@@ -175,6 +175,8 @@ message PrivateAliveReq{
     bytes nodeId=2;
     uint64 timestamp=3;
     bytes sign = 4;
+    uint64 total=5;
+	uint64 maxFileSize=6;
 }
 
 message PrivateAliveResp{

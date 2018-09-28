@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/samoslab/nebula/provider/config"
 	"github.com/samoslab/nebula/provider/node"
 	pb "github.com/samoslab/nebula/tracker/register/provider/pb"
 	"google.golang.org/grpc"
@@ -170,8 +171,12 @@ func PrivateAlive(trackerServer string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	node := node.LoadFormConfig()
-	req := &pb.PrivateAliveReq{NodeId: node.NodeId,
-		Timestamp: uint64(time.Now().Unix())}
+	total, max := config.AvailableVolume()
+	req := &pb.PrivateAliveReq{Version: 1,
+		NodeId:      node.NodeId,
+		Timestamp:   uint64(time.Now().Unix()),
+		Total:       total,
+		MaxFileSize: max}
 	req.SignReq(node.PriKey)
 	_, err = prsc.PrivateAlive(ctx, req)
 	if err != nil {
