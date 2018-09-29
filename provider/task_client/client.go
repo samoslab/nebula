@@ -19,6 +19,9 @@ func TaskList(client pb.ProviderTaskServiceClient) (list []*pb.Task, err error) 
 	if err != nil {
 		return nil, er
 	}
+	if err = resp.CheckAuth(node.PubKeyBytes); err != nil {
+		return
+	}
 	return resp.Task, nil
 }
 

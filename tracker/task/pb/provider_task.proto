@@ -23,6 +23,8 @@ message TaskListReq{
 
 message TaskListResp{
     repeated Task task=1;
+    uint64 timestamp=2;
+    bytes auth=3;
 }
 
 enum TaskType {

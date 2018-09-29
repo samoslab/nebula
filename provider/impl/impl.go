@@ -600,7 +600,16 @@ func (self *ProviderService) ProcessTask(taskServer string) {
 	for _, ta := range taskList {
 		switch ta.Type {
 		case ttpb.TaskType_REMOVE:
-			// TODO not implement for safety
+			var remark string
+			success := true
+			if err = self.taskRemove(ta.FileHash, ta.FileSize, ta.BlockHash, ta.BlockSize); err != nil {
+				remark = err.Error()
+				success = false
+				fmt.Printf("taskRemove failed, blockKey: %x, error: %s", ta.BlockHash, remark)
+			}
+			if err = task_client.FinishTask(ptsc, ta.Id, uint64(time.Now().Unix()), success, remark); err != nil {
+				fmt.Printf("Finish send task [%x] failed: %s\n", ta.Id, err.Error())
+			}
 		case ttpb.TaskType_PROVE:
 			if len(ta.ProofId) == 0 {
 				fmt.Printf("Task [%x] info error, none proof id\n", ta.Id)
@@ -669,6 +678,28 @@ func (self *ProviderService) ProcessTask(taskServer string) {
 			}
 		}
 	}
+}
+
+func (self *ProviderService) taskRemove(fileHash []byte, fileSize uint64, blockHash []byte, blockSize uint64) (err error) {
+	found, smallFile, storageIdx, subPath := self.querySubPath(blockHash)
+	if !found {
+		return
+	}
+	if err = self.providerDb.Delete(blockHash, nil); err != nil {
+		return fmt.Errorf("delete from provider db failed, error: %s", err)
+	}
+	if smallFile {
+		storage := config.GetStorage(storageIdx)
+		if err = storage.SmallFileDb.Delete(blockHash, nil); err != nil {
+			return fmt.Errorf("delete from small file db failed, error: %s", err)
+		}
+	} else {
+		path := config.GetStoragePath(storageIdx, subPath)
+		if err = os.Remove(path); err != nil {
+			return fmt.Errorf("remove file failed, error: %s", err)
+		}
+	}
+	return
 }
 
 func (self *ProviderService) taskProve(blockHash []byte, blockSize uint64, chunkSize uint32, chunkSeq map[uint32][]byte) (result []byte, err error) {
