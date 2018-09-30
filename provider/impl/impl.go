@@ -605,7 +605,7 @@ func (self *ProviderService) ProcessTask(taskServer string) {
 			if err = self.taskRemove(ta.FileHash, ta.FileSize, ta.BlockHash, ta.BlockSize); err != nil {
 				remark = err.Error()
 				success = false
-				fmt.Printf("taskRemove failed, blockKey: %x, error: %s", ta.BlockHash, remark)
+				fmt.Printf("taskRemove failed, blockKey: %x, error: %s\n", ta.BlockHash, remark)
 			}
 			if err = task_client.FinishTask(ptsc, ta.Id, uint64(time.Now().Unix()), success, remark); err != nil {
 				fmt.Printf("Finish send task [%x] failed: %s\n", ta.Id, err.Error())
@@ -651,7 +651,7 @@ func (self *ProviderService) ProcessTask(taskServer string) {
 			if err = self.taskSend(ta.FileHash, ta.FileSize, ta.BlockHash, ta.BlockSize, resp.Timestamp, resp.Info[0]); err != nil {
 				remark = err.Error()
 				success = false
-				fmt.Printf("taskSend failed, blockKey: %x, error: %s", ta.BlockHash, remark)
+				fmt.Printf("taskSend failed, blockKey: %x, error: %s\n", ta.BlockHash, remark)
 			}
 			if err = task_client.FinishTask(ptsc, ta.Id, uint64(time.Now().Unix()), success, remark); err != nil {
 				fmt.Printf("Finish send task [%x] failed: %s\n", ta.Id, err.Error())
@@ -675,7 +675,7 @@ func (self *ProviderService) ProcessTask(taskServer string) {
 			if err = self.taskReplicate(ta.FileHash, ta.FileSize, ta.BlockHash, ta.BlockSize, resp.Timestamp, resp.Info); err != nil {
 				remark = err.Error()
 				success = false
-				fmt.Printf("taskReplicate failed, blockKey: %x, error: %s", ta.BlockHash, remark)
+				fmt.Printf("taskReplicate failed, blockKey: %x, error: %s\n", ta.BlockHash, remark)
 			}
 			if err = task_client.FinishTask(ptsc, ta.Id, uint64(time.Now().Unix()), success, remark); err != nil {
 				fmt.Printf("Finish send task [%x] failed: %s\n", ta.Id, err.Error())
@@ -954,7 +954,7 @@ type OppositeProvider struct {
 
 func testPing(oppositeInfo []*ttpb.OppositeInfo) []*OppositeProvider {
 	result := make([]*OppositeProvider, 0, len(oppositeInfo))
-	timeout := 3
+	timeout := 5
 	for _, oi := range oppositeInfo {
 		nodeIdHash, latency, err := provider_client.Ping(oi.Host, oi.Port, timeout)
 		nodeId, err := base64.StdEncoding.DecodeString(oi.NodeId)

@@ -16,7 +16,7 @@ func TaskList(client pb.ProviderTaskServiceClient) (list []*pb.Task, err error) 
 		Timestamp: uint64(time.Now().Unix())}
 	req.SignReq(node.PriKey)
 	resp, er := client.TaskList(ctx, req)
-	if err != nil {
+	if er != nil {
 		return nil, er
 	}
 	if err = resp.CheckAuth(node.PubKeyBytes); err != nil {
@@ -34,7 +34,7 @@ func GetOppositeInfo(client pb.ProviderTaskServiceClient, taskId []byte) (resp *
 		TaskId:    taskId}
 	req.SignReq(node.PriKey)
 	resp, er := client.GetOppositeInfo(ctx, req)
-	if err != nil {
+	if er != nil {
 		return nil, er
 	}
 	return resp, nil
@@ -49,7 +49,7 @@ func GetProveInfo(client pb.ProviderTaskServiceClient, taskId []byte) (proofId [
 		TaskId:    taskId}
 	req.SignReq(node.PriKey)
 	resp, er := client.GetProveInfo(ctx, req)
-	if err != nil {
+	if er != nil {
 		return nil, 0, nil, er
 	}
 	return resp.ProofId, resp.ChunkSize, resp.ChunkSeq, nil

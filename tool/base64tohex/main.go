@@ -4,10 +4,15 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"os"
 )
 
 func main() {
-	bts, err := base64.StdEncoding.DecodeString("gtpIRY3ksd7iIWs3TIt4Rabwz9A=")
+	if len(os.Args) != 2 {
+		fmt.Printf("% string", os.Args[0])
+		return
+	}
+	bts, err := base64.StdEncoding.DecodeString(os.Args[1])
 	if err != nil {
 		fmt.Println(err)
 		return

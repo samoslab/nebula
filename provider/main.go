@@ -238,25 +238,28 @@ func daemon(configDir string, trackerServer string, collectorServer string, task
 	defer config.StopAutoCheck()
 	collector.Start(collectorServer)
 	defer collector.Stop()
-	port, err := strconv.Atoi(strings.Split(listen, ":")[1])
-	if err != nil {
-		fmt.Println("parse listen port error: " + err.Error())
-		os.Exit(2)
-	}
-	// connect to router
-	igd, err := upnp.Discover()
-	if err != nil {
-		fmt.Println("use upnp get router failed: " + err.Error())
-	} else {
-		err = igd.Forward(uint16(port), "Samos storage")
-		if err != nil {
-			fmt.Println("use upnp port mapping failed: " + err.Error())
-		}
-	}
-	grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(520 * 1024))
+	var port int
 	providerServer := impl.NewProviderService()
-	go startServer(listen, grpcServer, providerServer)
-	defer grpcServer.GracefulStop()
+	if !config.GetProviderConfig().Private {
+		port, err := strconv.Atoi(strings.Split(listen, ":")[1])
+		if err != nil {
+			fmt.Println("parse listen port error: " + err.Error())
+			os.Exit(2)
+		}
+		// connect to router
+		igd, err := upnp.Discover()
+		if err != nil {
+			fmt.Println("use upnp get router failed: " + err.Error())
+		} else {
+			err = igd.Forward(uint16(port), "Samos storage")
+			if err != nil {
+				fmt.Println("use upnp port mapping failed: " + err.Error())
+			}
+		}
+		grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(520 * 1024))
+		go startServer(listen, grpcServer, providerServer)
+		defer grpcServer.GracefulStop()
+	}
 	cronRunner := cron.New()
 	if config.GetProviderConfig().Private {
 		fmt.Println("Starting samos private network node.")
@@ -268,8 +271,8 @@ func daemon(configDir string, trackerServer string, collectorServer string, task
 			refreshIp(trackerServer, port, false)
 		})
 	}
+	fmt.Println("Node is running.")
 	if !quietFlag {
-		fmt.Println("Node is running.")
 		cronRunner.AddFunc("0 * * * * *", func() { fmt.Print(".") })
 	}
 	cronRunner.AddFunc("@every 3m", func() { providerServer.ProcessTask(taskServer) })
