@@ -19,6 +19,11 @@ service ProviderRegisterService {
 
     rpc RefreshIp(RefreshIpReq)returns (RefreshIpResp){}
 
+    rpc SwitchPrivate(SwitchPrivateReq)returns (SwitchPrivateResp){}
+
+    rpc SwitchPublic(SwitchPublicReq)returns (SwitchPublicResp){}
+
+    rpc PrivateAlive(PrivateAliveReq)returns(PrivateAliveResp){}
 }
 message GetPublicKeyReq {
     uint32 version =1;
@@ -50,6 +55,7 @@ message RegisterReq{
     repeated uint64 extraStorageVolume=17;
     bytes publicKeyHash=18;
     bytes sign=19;
+    bool confirmInner=20;
 }
 
 message RegisterResp{
@@ -135,4 +141,43 @@ message RefreshIpReq{
 
 message RefreshIpResp{
     string ip=1;
+}
+
+message SwitchPrivateReq{
+    uint32 version=1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    bytes sign = 4;
+}
+
+message SwitchPrivateResp{
+    bool success=1;
+}
+
+message SwitchPublicReq{
+    uint32 version=1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    bytes sign= 4;
+    bytes publicKeyHash=5;
+    uint32 port=6;
+    bytes hostEnc=7;
+    bytes dynamicDomainEnc=8;
+}
+
+message SwitchPublicResp{
+    uint32 code = 1;//0:success, other value: failed
+    string errMsg=2;
+}
+
+message PrivateAliveReq{
+    uint32 version=1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    bytes sign = 4;
+    uint64 total=5;
+	uint64 maxFileSize=6;
+}
+
+message PrivateAliveResp{
 }

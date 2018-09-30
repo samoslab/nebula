@@ -35,6 +35,7 @@ type ProviderConfig struct {
 	PublicKey         string
 	PrivateKey        string
 	Ddns              bool
+	Private           bool
 	Availability      float64
 	MainStoragePath   string
 	MainStorageVolume uint64
@@ -208,6 +209,10 @@ func CreateProviderConfig(configDir string, pc *ProviderConfig) string {
 	}
 	saveProviderConfig(path, pc)
 	return path
+}
+
+func GetConfigFullPath(configDir string) string {
+	return configDir + string(os.PathSeparator) + config_filename
 }
 
 func saveProviderConfig(configPath string, pc *ProviderConfig) error {

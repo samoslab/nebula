@@ -1,9 +1,11 @@
-#!/bin/bash -x
+#!/bin/bash
 if [ $# != 1 ]; then
   echo "USAGE: $0 version"
   exit 1;
 fi
+
 export VERSION=$1
+cd "$( dirname "${BASH_SOURCE[0]}" )"
 
 bld(){
 	echo $1
