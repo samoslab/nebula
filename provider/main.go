@@ -58,7 +58,7 @@ func main() {
 	daemonConfigDirFlag := daemonCommand.String("configDir", defaultConfigDirFlag, "config directory")
 	daemonTrackerServerFlag := daemonCommand.String("trackerServer", "tracker.store.samos.io:6677", "tracker server address, eg: tracker.store.samos.io:6677")
 	daemonCollectorServerFlag := daemonCommand.String("collectorServer", "collector.store.samos.io:6688", "collector server address, eg: collector.store.samos.io:6688")
-	daemonTaskServerFlag := daemonCommand.String("taskServer", "task.store.samos.io:6688", "task server address, eg: task.store.samos.io:6699")
+	daemonTaskServerFlag := daemonCommand.String("taskServer", "task.store.samos.io:6622", "task server address, eg: task.store.samos.io:6622")
 	listenFlag := daemonCommand.String("listen", ":6666", "listen address and port, eg: 111.111.111.111:6666 or :6666")
 	disableAutoRefreshIpFlag := daemonCommand.Bool("disableAutoRefreshIp", false, "disable auto refresh provider ip or enable auto refresh provider ip")
 	quietFlag := daemonCommand.Bool("quiet", false, "not print dot when running")

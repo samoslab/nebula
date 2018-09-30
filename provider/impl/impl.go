@@ -611,13 +611,17 @@ func (self *ProviderService) ProcessTask(taskServer string) {
 				fmt.Printf("Finish send task [%x] failed: %s\n", ta.Id, err.Error())
 			}
 		case ttpb.TaskType_PROVE:
-			if len(ta.ProofId) == 0 {
-				fmt.Printf("Task [%x] info error, none proof id\n", ta.Id)
+			proofId, chunkSize, chunkSeq, err := task_client.GetProveInfo(ptsc, ta.Id)
+			if err != nil {
+				fmt.Printf("Get task [%x] prove info failed: %s\n", ta.Id, err.Error())
 				continue
 			}
-			chunkSize, chunkSeq, err := task_client.GetProveInfo(ptsc, ta.Id, ta.ProofId)
-			if err != nil {
-				fmt.Printf("Get task [%x] prove [%x] info failed: %s\n", ta.Id, ta.ProofId, err.Error())
+			if len(proofId) == 0 {
+				fmt.Printf("none proof id, task id: %x\n", ta.Id)
+				continue
+			}
+			if len(ta.ProofId) > 0 && !bytes.Equal(ta.ProofId, proofId) {
+				fmt.Printf("task [%x] prove id not same\n", ta.Id)
 				continue
 			}
 			result, err := self.taskProve(ta.BlockHash, ta.BlockSize, chunkSize, chunkSeq)
@@ -625,7 +629,7 @@ func (self *ProviderService) ProcessTask(taskServer string) {
 			if err != nil {
 				remark = err.Error()
 			}
-			if err = task_client.FinishProve(ptsc, ta.Id, ta.ProofId, uint64(time.Now().Unix()), result, remark); err != nil {
+			if err = task_client.FinishProve(ptsc, ta.Id, proofId, uint64(time.Now().Unix()), result, remark); err != nil {
 				fmt.Printf("Finish prove task [%x] failed: %s\n", ta.Id, err.Error())
 			}
 		case ttpb.TaskType_SEND:

@@ -72,10 +72,10 @@ message GetProveInfoReq{
     uint64 timestamp=2;
     bytes sign=3;
     bytes taskId=4;
-    bytes proofId=5;
 }
 
 message GetProveInfoResp{
+    bytes proofId=5;
     uint32 chunkSize=1;
 	map<uint32, bytes> chunkSeq = 2;
 }

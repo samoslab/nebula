@@ -47,7 +47,6 @@ func (self *GetProveInfoReq) hash() []byte {
 	hasher.Write(self.NodeId)
 	hasher.Write(util_bytes.FromUint64(self.Timestamp))
 	hasher.Write(self.TaskId)
-	hasher.Write(self.ProofId)
 	return hasher.Sum(nil)
 }
 

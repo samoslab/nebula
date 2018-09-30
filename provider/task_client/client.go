@@ -40,7 +40,7 @@ func GetOppositeInfo(client pb.ProviderTaskServiceClient, taskId []byte) (resp *
 	return resp, nil
 }
 
-func GetProveInfo(client pb.ProviderTaskServiceClient, taskId []byte, proofId []byte) (chunkSize uint32, chunkSeq map[uint32][]byte, err error) {
+func GetProveInfo(client pb.ProviderTaskServiceClient, taskId []byte) (proofId []byte, chunkSize uint32, chunkSeq map[uint32][]byte, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	node := node.LoadFormConfig()
@@ -50,9 +50,9 @@ func GetProveInfo(client pb.ProviderTaskServiceClient, taskId []byte, proofId []
 	req.SignReq(node.PriKey)
 	resp, er := client.GetProveInfo(ctx, req)
 	if err != nil {
-		return 0, nil, er
+		return nil, 0, nil, er
 	}
-	return resp.ChunkSize, resp.ChunkSeq, nil
+	return resp.ProofId, resp.ChunkSize, resp.ChunkSeq, nil
 }
 
 func FinishProve(client pb.ProviderTaskServiceClient, taskId []byte, proofId []byte, finishedTime uint64, result []byte, remark string) (err error) {
