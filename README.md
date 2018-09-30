@@ -1,3 +1,3 @@
-#samos storage service
+# samos storage service
 
 storage for samos network
