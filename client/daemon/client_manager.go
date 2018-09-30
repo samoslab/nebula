@@ -1046,8 +1046,8 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 }
 
 func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, tm uint64, uploadPara *common.UploadParameter, chunkSize uint32) (*mpb.StoreBlock, error) {
-	log := c.Log
 	server := fmt.Sprintf("%s:%d", pro.GetServer(), pro.GetPort())
+	log := c.Log.WithField("server", server).WithField("erasurefile", uploadPara.HF.FileName)
 	uploadPara.Provider = server
 	conn, err := common.GrpcDial(server)
 	if err != nil {
@@ -1087,7 +1087,7 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 
 	doneNum := 0
 
-	for {
+	for doneNum < taskNum {
 		select {
 		case err := <-errRes:
 			log.Errorf("upload failed %v", err)
@@ -1095,9 +1095,7 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 			return nil, nil
 		case <-done:
 			doneNum++
-			if doneNum >= taskNum {
-				break
-			}
+			log.Infof("doneNum %d,  taskNUm %d", doneNum, taskNum)
 		}
 	}
 
@@ -1115,7 +1113,7 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 		Phi:         phi,
 	}
 	block.StoreNodeId = append(block.StoreNodeId, []byte(pro.GetNodeId()))
-	log.Debugf("Upload %s to provider %s success", uploadPara.HF.FileName, server)
+	log.Debugf("Upload to provider success")
 
 	return block, nil
 }
@@ -1227,7 +1225,7 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 	uniqKey := common.ProgressKey(sp, sno)
 	c.PM.SetPartitionMap(fileName, uniqKey)
 
-	providers, backupPros, err := GetBestReplicaProvider(ufprsp.GetProvider(), ReplicaNum)
+	providers, backupPros, err := GetBestReplicaProvider(ufprsp.GetProvider(), MinReplicaNum)
 	if err != nil {
 		return nil, err
 	}
