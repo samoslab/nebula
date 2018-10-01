@@ -240,8 +240,9 @@ func daemon(configDir string, trackerServer string, collectorServer string, task
 	defer collector.Stop()
 	var port int
 	providerServer := impl.NewProviderService()
-	if !config.GetProviderConfig().Private {
-		port, err := strconv.Atoi(strings.Split(listen, ":")[1])
+	private := config.GetProviderConfig().Private
+	if !private {
+		port, err = strconv.Atoi(strings.Split(listen, ":")[1])
 		if err != nil {
 			fmt.Println("parse listen port error: " + err.Error())
 			os.Exit(2)
@@ -261,11 +262,11 @@ func daemon(configDir string, trackerServer string, collectorServer string, task
 		defer grpcServer.GracefulStop()
 	}
 	cronRunner := cron.New()
-	if config.GetProviderConfig().Private {
+	if private {
 		fmt.Println("Starting samos private network node.")
 		cronRunner.AddFunc("@every 5m", func() { client.PrivateAlive(trackerServer) })
 	}
-	if !disableAutoRefreshIpFlag && !config.GetProviderConfig().Ddns && !config.GetProviderConfig().Private {
+	if !disableAutoRefreshIpFlag && !config.GetProviderConfig().Ddns && !private {
 		refreshIp(trackerServer, port, true)
 		cronRunner.AddFunc("37 */2 * * * *", func() {
 			refreshIp(trackerServer, port, false)
@@ -275,7 +276,7 @@ func daemon(configDir string, trackerServer string, collectorServer string, task
 	if !quietFlag {
 		cronRunner.AddFunc("0 * * * * *", func() { fmt.Print(".") })
 	}
-	cronRunner.AddFunc("@every 3m", func() { providerServer.ProcessTask(taskServer) })
+	cronRunner.AddFunc("@every 1m", func() { providerServer.ProcessTask(taskServer, private) })
 	cronRunner.Start()
 	defer cronRunner.Stop()
 	sigChan := make(chan os.Signal, 1)

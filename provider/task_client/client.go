@@ -62,6 +62,7 @@ func FinishProve(client pb.ProviderTaskServiceClient, taskId []byte, proofId []b
 	req := &pb.FinishProveReq{NodeId: node.NodeId,
 		Timestamp:    uint64(time.Now().Unix()),
 		TaskId:       taskId,
+		ProofId:      proofId,
 		FinishedTime: finishedTime,
 		Result:       result,
 		Remark:       remark}

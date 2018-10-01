@@ -576,7 +576,7 @@ func (self *ProviderService) CheckAvailable(ctx context.Context, req *pb.CheckAv
 	return &pb.CheckAvailableResp{Total: total, MaxFileSize: max, Version: 1}, nil
 }
 
-func (self *ProviderService) ProcessTask(taskServer string) {
+func (self *ProviderService) ProcessTask(taskServer string, private bool) {
 	if self.taskRunning.TryLock() {
 		defer self.taskRunning.UnLock()
 	} else {
@@ -608,7 +608,7 @@ func (self *ProviderService) ProcessTask(taskServer string) {
 				fmt.Printf("taskRemove failed, blockKey: %x, error: %s\n", ta.BlockHash, remark)
 			}
 			if err = task_client.FinishTask(ptsc, ta.Id, uint64(time.Now().Unix()), success, remark); err != nil {
-				fmt.Printf("Finish send task [%x] failed: %s\n", ta.Id, err.Error())
+				fmt.Printf("Finish remove task [%x] failed: %s\n", ta.Id, err.Error())
 			}
 		case ttpb.TaskType_PROVE:
 			proofId, chunkSize, chunkSeq, err := task_client.GetProveInfo(ptsc, ta.Id)
@@ -678,7 +678,7 @@ func (self *ProviderService) ProcessTask(taskServer string) {
 				fmt.Printf("taskReplicate failed, blockKey: %x, error: %s\n", ta.BlockHash, remark)
 			}
 			if err = task_client.FinishTask(ptsc, ta.Id, uint64(time.Now().Unix()), success, remark); err != nil {
-				fmt.Printf("Finish send task [%x] failed: %s\n", ta.Id, err.Error())
+				fmt.Printf("Finish replicate task [%x] failed: %s\n", ta.Id, err.Error())
 			}
 		}
 	}
@@ -726,8 +726,8 @@ func (self *ProviderService) taskProve(blockHash []byte, blockSize uint64, chunk
 		length := int64(len(data))
 		for _, k := range keys {
 			start := int64(k-1) * int64(chunkSize)
-			if start >= length {
-				return nil, fmt.Errorf("seq out of range")
+			if k < 1 || start >= length {
+				return nil, fmt.Errorf("seq out of range: %d", k)
 			}
 			end := start + int64(chunkSize)
 			if end > length {
@@ -863,7 +863,7 @@ func (self *ProviderService) taskReplicate(fileHash []byte, fileSize uint64, blo
 		providerAddr := fmt.Sprintf("%s:%d", pro.Host, pro.Port)
 		conn, err := grpc.Dial(providerAddr, grpc.WithInsecure())
 		if err != nil {
-			errs = append(errs, fmt.Errorf("RPC Dial taskServer %s failed: %s", providerAddr, err.Error()))
+			errs = append(errs, fmt.Errorf("RPC Dial provider %s failed: %s", providerAddr, err.Error()))
 			continue
 		}
 		defer conn.Close()
@@ -957,8 +957,17 @@ func testPing(oppositeInfo []*ttpb.OppositeInfo) []*OppositeProvider {
 	timeout := 5
 	for _, oi := range oppositeInfo {
 		nodeIdHash, latency, err := provider_client.Ping(oi.Host, oi.Port, timeout)
+		if err != nil {
+			fmt.Printf("ping provider %s:%d failed: %s", oi.Host, oi.Port, err)
+			continue
+		}
 		nodeId, err := base64.StdEncoding.DecodeString(oi.NodeId)
-		if err != nil || !bytes.Equal(util_hash.Sha1(nodeId), nodeIdHash) {
+		if err != nil {
+			fmt.Printf("decode provider id %x failed: %s", oi.NodeId, err)
+			continue
+		}
+		if len(nodeIdHash) > 0 && !bytes.Equal(util_hash.Sha1(nodeId), nodeIdHash) {
+			fmt.Printf("provider %s:%d node id %x not same", oi.Host, oi.Port, oi.NodeId)
 			continue
 		}
 		result = append(result, &OppositeProvider{OppositeInfo: oi, lantency: latency})
