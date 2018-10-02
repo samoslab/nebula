@@ -239,8 +239,8 @@ func daemon(configDir string, trackerServer string, collectorServer string, task
 	collector.Start(collectorServer)
 	defer collector.Stop()
 	var port int
-	providerServer := impl.NewProviderService()
 	private := config.GetProviderConfig().Private
+	providerServer := impl.NewProviderService(taskServer, private)
 	if !private {
 		port, err = strconv.Atoi(strings.Split(listen, ":")[1])
 		if err != nil {
@@ -276,12 +276,13 @@ func daemon(configDir string, trackerServer string, collectorServer string, task
 	if !quietFlag {
 		cronRunner.AddFunc("0 * * * * *", func() { fmt.Print(".") })
 	}
-	cronRunner.AddFunc("@every 1m", func() { providerServer.ProcessTask(taskServer, private) })
+	cronRunner.AddFunc("@every 1m", func() { providerServer.GetTask() })
 	cronRunner.Start()
 	defer cronRunner.Stop()
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 	<-sigChan
+	providerServer.CloseTaskProcessor()
 }
 
 func startServer(listen string, grpcServer *grpc.Server, providerServer *impl.ProviderService) {

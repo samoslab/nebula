@@ -8,9 +8,8 @@ import (
 	"math/big"
 	"os"
 	"sort"
+	"sync"
 	"time"
-
-	"golang.org/x/net/context"
 
 	gosync "github.com/lrita/gosync"
 	client "github.com/samoslab/nebula/provider/collector_client"
@@ -25,6 +24,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/syndtr/goleveldb/leveldb"
 	leveldb_errors "github.com/syndtr/goleveldb/leveldb/errors"
+	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -36,13 +36,20 @@ const small_file_limit = 512 * 1024
 var skip_check_auth = false
 
 type ProviderService struct {
-	node        *node.Node
-	nodeIdHash  []byte
-	providerDb  *leveldb.DB
-	taskRunning gosync.Mutex
+	node               *node.Node
+	nodeIdHash         []byte
+	providerDb         *leveldb.DB
+	taskGetting        gosync.Mutex
+	replicateChan      chan *ttpb.Task
+	sendChan           chan *ttpb.Task
+	removeAndProveChan chan *ttpb.Task
+	closeSignal        chan bool
+	waitClose          sync.WaitGroup
+	taskConnection     *grpc.ClientConn
+	ptsc               ttpb.ProviderTaskServiceClient
 }
 
-func NewProviderService() *ProviderService {
+func NewProviderService(taskServer string, private bool) *ProviderService {
 	if os.Getenv("NEBULA_TEST_MODE") == "1" {
 		skip_check_auth = true
 	}
@@ -54,7 +61,7 @@ func NewProviderService() *ProviderService {
 	if err != nil {
 		log.Fatalf("open Provider DB failed:%s", err)
 	}
-	ps.taskRunning = gosync.NewMutex()
+	ps.initTaskProcessor(taskServer, private)
 	return ps
 }
 
@@ -576,92 +583,55 @@ func (self *ProviderService) CheckAvailable(ctx context.Context, req *pb.CheckAv
 	return &pb.CheckAvailableResp{Total: total, MaxFileSize: max, Version: 1}, nil
 }
 
-func (self *ProviderService) ProcessTask(taskServer string, private bool) {
-	if self.taskRunning.TryLock() {
-		defer self.taskRunning.UnLock()
-	} else {
-		return
+func (self *ProviderService) initTaskProcessor(taskServer string, private bool) {
+	self.taskGetting = gosync.NewMutex()
+	self.closeSignal = make(chan bool, 1)
+	self.replicateChan = make(chan *ttpb.Task, 320)
+	self.sendChan = make(chan *ttpb.Task, 320)
+	self.removeAndProveChan = make(chan *ttpb.Task, 320)
+	replicateThread := 2
+	sendTread := 1
+	processRemoveAndProve := 1
+	if private {
+		replicateThread, sendTread, processRemoveAndProve = 8, 2, 2
 	}
-	conn, err := grpc.Dial(taskServer, grpc.WithInsecure())
+	for i := 0; i < processRemoveAndProve; i++ {
+		go self.processRemoveAndProve()
+	}
+	for i := 0; i < sendTread; i++ {
+		go self.processSend()
+	}
+	for i := 0; i < replicateThread; i++ {
+		go self.processReplicate()
+	}
+	self.waitClose.Add(replicateThread + sendTread + processRemoveAndProve)
+	var err error
+	self.taskConnection, err = grpc.Dial(taskServer, grpc.WithInsecure())
 	if err != nil {
 		fmt.Printf("RPC Dial taskServer %s failed: %s\n", taskServer, err.Error())
-		return
+		os.Exit(60)
 	}
-	defer conn.Close()
-	ptsc := ttpb.NewProviderTaskServiceClient(conn)
-	taskList, err := task_client.TaskList(ptsc)
-	if err != nil {
-		fmt.Printf("Get task list failed: %s\n", err.Error())
-		return
-	}
-	if len(taskList) == 0 {
-		return
-	}
-	for _, ta := range taskList {
-		switch ta.Type {
-		case ttpb.TaskType_REMOVE:
-			var remark string
-			success := true
-			if err = self.taskRemove(ta.FileHash, ta.FileSize, ta.BlockHash, ta.BlockSize); err != nil {
-				remark = err.Error()
-				success = false
-				fmt.Printf("taskRemove failed, blockKey: %x, error: %s\n", ta.BlockHash, remark)
-			}
-			if err = task_client.FinishTask(ptsc, ta.Id, uint64(time.Now().Unix()), success, remark); err != nil {
-				fmt.Printf("Finish remove task [%x] failed: %s\n", ta.Id, err.Error())
-			}
-		case ttpb.TaskType_PROVE:
-			proofId, chunkSize, chunkSeq, err := task_client.GetProveInfo(ptsc, ta.Id)
-			if err != nil {
-				fmt.Printf("Get task [%x] prove info failed: %s\n", ta.Id, err.Error())
-				continue
-			}
-			if len(proofId) == 0 {
-				fmt.Printf("none proof id, task id: %x\n", ta.Id)
-				continue
-			}
-			if len(ta.ProofId) > 0 && !bytes.Equal(ta.ProofId, proofId) {
-				fmt.Printf("task [%x] prove id not same\n", ta.Id)
-				continue
-			}
-			result, err := self.taskProve(ta.BlockHash, ta.BlockSize, chunkSize, chunkSeq)
-			var remark string
-			if err != nil {
-				remark = err.Error()
-			}
-			if err = task_client.FinishProve(ptsc, ta.Id, proofId, uint64(time.Now().Unix()), result, remark); err != nil {
-				fmt.Printf("Finish prove task [%x] failed: %s\n", ta.Id, err.Error())
-			}
-		case ttpb.TaskType_SEND:
-			if len(ta.OppositeId) != 1 {
-				fmt.Printf("Task [%x] info error, SEND task haven't single opposite id\n", ta.Id)
-				continue
-			}
-			resp, err := task_client.GetOppositeInfo(ptsc, ta.Id)
-			if err != nil {
-				fmt.Printf("Get task [%x] opposite info failed: %s\n", ta.Id, err.Error())
-				continue
-			}
-			if len(resp.Info) != 1 {
-				fmt.Printf("Get task [%x] opposite info error, SEND task haven't single opposite info\n", ta.Id)
-				continue
-			}
-			var remark string
-			success := true
-			if err = self.taskSend(ta.FileHash, ta.FileSize, ta.BlockHash, ta.BlockSize, resp.Timestamp, resp.Info[0]); err != nil {
-				remark = err.Error()
-				success = false
-				fmt.Printf("taskSend failed, blockKey: %x, error: %s\n", ta.BlockHash, remark)
-			}
-			if err = task_client.FinishTask(ptsc, ta.Id, uint64(time.Now().Unix()), success, remark); err != nil {
-				fmt.Printf("Finish send task [%x] failed: %s\n", ta.Id, err.Error())
-			}
-		case ttpb.TaskType_REPLICATE:
+	self.ptsc = ttpb.NewProviderTaskServiceClient(self.taskConnection)
+}
+
+func (self *ProviderService) CloseTaskProcessor() {
+	defer self.taskConnection.Close()
+	self.closeSignal <- true
+	self.waitClose.Wait()
+}
+
+func (self *ProviderService) processReplicate() {
+	for {
+		select {
+		case <-self.closeSignal:
+			self.waitClose.Done()
+			return
+		case ta := <-self.replicateChan:
 			if len(ta.OppositeId) == 0 {
 				fmt.Printf("Task [%x] info error, REPLICATE task haven't opposite id\n", ta.Id)
 				continue
 			}
-			resp, err := task_client.GetOppositeInfo(ptsc, ta.Id)
+			resp, err := task_client.GetOppositeInfo(self.ptsc, ta.Id)
 			if err != nil {
 				fmt.Printf("Get task [%x] opposite info failed: %s\n", ta.Id, err.Error())
 				continue
@@ -677,9 +647,116 @@ func (self *ProviderService) ProcessTask(taskServer string, private bool) {
 				success = false
 				fmt.Printf("taskReplicate failed, blockKey: %x, error: %s\n", ta.BlockHash, remark)
 			}
-			if err = task_client.FinishTask(ptsc, ta.Id, uint64(time.Now().Unix()), success, remark); err != nil {
+			if err = task_client.FinishTask(self.ptsc, ta.Id, uint64(time.Now().Unix()), success, remark); err != nil {
 				fmt.Printf("Finish replicate task [%x] failed: %s\n", ta.Id, err.Error())
 			}
+		}
+	}
+}
+
+func (self *ProviderService) processSend() {
+	for {
+		select {
+		case <-self.closeSignal:
+			self.waitClose.Done()
+			return
+		case ta := <-self.sendChan:
+			if len(ta.OppositeId) != 1 {
+				fmt.Printf("Task [%x] info error, SEND task haven't single opposite id\n", ta.Id)
+				continue
+			}
+			resp, err := task_client.GetOppositeInfo(self.ptsc, ta.Id)
+			if err != nil {
+				fmt.Printf("Get task [%x] opposite info failed: %s\n", ta.Id, err.Error())
+				continue
+			}
+			if len(resp.Info) != 1 {
+				fmt.Printf("Get task [%x] opposite info error, SEND task haven't single opposite info\n", ta.Id)
+				continue
+			}
+			var remark string
+			success := true
+			if err = self.taskSend(ta.FileHash, ta.FileSize, ta.BlockHash, ta.BlockSize, resp.Timestamp, resp.Info[0]); err != nil {
+				remark = err.Error()
+				success = false
+				fmt.Printf("taskSend failed, blockKey: %x, error: %s\n", ta.BlockHash, remark)
+			}
+			if err = task_client.FinishTask(self.ptsc, ta.Id, uint64(time.Now().Unix()), success, remark); err != nil {
+				fmt.Printf("Finish send task [%x] failed: %s\n", ta.Id, err.Error())
+			}
+		}
+	}
+}
+
+func (self *ProviderService) processRemoveAndProve() {
+	for {
+		select {
+		case <-self.closeSignal:
+			self.waitClose.Done()
+			return
+		case ta := <-self.removeAndProveChan:
+			if ta.Type == ttpb.TaskType_REMOVE {
+				var remark string
+				success := true
+				if err := self.taskRemove(ta.FileHash, ta.FileSize, ta.BlockHash, ta.BlockSize); err != nil {
+					remark = err.Error()
+					success = false
+					fmt.Printf("taskRemove failed, blockKey: %x, error: %s\n", ta.BlockHash, remark)
+				}
+				if err := task_client.FinishTask(self.ptsc, ta.Id, uint64(time.Now().Unix()), success, remark); err != nil {
+					fmt.Printf("Finish remove task [%x] failed: %s\n", ta.Id, err.Error())
+				}
+			} else if ta.Type == ttpb.TaskType_PROVE {
+				proofId, chunkSize, chunkSeq, err := task_client.GetProveInfo(self.ptsc, ta.Id)
+				if err != nil {
+					fmt.Printf("Get task [%x] prove info failed: %s\n", ta.Id, err.Error())
+					continue
+				}
+				if len(proofId) == 0 {
+					fmt.Printf("none proof id, task id: %x\n", ta.Id)
+					continue
+				}
+				if len(ta.ProofId) > 0 && !bytes.Equal(ta.ProofId, proofId) {
+					fmt.Printf("task [%x] prove id not same\n", ta.Id)
+					continue
+				}
+				result, err := self.taskProve(ta.BlockHash, ta.BlockSize, chunkSize, chunkSeq)
+				var remark string
+				if err != nil {
+					remark = err.Error()
+				}
+				if err = task_client.FinishProve(self.ptsc, ta.Id, proofId, uint64(time.Now().Unix()), result, remark); err != nil {
+					fmt.Printf("Finish prove task [%x] failed: %s\n", ta.Id, err.Error())
+				}
+			}
+		}
+	}
+}
+
+func (self *ProviderService) GetTask() {
+	if self.taskGetting.TryLock() {
+		defer self.taskGetting.UnLock()
+	} else {
+		return
+	}
+	taskList, err := task_client.TaskList(self.ptsc)
+	if err != nil {
+		fmt.Printf("Get task list failed: %s\n", err.Error())
+		return
+	}
+	if len(taskList) == 0 {
+		return
+	}
+	for _, ta := range taskList {
+		switch ta.Type {
+		case ttpb.TaskType_REMOVE:
+			self.removeAndProveChan <- ta
+		case ttpb.TaskType_PROVE:
+			self.removeAndProveChan <- ta
+		case ttpb.TaskType_SEND:
+			self.sendChan <- ta
+		case ttpb.TaskType_REPLICATE:
+			self.replicateChan <- ta
 		}
 	}
 }
@@ -958,16 +1035,16 @@ func testPing(oppositeInfo []*ttpb.OppositeInfo) []*OppositeProvider {
 	for _, oi := range oppositeInfo {
 		nodeIdHash, latency, err := provider_client.Ping(oi.Host, oi.Port, timeout)
 		if err != nil {
-			fmt.Printf("ping provider %s:%d failed: %s", oi.Host, oi.Port, err)
+			fmt.Printf("ping provider %s:%d failed: %s\n", oi.Host, oi.Port, err)
 			continue
 		}
 		nodeId, err := base64.StdEncoding.DecodeString(oi.NodeId)
 		if err != nil {
-			fmt.Printf("decode provider id %x failed: %s", oi.NodeId, err)
+			fmt.Printf("decode provider id %x failed: %s\n", oi.NodeId, err)
 			continue
 		}
 		if len(nodeIdHash) > 0 && !bytes.Equal(util_hash.Sha1(nodeId), nodeIdHash) {
-			fmt.Printf("provider %s:%d node id %x not same", oi.Host, oi.Port, oi.NodeId)
+			fmt.Printf("provider %s:%d node id %x not same\n", oi.Host, oi.Port, oi.NodeId)
 			continue
 		}
 		result = append(result, &OppositeProvider{OppositeInfo: oi, lantency: latency})
