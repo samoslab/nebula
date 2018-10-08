@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/hex"
@@ -18,7 +19,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/eiannone/keyboard"
 	"github.com/robfig/cron"
 	collector "github.com/samoslab/nebula/provider/collector_client"
 	"github.com/samoslab/nebula/provider/config"
@@ -563,25 +563,25 @@ func doRegister(configDir string, trackerServer string, listen string, walletAdd
 				if len(host) == 0 {
 					h = dynamicDomain
 				}
-				err := keyboard.Open()
-				if err != nil {
-					fmt.Printf("Prepare read from keyboard error: %s\n", err.Error())
-					os.Exit(56)
-				}
-				defer keyboard.Close()
+
 				fmt.Printf("Ping %s:%d failed, You may not have a public network ip, error message: %s\n", h, port, errMsg)
-				fmt.Printf("If you want to register as a private network node, press Y and press another key to terminate the registration process. [Y/N]")
-				char, _, err := keyboard.GetKey()
+				fmt.Printf("If you want to register as a private network node, please type yes and press Enter.\n")
+				fmt.Printf("If you press the Enter key directly or enter another character and press Enter will terminate the registration process.\n")
+				bio := bufio.NewReader(os.Stdin)
+				line, _, err := bio.ReadLine()
 				if err != nil {
-					fmt.Printf("Read from keyboard error: %s\n", err.Error())
+					fmt.Printf("Read from input error: %s\n", err.Error())
 					os.Exit(57)
-				}
-				if char == 'y' || char == 'Y' {
-					privateNetwork = true
-					break
 				} else {
-					fmt.Println("Register failed")
-					os.Exit(58)
+					str := string(line)
+					if "yes" == strings.ToLower(strings.TrimSpace(str)) {
+						fmt.Printf("You entered \"%s\", will register as a private network node.\n", str)
+						privateNetwork = true
+						break
+					} else {
+						fmt.Printf("You entered \"%s\", register failed.\n", str)
+						os.Exit(58)
+					}
 				}
 			} else {
 				fmt.Printf("Error Code: %d, error message:%s\n", code, errMsg)
@@ -762,40 +762,40 @@ func switchPrivate(configDir string, trackerServer string) {
 		os.Exit(202)
 	}
 	pc := config.GetProviderConfig()
-	err = keyboard.Open()
+	fmt.Printf("The rewards obtained after switching to the private network node will be greatly reduced.\n")
+	fmt.Printf("If you want to switch to private network node, please type yes and press Enter.\n")
+	fmt.Printf("If you press the Enter key directly or enter another character and press Enter will cancel the switch process.\n")
+	bio := bufio.NewReader(os.Stdin)
+	line, _, err := bio.ReadLine()
 	if err != nil {
-		fmt.Printf("Prepare read from keyboard error: %s\n", err.Error())
-		os.Exit(1)
-	}
-	defer keyboard.Close()
-	fmt.Printf("The rewards obtained after switching to the private network node will be greatly reduced. Press Y if you want to switch, press the other keys to cancel the switch. [Y/N]")
-	char, _, err := keyboard.GetKey()
-	if err != nil {
-		fmt.Printf("Read from keyboard error: %s\n", err.Error())
+		fmt.Printf("Read from input error: %s\n", err.Error())
 		os.Exit(2)
-	}
-	if char == 'y' || char == 'Y' {
-		conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
-		if err != nil {
-			fmt.Printf("RPC Dial failed: %s\n", err.Error())
-			os.Exit(9)
-		}
-		defer conn.Close()
-		prsc := trp_pb.NewProviderRegisterServiceClient(conn)
-		success, err := client.SwitchPrivate(prsc)
-		if err != nil {
-			fmt.Printf("resendVerifyCode failed: %s\n", err.Error())
-			os.Exit(10)
-		}
-		if !success {
-			fmt.Println("resendVerifyCode failed, please retry")
-			os.Exit(11)
-		}
-		pc.Private = true
-		config.SaveProviderConfig()
-		fmt.Println("Switch to private network node success, please backup your config file: " + config.GetConfigFullPath(configDir))
 	} else {
-		fmt.Println("Switch has been canceled")
+		str := string(line)
+		if "yes" == strings.ToLower(strings.TrimSpace(str)) {
+			fmt.Printf("You entered \"%s\", will switch to private network node.\n", str)
+			conn, err := grpc.Dial(trackerServer, grpc.WithInsecure())
+			if err != nil {
+				fmt.Printf("RPC Dial failed: %s\n", err.Error())
+				os.Exit(9)
+			}
+			defer conn.Close()
+			prsc := trp_pb.NewProviderRegisterServiceClient(conn)
+			success, err := client.SwitchPrivate(prsc)
+			if err != nil {
+				fmt.Printf("resendVerifyCode failed: %s\n", err.Error())
+				os.Exit(10)
+			}
+			if !success {
+				fmt.Println("resendVerifyCode failed, please retry")
+				os.Exit(11)
+			}
+			pc.Private = true
+			config.SaveProviderConfig()
+			fmt.Println("Switch to private network node success, please backup your config file: " + config.GetConfigFullPath(configDir))
+		} else {
+			fmt.Printf("You entered \"%s\", switch has been canceled.\n", str)
+		}
 	}
 }
 
