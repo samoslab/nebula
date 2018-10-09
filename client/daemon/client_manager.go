@@ -1092,7 +1092,7 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 		case err := <-errRes:
 			log.Errorf("upload failed %v", err)
 			time.Sleep(time.Second)
-			return nil, nil
+			return nil, err
 		case <-done:
 			doneNum++
 			log.Infof("doneNum %d,  taskNUm %d", doneNum, taskNum)
