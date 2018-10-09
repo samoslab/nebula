@@ -18,7 +18,8 @@ service ProviderTaskService {
 message TaskListReq{
     bytes nodeId=1;
     uint64 timestamp=2;
-    bytes sign=3;
+    uint32 category=3;
+    bytes sign=4;
 }
 
 message TaskListResp{

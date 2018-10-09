@@ -43,7 +43,7 @@ type ProviderService struct {
 	replicateChan      chan *ttpb.Task
 	sendChan           chan *ttpb.Task
 	removeAndProveChan chan *ttpb.Task
-	closeSignal        chan bool
+	closeSignal        []chan bool
 	waitClose          sync.WaitGroup
 	taskConnection     *grpc.ClientConn
 	ptsc               ttpb.ProviderTaskServiceClient
@@ -585,7 +585,6 @@ func (self *ProviderService) CheckAvailable(ctx context.Context, req *pb.CheckAv
 
 func (self *ProviderService) initTaskProcessor(taskServer string, private bool) {
 	self.taskGetting = gosync.NewMutex()
-	self.closeSignal = make(chan bool, 1)
 	self.replicateChan = make(chan *ttpb.Task, 320)
 	self.sendChan = make(chan *ttpb.Task, 320)
 	self.removeAndProveChan = make(chan *ttpb.Task, 320)
@@ -595,14 +594,21 @@ func (self *ProviderService) initTaskProcessor(taskServer string, private bool) 
 	if private {
 		replicateThread, sendTread, processRemoveAndProve = 8, 2, 2
 	}
+	self.closeSignal = make([]chan bool, 0, replicateThread+sendTread+processRemoveAndProve)
 	for i := 0; i < processRemoveAndProve; i++ {
-		go self.processRemoveAndProve()
+		closeSig := make(chan bool, 1)
+		self.closeSignal = append(self.closeSignal, closeSig)
+		go self.processRemoveAndProve(closeSig)
 	}
 	for i := 0; i < sendTread; i++ {
-		go self.processSend()
+		closeSig := make(chan bool, 1)
+		self.closeSignal = append(self.closeSignal, closeSig)
+		go self.processSend(closeSig)
 	}
 	for i := 0; i < replicateThread; i++ {
-		go self.processReplicate()
+		closeSig := make(chan bool, 1)
+		self.closeSignal = append(self.closeSignal, closeSig)
+		go self.processReplicate(closeSig)
 	}
 	self.waitClose.Add(replicateThread + sendTread + processRemoveAndProve)
 	var err error
@@ -616,14 +622,16 @@ func (self *ProviderService) initTaskProcessor(taskServer string, private bool) 
 
 func (self *ProviderService) CloseTaskProcessor() {
 	defer self.taskConnection.Close()
-	self.closeSignal <- true
+	for _, closeSig := range self.closeSignal {
+		closeSig <- true
+	}
 	self.waitClose.Wait()
 }
 
-func (self *ProviderService) processReplicate() {
+func (self *ProviderService) processReplicate(closeSig chan bool) {
 	for {
 		select {
-		case <-self.closeSignal:
+		case <-closeSig:
 			self.waitClose.Done()
 			return
 		case ta := <-self.replicateChan:
@@ -654,10 +662,10 @@ func (self *ProviderService) processReplicate() {
 	}
 }
 
-func (self *ProviderService) processSend() {
+func (self *ProviderService) processSend(closeSig chan bool) {
 	for {
 		select {
-		case <-self.closeSignal:
+		case <-closeSig:
 			self.waitClose.Done()
 			return
 		case ta := <-self.sendChan:
@@ -688,10 +696,10 @@ func (self *ProviderService) processSend() {
 	}
 }
 
-func (self *ProviderService) processRemoveAndProve() {
+func (self *ProviderService) processRemoveAndProve(closeSig chan bool) {
 	for {
 		select {
-		case <-self.closeSignal:
+		case <-closeSig:
 			self.waitClose.Done()
 			return
 		case ta := <-self.removeAndProveChan:
@@ -739,7 +747,8 @@ func (self *ProviderService) GetTask() {
 	} else {
 		return
 	}
-	taskList, err := task_client.TaskList(self.ptsc)
+	taskList, err := task_client.TaskList(self.ptsc, len(self.removeAndProveChan) == 0,
+		len(self.removeAndProveChan) == 0, len(self.sendChan) == 0, len(self.replicateChan) == 0)
 	if err != nil {
 		fmt.Printf("Get task list failed: %s\n", err.Error())
 		return

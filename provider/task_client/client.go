@@ -8,12 +8,29 @@ import (
 	pb "github.com/samoslab/nebula/tracker/task/pb"
 )
 
-func TaskList(client pb.ProviderTaskServiceClient) (list []*pb.Task, err error) {
+func TaskList(client pb.ProviderTaskServiceClient, remove bool, prove bool, send bool, replicate bool) (list []*pb.Task, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	node := node.LoadFormConfig()
+	var cate uint32 = 0
+	if remove {
+		cate |= 0x1
+	}
+	if prove {
+		cate |= 0x2
+	}
+	if send {
+		cate |= 0x4
+	}
+	if replicate {
+		cate |= 0x8
+	}
+	if cate == 0 {
+		return
+	}
 	req := &pb.TaskListReq{NodeId: node.NodeId,
-		Timestamp: uint64(time.Now().Unix())}
+		Timestamp: uint64(time.Now().Unix()),
+		Category:  cate}
 	req.SignReq(node.PriKey)
 	resp, er := client.TaskList(ctx, req)
 	if er != nil {

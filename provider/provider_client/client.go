@@ -11,6 +11,8 @@ import (
 	pb "github.com/samoslab/nebula/provider/pb"
 	tcppb "github.com/samoslab/nebula/tracker/collector/provider/pb"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const stream_data_size = 32 * 1024
@@ -73,7 +75,7 @@ func StoreSmall(psc pb.ProviderServiceClient, data []byte, auth []byte, timestam
 	if blockSize >= small_file_limit || int(blockSize) != len(data) {
 		return fmt.Errorf("check data size failed")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	req := &pb.StoreReq{Data: data,
 		Auth:      auth,
@@ -88,6 +90,11 @@ func StoreSmall(psc pb.ProviderServiceClient, data []byte, auth []byte, timestam
 	defer client.Collect(al)
 	resp, err := psc.StoreSmall(ctx, req)
 	if err != nil {
+		st, ok := status.FromError(err)
+		if ok && st.Code() == codes.AlreadyExists {
+			al.Success, al.EndTime = true, now()
+			return nil
+		}
 		setActionLog(err, al)
 		return err
 	}
@@ -171,6 +178,11 @@ func Store(psc pb.ProviderServiceClient, filePath string, auth []byte, timestamp
 	}
 	storeResp, err := stream.CloseAndRecv()
 	if err != nil {
+		st, ok := status.FromError(err)
+		if ok && st.Code() == codes.AlreadyExists {
+			al.Success, al.EndTime = true, now()
+			return nil
+		}
 		err = fmt.Errorf("RPC CloseAndRecv failed: %s", err.Error())
 		setActionLog(err, al)
 		return err
@@ -189,7 +201,7 @@ func RetrieveSmall(psc pb.ProviderServiceClient, auth []byte, timestamp uint64, 
 	if blockSize >= small_file_limit {
 		return nil, fmt.Errorf("check data size failed")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	req := &pb.RetrieveReq{Auth: auth,
 		Timestamp: timestamp,
@@ -214,13 +226,6 @@ func Retrieve(psc pb.ProviderServiceClient, filePath string, auth []byte, timest
 	if blockSize < small_file_limit {
 		return fmt.Errorf("check data size failed")
 	}
-	file, err := os.OpenFile(filePath,
-		os.O_WRONLY|os.O_TRUNC|os.O_CREATE,
-		0666)
-	if err != nil {
-		return fmt.Errorf("open file failed: %s", err.Error())
-	}
-	defer file.Close()
 	req := &pb.RetrieveReq{Auth: auth,
 		Timestamp: timestamp,
 		Ticket:    ticket,
@@ -234,6 +239,8 @@ func Retrieve(psc pb.ProviderServiceClient, filePath string, auth []byte, timest
 	}
 	al := newActionLogFromStoreReq(ticket, fileHash, fileSize, blockHash, blockSize)
 	defer client.Collect(al)
+	first := true
+	var file *os.File
 	for {
 		resp, err := stream.Recv()
 		if err == io.EOF {
@@ -248,6 +255,16 @@ func Retrieve(psc pb.ProviderServiceClient, filePath string, auth []byte, timest
 			break
 		}
 		al.TransportSize += uint64(len(resp.Data))
+		if first {
+			first = false
+			file, err = os.OpenFile(filePath,
+				os.O_WRONLY|os.O_TRUNC|os.O_CREATE,
+				0666)
+			if err != nil {
+				return fmt.Errorf("open file failed: %s", err.Error())
+			}
+			defer file.Close()
+		}
 		if _, err = file.Write(resp.Data); err != nil {
 			err = fmt.Errorf("write file %d bytes failed : %s", len(resp.Data), err.Error())
 			setActionLog(err, al)
