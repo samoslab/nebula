@@ -1061,3 +1061,56 @@ func testPing(oppositeInfo []*ttpb.OppositeInfo) []*OppositeProvider {
 	sort.Slice(result, func(i, j int) bool { return result[i].lantency < result[j].lantency })
 	return result
 }
+
+func (self *ProviderService) VerifyBlocks() {
+	query := true
+	var previous uint64
+	var miss, blocks []*ttpb.HashAndSize
+	var hasNext bool
+	var err error
+	for {
+		for i := 1; i < 4; i++ {
+			previous, blocks, hasNext, err = task_client.VerifyBlocks(self.ptsc, query, previous, miss)
+			if err != nil {
+				fmt.Printf("verifyBlocks %d times get data from task server error: %s\n", i, err)
+			} else {
+				break
+			}
+		}
+		if err != nil {
+			fmt.Printf("verifyBlocks reach the maximum number of retries and terminate\n")
+			return
+		}
+		if !hasNext {
+			query = false
+		}
+		if len(blocks) == 0 {
+			return
+		}
+		miss = make([]*ttpb.HashAndSize, 0, 32)
+		for _, block := range blocks {
+			if !self.verifyBlock(block.Hash, block.Size) {
+				miss = append(miss, block)
+			}
+		}
+	}
+}
+
+func (self *ProviderService) verifyBlock(hash []byte, size uint64) bool {
+	found, smallFile, storageIdx, subPath := self.querySubPath(hash)
+	if !found {
+		return false
+	}
+	if smallFile {
+		storage := config.GetStorage(storageIdx)
+		if storage == nil {
+			return false
+		}
+		data, err := storage.SmallFileDb.Get(hash, nil)
+		return err == nil && len(data) > 0 && bytes.Equal(hash, util_hash.Sha1(data))
+	} else {
+		path := config.GetStoragePath(storageIdx, subPath)
+		sum, err := util_hash.Sha1File(path)
+		return err == nil && len(sum) > 0 && bytes.Equal(hash, sum)
+	}
+}

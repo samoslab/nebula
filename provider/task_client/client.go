@@ -102,3 +102,22 @@ func FinishTask(client pb.ProviderTaskServiceClient, taskId []byte, finishedTime
 	_, err = client.FinishTask(ctx, req)
 	return
 }
+
+func VerifyBlocks(client pb.ProviderTaskServiceClient, query bool, previous uint64, miss []*pb.HashAndSize) (last uint64, blocks []*pb.HashAndSize, hasNext bool, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	node := node.LoadFormConfig()
+	req := &pb.VerifyBlocksReq{NodeId: node.NodeId,
+		Timestamp: uint64(time.Now().Unix()),
+		Query:     query,
+		Previous:  previous,
+		Miss:      miss}
+	req.SignReq(node.PriKey)
+	resp, er := client.VerifyBlocks(ctx, req)
+	if er != nil {
+		err = er
+	} else {
+		last, blocks, hasNext = resp.Last, resp.Blocks, resp.HasNext
+	}
+	return
+}

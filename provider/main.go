@@ -8,6 +8,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"math/rand"
 	"net"
 	"os"
 	"os/signal"
@@ -277,6 +278,9 @@ func daemon(configDir string, trackerServer string, collectorServer string, task
 		cronRunner.AddFunc("0 * * * * *", func() { fmt.Print(".") })
 	}
 	cronRunner.AddFunc("@every 1m", func() { providerServer.GetTask() })
+	rand.Seed(time.Now().UnixNano())
+	random := rand.Intn(300)
+	cronRunner.AddFunc(fmt.Sprintf("%d %d 1 * * *", random%60, random/60), func() { providerServer.VerifyBlocks() })
 	cronRunner.Start()
 	defer cronRunner.Stop()
 	sigChan := make(chan os.Signal, 1)
