@@ -8,10 +8,9 @@ import (
 	"github.com/samoslab/nebula/client/common"
 	client "github.com/samoslab/nebula/client/provider_client"
 	mpb "github.com/samoslab/nebula/tracker/metadata/pb"
-	"github.com/yanzay/log"
 )
 
-func chooseBackupProvicer(hash []byte, backProMap map[string][]*SortablePro) *SortablePro {
+func ChooseBackupProvicer(hash []byte, backProMap map[string][]*SortablePro) *SortablePro {
 	hashKey := string(hash)
 	if sortPros, ok := backProMap[hashKey]; ok {
 		for i, _ := range sortPros {
@@ -25,7 +24,7 @@ func chooseBackupProvicer(hash []byte, backProMap map[string][]*SortablePro) *So
 	return nil
 }
 
-func createBackupProvicer(backupPros []*SortablePro) map[string][]*SortablePro {
+func CreateBackupProvicer(backupPros []*SortablePro) map[string][]*SortablePro {
 	backProMap := map[string][]*SortablePro{}
 	for _, sortPro := range backupPros {
 		for _, pha := range sortPro.Pro.HashAuth {
@@ -80,6 +79,7 @@ func GetBestReplicaProvider(pros []*mpb.ReplicaProvider, needNum int) ([]*mpb.Re
 	return wellPros[0:common.Min(needNum, len(wellPros))], wellPros[common.Min(needNum, len(wellPros)):len(wellPros)], nil
 }
 
+// SortablePro provider sorted by delay
 type SortablePro struct {
 	Pro         *mpb.BlockProviderAuth
 	Delay       int
@@ -88,33 +88,11 @@ type SortablePro struct {
 }
 
 // UsingBestProvider ping provider
-func UsingBestProvider(pros []*mpb.BlockProviderAuth) ([]*mpb.BlockProviderAuth, error) {
+func UsingBestProvider(pros []*mpb.BlockProviderAuth) ([]*SortablePro, []*SortablePro) {
 	sortPros := []*SortablePro{}
-	pingResultMap := map[int]int{}
-	var pingResultMutex sync.Mutex
-
-	var wg sync.WaitGroup
-
 	for i, bpa := range pros {
-		wg.Add(1)
-		go func(i int, bpa *mpb.BlockProviderAuth) {
-			defer wg.Done()
-			pingTime := client.GetPingTime(bpa.GetServer(), bpa.GetPort())
-			pingResultMutex.Lock()
-			defer pingResultMutex.Unlock()
-			pingResultMap[i] = pingTime
-		}(i, bpa)
+		sortPros = append(sortPros, &SortablePro{Pro: bpa, Delay: 0, OriginIndex: i})
 	}
-	wg.Wait()
-	for i, bpa := range pros {
-		pingTime, _ := pingResultMap[i]
-		sortPros = append(sortPros, &SortablePro{Pro: bpa, Delay: pingTime, OriginIndex: i})
-	}
-
-	return generateAvaliablePro(sortPros)
-}
-
-func generateAvaliablePro(sortPros []*SortablePro) ([]*mpb.BlockProviderAuth, error) {
 	workPros := []*SortablePro{}
 	backupPros := []*SortablePro{}
 	for _, proInfo := range sortPros {
@@ -125,25 +103,7 @@ func generateAvaliablePro(sortPros []*SortablePro) ([]*mpb.BlockProviderAuth, er
 		}
 	}
 
-	backupProMap := createBackupProvicer(backupPros)
-
-	availablePros := []*mpb.BlockProviderAuth{}
-	for _, proInfo := range workPros {
-		if proInfo.Delay == common.NetworkUnreachable || proInfo.Delay > common.MaxInvalidDelay {
-			// provider cannot connect , choose one from backup
-			log.Errorf("Provider %+v cannot connected", proInfo.Pro)
-			replacePro := chooseBackupProvicer(proInfo.Pro.HashAuth[0].Hash, backupProMap)
-			if replacePro == nil {
-				log.Errorf("No availbe provider for provider %d", proInfo.OriginIndex)
-				return nil, fmt.Errorf("no more backup provider can be choosed")
-			}
-			availablePros = append(availablePros, replacePro.Pro)
-		} else {
-			availablePros = append(availablePros, proInfo.Pro)
-		}
-	}
-
-	return availablePros, nil
+	return workPros, backupPros
 }
 
 // BestRetrieveNode ping retrieve node

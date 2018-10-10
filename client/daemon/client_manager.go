@@ -1003,15 +1003,14 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 	partition := &mpb.StorePartition{}
 	partition.Block = []*mpb.StoreBlock{}
 	phas := rspPartition.GetProviderAuth()
-	providers, err := UsingBestProvider(phas)
-	if err != nil {
-		return nil, err
-	}
+	providers, backupPros := UsingBestProvider(phas)
+
+	backupProMap := CreateBackupProvicer(backupPros)
 
 	var errResult []error
 	var mutex sync.Mutex
 	ccControl := NewCCController(common.CCUploadGoNum)
-	for i, pro := range providers {
+	for i, sortPro := range providers {
 		checksum := i >= dataShards
 		uploadParas := &common.UploadParameter{
 			Checksum:       checksum,
@@ -1021,13 +1020,33 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 		}
 		ccControl.Add()
 		go func(pro *mpb.BlockProviderAuth, tm uint64, uploadPara *common.UploadParameter, chunkSize uint32) {
+			log := log.WithField("provider", fmt.Sprintf("%s:%d", pro.Server, pro.Port))
 			done := make(chan struct{})
 			go HandleQuit(c.quit, done, ccControl)
 			defer func() {
 				close(done)
 				ccControl.Done()
 			}()
-			block, err := c.uploadFileToErasureProvider(pro, tm, uploadParas, chunkSize)
+			var block *mpb.StoreBlock
+			var err error
+			for {
+				block, err = c.uploadFileToErasureProvider(pro, tm, uploadParas, chunkSize)
+				if err != nil {
+					mutex.Lock()
+					newPro := ChooseBackupProvicer(pro.HashAuth[0].Hash, backupProMap)
+					mutex.Unlock()
+					if newPro != nil {
+						log.Infof("Choose provider success new %s:%d", newPro.Pro.Server, newPro.Pro.Port)
+						pro = newPro.Pro
+					} else {
+						log.Info("Choose provider failed")
+						break
+					}
+				} else {
+					break
+				}
+			}
+
 			mutex.Lock()
 			defer mutex.Unlock()
 			if err != nil {
@@ -1036,7 +1055,7 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 				return
 			}
 			partition.Block = append(partition.Block, block)
-		}(pro, rspPartition.GetTimestamp(), uploadParas, chunkSize)
+		}(sortPro.Pro, rspPartition.GetTimestamp(), uploadParas, chunkSize)
 	}
 	ccControl.Wait()
 	if len(errResult) != 0 {
