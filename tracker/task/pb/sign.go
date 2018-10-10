@@ -13,6 +13,7 @@ func (self *TaskListReq) hash() []byte {
 	hasher := sha256.New()
 	hasher.Write(self.NodeId)
 	hasher.Write(util_bytes.FromUint64(self.Timestamp))
+	hasher.Write(util_bytes.FromUint32(self.Category))
 	return hasher.Sum(nil)
 }
 
