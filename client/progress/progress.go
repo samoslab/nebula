@@ -54,11 +54,15 @@ func NewProgressManager() *ProgressManager {
 
 // SetProgress set current progress file size
 func (pm *ProgressManager) SetProgress(tp, fileName string, currentSize, totalSize uint64, sno uint32, local string) {
+	pm.Mutex.Lock()
+	defer pm.Mutex.Unlock()
 	pm.Progress[fileName] = ProgressCell{Type: tp, Total: totalSize, Current: currentSize, Rate: calRate(currentSize, totalSize), Time: common.Now(), SpaceNo: int(sno), Local: local}
 }
 
 // SetPartitionMap set progress file map
 func (pm *ProgressManager) SetPartitionMap(fileName, originFile string) {
+	pm.Mutex.Lock()
+	defer pm.Mutex.Unlock()
 	pm.PartitionToOriginMap[fileName] = originFile
 }
 
