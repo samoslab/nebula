@@ -1085,7 +1085,10 @@ func (self *ProviderService) VerifyBlocks() {
 			query = false
 		}
 		if len(blocks) == 0 {
+			fmt.Println("VerifyBlocks finished")
 			return
+		} else {
+			fmt.Printf("VerifyBlocks get %d blocks, current timestamp: %d\n", len(blocks), time.Now().Unix())
 		}
 		miss = make([]*ttpb.HashAndSize, 0, 32)
 		for _, block := range blocks {
