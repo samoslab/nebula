@@ -1060,43 +1060,17 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 	var paraStr string
 	var generator, pubKey, random []byte
 	var phi [][]byte
-	errRes := make(chan error)
-	done := make(chan struct{})
-	taskNum := 1
 	if chunkSize > 0 {
-		taskNum++
-		go func() {
-			paraStr, generator, pubKey, random, phi, err = filecheck.GenMetadata(uploadPara.HF.FileName, chunkSize)
-			if err != nil {
-				errRes <- err
-			} else {
-				done <- struct{}{}
-			}
-		}()
+		paraStr, generator, pubKey, random, phi, err = filecheck.GenMetadata(uploadPara.HF.FileName, chunkSize)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	go func() {
-		ha := pro.GetHashAuth()[0]
-		err = client.StorePiece(log, pclient, uploadPara, ha.GetAuth(), ha.GetTicket(), tm, c.PM)
-		if err != nil {
-			errRes <- err
-		} else {
-			done <- struct{}{}
-		}
-	}()
-
-	doneNum := 0
-
-	for doneNum < taskNum {
-		select {
-		case err := <-errRes:
-			log.Errorf("upload failed %v", err)
-			time.Sleep(time.Second)
-			return nil, err
-		case <-done:
-			doneNum++
-			log.Infof("doneNum %d,  taskNUm %d", doneNum, taskNum)
-		}
+	ha := pro.GetHashAuth()[0]
+	err = client.StorePiece(log, pclient, uploadPara, ha.GetAuth(), ha.GetTicket(), tm, c.PM)
+	if err != nil {
+		return nil, err
 	}
 
 	block := &mpb.StoreBlock{
