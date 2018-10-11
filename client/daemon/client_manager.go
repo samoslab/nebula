@@ -547,21 +547,21 @@ func (c *ClientManager) UploadDir(parent, dest string, interactive, newVersion, 
 			return fmt.Errorf("Password not set")
 		}
 	}
-	log.Debugf("Upload dirs %+v", dirs)
+	log.Infof("Upload dirs %+v", dirs)
 	newDirs := dirAdjust(dirs, parent, dest, runtime.GOOS)
-	log.Debugf("New upload dirs %+v", newDirs)
+	log.Infof("New upload dirs %+v", newDirs)
 	errArr := []error{}
 	var mutex sync.Mutex
 	ccControl := NewCCController(common.CCUploadFileNum)
 	for _, dpair := range newDirs {
 		if dpair.Folder {
-			log.Debugf("Mkfolder %+v", dpair)
+			log.Infof("Mkfolder %+v", dpair)
 			_, err := c.MkFolder(dpair.Parent, []string{dpair.Name}, interactive, sno)
 			if err != nil {
 				return err
 			}
 		} else {
-			log.Debugf("Upload file %+v", dpair)
+			log.Infof("Upload file %+v", dpair)
 			ccControl.Add()
 			go func(dpair DirPair) {
 				done := make(chan struct{})
@@ -747,7 +747,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 			})
 			log.Infof("File %s need split to %d blocks", fname, len(fileSlices))
 			for _, fs := range fileSlices {
-				log.Debugf("Erasure block files %s index %d", fs.FileName, fs.SliceIndex)
+				log.Infof("Erasure block files %s index %d", fs.FileName, fs.SliceIndex)
 				c.PM.SetPartitionMap(fs.FileName, uniqKey)
 				realSizeAfterRS += fs.FileSize
 			}
@@ -791,7 +791,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 		for i, part := range rspPartitions {
 			auth := part.GetProviderAuth()
 			for _, pa := range auth {
-				log.Debugf("Partition %d, %s:%d %v hashauth %d", i, pa.Server, pa.Port, pa.Spare, len(pa.HashAuth))
+				log.Infof("Partition %d, %s:%d %v hashauth %d", i, pa.Server, pa.Port, pa.Spare, len(pa.HashAuth))
 			}
 		}
 
@@ -801,7 +801,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 			if err != nil {
 				return err
 			}
-			log.Debugf("Partition %d has %d store blocks", i, len(partition.GetBlock()))
+			log.Infof("Partition %d has %d store blocks", i, len(partition.GetBlock()))
 			partitions = append(partitions, partition)
 		}
 		log.Infof("There are %d store partitions", len(partitions))
@@ -831,11 +831,11 @@ func (c *ClientManager) createUploadPrepareRequest(req *mpb.CheckFileExistReq, p
 				Size: uint32(slice.FileSize),
 			}
 			phslist = append(phslist, phs)
-			log.Debugf("%s %dth piece", slice.FileName, j)
+			log.Infof("%s %dth piece", slice.FileName, j)
 			block++
 		}
 		ufpr.Partition[i] = &mpb.SplitPartition{phslist}
-		log.Debugf("%s is %dth partitions", partInfo.FileName, i)
+		log.Infof("%s is %dth partitions", partInfo.FileName, i)
 	}
 	log.Infof("upload request has %d partitions, %d pieces", len(ufpr.Partition), block)
 	if err := ufpr.SignReq(c.cfg.Node.PriKey); err != nil {
@@ -846,7 +846,7 @@ func (c *ClientManager) createUploadPrepareRequest(req *mpb.CheckFileExistReq, p
 }
 
 func deleteTemporaryFile(log logrus.FieldLogger, fileName string) {
-	log.Debugf("delete file %s", fileName)
+	log.Infof("delete file %s", fileName)
 	if err := os.Remove(fileName); err != nil {
 		log.Errorf("delete %s failed, error %v", fileName, err)
 	}
@@ -1106,7 +1106,7 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 		Phi:         phi,
 	}
 	block.StoreNodeId = append(block.StoreNodeId, []byte(pro.GetNodeId()))
-	log.Debugf("Upload to provider success")
+	log.Infof("Upload to provider success")
 
 	return block, nil
 }
@@ -1117,7 +1117,7 @@ func (c *ClientManager) uploadFileToReplicaProvider(conn *grpc.ClientConn, pro *
 	log := c.Log.WithField("uploading", fileInfo.FileName).WithField("provider", server)
 	uploadPara.Provider = server
 	pclient := pb.NewProviderServiceClient(conn)
-	log.Debugf("Upload file hash %x size %d", fileInfo.FileHash, fileInfo.FileSize)
+	log.Infof("Upload file hash %x size %d", fileInfo.FileHash, fileInfo.FileSize)
 
 	err := client.StorePiece(log, pclient, uploadPara, pro.Auth, pro.Ticket, pro.Timestamp, c.PM)
 	if err != nil {
