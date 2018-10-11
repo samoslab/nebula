@@ -1630,11 +1630,21 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 	log.Info("This is erasure file")
 	// for progress stats
 	realSizeAfterRS := uint64(0)
+	for _, partition := range partitions {
+		for j, block := range partition.GetBlock() {
+			for _, sn := range block.GetStoreNode() {
+				fmt.Printf("block %d hash %x seq %d provider %s:%d\n", j, block.Hash, block.BlockSeq, sn.Server, sn.Port)
+			}
+		}
+	}
 	for i, partition := range partitions {
 		for j, block := range partition.GetBlock() {
 			c.PM.SetPartitionMap(hex.EncodeToString(block.GetHash()), common.ProgressKey(serverFile, sno))
 			realSizeAfterRS += block.GetSize()
 			log.Infof("Partition %d block %d hash %x size %d checksum %v seq %d", i, j, block.Hash, block.Size, block.Checksum, block.BlockSeq)
+			for _, sn := range block.GetStoreNode() {
+				log.Infof("block %d hash %x seq %d provider %s:%d", j, block.Hash, block.BlockSeq, sn.Server, sn.Port)
+			}
 		}
 	}
 	c.PM.SetProgress(common.TaskDownloadProgressType, common.ProgressKey(serverFile, sno), 0, realSizeAfterRS, sno, downFileName)
