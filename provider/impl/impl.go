@@ -40,10 +40,12 @@ type ProviderService struct {
 	nodeIdHash         []byte
 	providerDb         *leveldb.DB
 	taskGetting        gosync.Mutex
+	blocksVerifying    gosync.Mutex
 	replicateChan      chan *ttpb.Task
 	sendChan           chan *ttpb.Task
 	removeAndProveChan chan *ttpb.Task
 	closeSignal        []chan bool
+	shutdownSignal     chan bool
 	waitClose          sync.WaitGroup
 	taskConnection     *grpc.ClientConn
 	ptsc               ttpb.ProviderTaskServiceClient
@@ -585,6 +587,8 @@ func (self *ProviderService) CheckAvailable(ctx context.Context, req *pb.CheckAv
 
 func (self *ProviderService) initTaskProcessor(taskServer string, private bool) {
 	self.taskGetting = gosync.NewMutex()
+	self.blocksVerifying = gosync.NewMutex()
+	self.shutdownSignal = make(chan bool, 1)
 	self.replicateChan = make(chan *ttpb.Task, 320)
 	self.sendChan = make(chan *ttpb.Task, 320)
 	self.removeAndProveChan = make(chan *ttpb.Task, 320)
@@ -622,6 +626,7 @@ func (self *ProviderService) initTaskProcessor(taskServer string, private bool) 
 
 func (self *ProviderService) CloseTaskProcessor() {
 	defer self.taskConnection.Close()
+	self.shutdownSignal <- true
 	for _, closeSig := range self.closeSignal {
 		closeSig <- true
 	}
@@ -1063,6 +1068,11 @@ func testPing(oppositeInfo []*ttpb.OppositeInfo) []*OppositeProvider {
 }
 
 func (self *ProviderService) VerifyBlocks() {
+	if self.blocksVerifying.TryLock() {
+		defer self.blocksVerifying.UnLock()
+	} else {
+		return
+	}
 	query := true
 	var previous uint64
 	var miss, blocks []*ttpb.HashAndSize
@@ -1070,11 +1080,16 @@ func (self *ProviderService) VerifyBlocks() {
 	var err error
 	for {
 		for i := 1; i < 4; i++ {
-			previous, blocks, hasNext, err = task_client.VerifyBlocks(self.ptsc, query, previous, miss)
-			if err != nil {
-				fmt.Printf("verifyBlocks %d times get data from task server error: %s\n", i, err)
-			} else {
-				break
+			select {
+			case <-self.shutdownSignal:
+				return
+			default:
+				previous, blocks, hasNext, err = task_client.VerifyBlocks(self.ptsc, query, previous, miss)
+				if err != nil {
+					fmt.Printf("verifyBlocks %d times get data from task server error: %s\n", i, err)
+				} else {
+					break
+				}
 			}
 		}
 		if err != nil {
@@ -1092,8 +1107,13 @@ func (self *ProviderService) VerifyBlocks() {
 		}
 		miss = make([]*ttpb.HashAndSize, 0, 32)
 		for _, block := range blocks {
-			if !self.verifyBlock(block.Hash, block.Size) {
-				miss = append(miss, block)
+			select {
+			case <-self.shutdownSignal:
+				return
+			default:
+				if !self.verifyBlock(block.Hash, block.Size) {
+					miss = append(miss, block)
+				}
 			}
 		}
 	}

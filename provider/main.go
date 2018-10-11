@@ -269,7 +269,7 @@ func daemon(configDir string, trackerServer string, collectorServer string, task
 	}
 	if !disableAutoRefreshIpFlag && !config.GetProviderConfig().Ddns && !private {
 		refreshIp(trackerServer, port, true)
-		cronRunner.AddFunc("37 */2 * * * *", func() {
+		cronRunner.AddFunc("@every 2m", func() {
 			refreshIp(trackerServer, port, false)
 		})
 	}
@@ -280,7 +280,7 @@ func daemon(configDir string, trackerServer string, collectorServer string, task
 	cronRunner.AddFunc("@every 1m", func() { providerServer.GetTask() })
 	rand.Seed(time.Now().UnixNano())
 	random := rand.Intn(300)
-	cronRunner.AddFunc(fmt.Sprintf("%d %d 1 * * *", random%60, random/60), func() { providerServer.VerifyBlocks() })
+	cronRunner.AddFunc(fmt.Sprintf("%d %d 0 %d/3 * *", random%60, 30+random/60, time.Now().Day()%3+1), func() { providerServer.VerifyBlocks() })
 	cronRunner.Start()
 	defer cronRunner.Stop()
 	sigChan := make(chan os.Signal, 1)
