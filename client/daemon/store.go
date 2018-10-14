@@ -177,3 +177,28 @@ func (s *store) GetTask(taskID string) (TaskInfo, error) {
 	}
 	return taskInfo, nil
 }
+
+//DeleteTask delete task by id
+func (s *store) DeleteTask(taskID string) (TaskInfo, error) {
+	var taskInfo TaskInfo
+	if err := s.db.Update(func(tx *bolt.Tx) error {
+		bkt := tx.Bucket(taskBkt)
+		if bkt == nil {
+			return errors.New("Buckte not exist")
+		}
+
+		bkey := []byte(taskID)
+		v := bkt.Get(bkey)
+		if v != nil {
+			err := json.Unmarshal(v, &taskInfo)
+			if err != nil {
+				return err
+			}
+		}
+
+		return bkt.Delete(bkey)
+	}); err != nil {
+		return TaskInfo{}, err
+	}
+	return taskInfo, nil
+}
