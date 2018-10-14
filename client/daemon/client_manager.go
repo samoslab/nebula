@@ -260,7 +260,7 @@ func (c *ClientManager) ExecuteTask() error {
 	log.Info("Start task goroutine, handle unfinished task first")
 	// unfinished task
 	unhandleTasks, err := c.store.GetTaskArray(func(rwd TaskInfo) bool {
-		return rwd.Status == StatusGotTask
+		return rwd.Status == StatusGotTask && rwd.Deleted == false
 	})
 	if err != nil {
 		log.WithError(err).Error("Get unhandle task failed")
@@ -2017,13 +2017,10 @@ func (c *ClientManager) TaskStatus(taskID string) (string, error) {
 }
 
 // TaskDelete get task status
-func (c *ClientManager) TaskDelete(taskID string) (string, error) {
-	taskInfo, err := c.store.GetTask(taskID)
-	if err != nil {
-		return "", err
-	}
-	if taskInfo.Err != "" {
-		return "", errors.New(taskInfo.Err)
-	}
-	return taskInfo.Status.String(), nil
+func (c *ClientManager) TaskDelete(taskID string) (TaskInfo, error) {
+	return c.store.UpdateTaskInfo(taskID, func(rs TaskInfo) TaskInfo {
+		rs.UpdatedAt = common.Now()
+		rs.Deleted = true
+		return rs
+	})
 }

@@ -309,6 +309,7 @@ func (s *HTTPServer) setupMux() *http.ServeMux {
 	handleAPI("/api/v1/task/download", TaskDownloadHandler(s))
 	handleAPI("/api/v1/task/downloaddir", TaskDownloadDirHandler(s))
 	handleAPI("/api/v1/task/status", TaskStatusHandler(s))
+	handleAPI("/api/v1/task/delete", TaskDeleteHandler(s))
 
 	handleAPI("/api/v1/package/all", GetAllPackageHandler(s))
 	handleAPI("/api/v1/package", GetPackageInfoHandler(s))
@@ -1208,7 +1209,7 @@ func TaskDownloadDirHandler(s *HTTPServer) http.HandlerFunc {
 	}
 }
 
-// TaskStatusHandler upload directory handler
+// TaskStatusHandler get task status
 func TaskStatusHandler(s *HTTPServer) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
@@ -1247,7 +1248,61 @@ func TaskStatusHandler(s *HTTPServer) http.HandlerFunc {
 		result, err := s.cm.TaskStatus(req.TaskID)
 		code, errmsg := 0, ""
 		if err != nil {
-			log.Errorf("Upload %+v error %v", req, err)
+			log.Errorf("Get task status %+v error %v", req, err)
+			code, errmsg = common.StatusErrFromError(err)
+		}
+
+		rsp, err := common.MakeUnifiedHTTPResponse(code, result, errmsg)
+		if err != nil {
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+		if err := JSONResponse(w, rsp); err != nil {
+			log.Infof("Error %v\n", err)
+		}
+	}
+}
+
+// TaskDeleteHandler delete task
+func TaskDeleteHandler(s *HTTPServer) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		ctx := r.Context()
+		if !s.CanBeWork() {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("register first"))
+			return
+		}
+		log := s.cm.Log
+		w.Header().Set("Accept", "application/json")
+
+		if !validMethod(ctx, w, r, []string{http.MethodPost}) {
+			return
+		}
+
+		if r.Header.Get("Content-Type") != "application/json" {
+			errorResponse(ctx, w, http.StatusUnsupportedMediaType, errors.New("Invalid content type"))
+			return
+		}
+
+		req := &TaskStatusReq{}
+		decoder := json.NewDecoder(r.Body)
+		if err := decoder.Decode(&req); err != nil {
+			err = fmt.Errorf("Invalid json request body: %v", err)
+			errorResponse(ctx, w, http.StatusBadRequest, err)
+			return
+		}
+
+		defer r.Body.Close()
+
+		if req.TaskID == "" {
+			errorResponse(ctx, w, http.StatusBadRequest, errors.New("argument task_id must not empty"))
+			return
+		}
+
+		log.Infof("task id %s", req.TaskID)
+		result, err := s.cm.TaskDelete(req.TaskID)
+		code, errmsg := 0, ""
+		if err != nil {
+			log.Errorf("Delete task %+v error %v", req, err)
 			code, errmsg = common.StatusErrFromError(err)
 		}
 
