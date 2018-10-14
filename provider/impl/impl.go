@@ -1074,21 +1074,25 @@ func (self *ProviderService) VerifyBlocks() {
 		return
 	}
 	query := true
-	var previous uint64
+	var previous, last uint64
 	var miss, blocks []*ttpb.HashAndSize
-	var hasNext bool
+	var hasNext, respHasNext bool
 	var err error
 	for {
+	retry:
 		for i := 1; i < 4; i++ {
 			select {
 			case <-self.shutdownSignal:
 				return
 			default:
-				previous, blocks, hasNext, err = task_client.VerifyBlocks(self.ptsc, query, previous, miss)
+				last, blocks, respHasNext, err = task_client.VerifyBlocks(self.ptsc, query, previous, miss)
+				// fmt.Printf("i: %d, req query: %t, previous: %d, miss count: %d, resp last: %d, blocks count: %d, respHasNext: %t, err: %s\n", i, query, previous, len(miss), last, len(blocks), respHasNext, err)
 				if err != nil {
 					fmt.Printf("verifyBlocks %d times get data from task server error: %s\n", i, err)
 				} else {
-					break
+					previous = last
+					hasNext = respHasNext
+					break retry
 				}
 			}
 		}
