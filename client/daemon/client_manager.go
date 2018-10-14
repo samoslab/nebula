@@ -2015,3 +2015,15 @@ func (c *ClientManager) TaskStatus(taskID string) (string, error) {
 	}
 	return taskInfo.Status.String(), nil
 }
+
+// TaskDelete get task status
+func (c *ClientManager) TaskDelete(taskID string) (string, error) {
+	taskInfo, err := c.store.GetTask(taskID)
+	if err != nil {
+		return "", err
+	}
+	if taskInfo.Err != "" {
+		return "", errors.New(taskInfo.Err)
+	}
+	return taskInfo.Status.String(), nil
+}
