@@ -24,14 +24,14 @@
     "electron-context-menu": "^0.10.0",
     "electron-updater": "^3.1.1",
     "electron-builder": "20.27.1",
-    "jquery": "3.3.1",
-    "electron-tabs": "0.9.4"
+    "jquery": "3.3.1"
   },
   "dependencies": {
     "electron-context-menu": "^0.10.0",
     "electron-debug": "^2.0.0",
     "electron-log": "^2.2.16",
-    "jquery": "3.3.1"
+    "jquery": "3.3.1",
+    "electron-tabs": "^0.9.4"
   },
   "build": {
     "appId": "io.samos.storage",
@@ -74,8 +74,8 @@
       "target": "nsis",
       "extraFiles": [
         {
-          "from": "../client/dist/${os}-${arch}/nebula-client.exe",
-          "to": "./resources/app/"
+          "from": "dist/client-${os}-4.0-${arch}.exe",
+          "to": "./resources/app/nebula-client.exe"
         }
       ]
     },
