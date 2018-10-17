@@ -40,10 +40,12 @@ type ProviderService struct {
 	nodeIdHash         []byte
 	providerDb         *leveldb.DB
 	taskGetting        gosync.Mutex
+	blocksVerifying    gosync.Mutex
 	replicateChan      chan *ttpb.Task
 	sendChan           chan *ttpb.Task
 	removeAndProveChan chan *ttpb.Task
 	closeSignal        []chan bool
+	shutdownSignal     chan bool
 	waitClose          sync.WaitGroup
 	taskConnection     *grpc.ClientConn
 	ptsc               ttpb.ProviderTaskServiceClient
@@ -585,6 +587,8 @@ func (self *ProviderService) CheckAvailable(ctx context.Context, req *pb.CheckAv
 
 func (self *ProviderService) initTaskProcessor(taskServer string, private bool) {
 	self.taskGetting = gosync.NewMutex()
+	self.blocksVerifying = gosync.NewMutex()
+	self.shutdownSignal = make(chan bool, 1)
 	self.replicateChan = make(chan *ttpb.Task, 320)
 	self.sendChan = make(chan *ttpb.Task, 320)
 	self.removeAndProveChan = make(chan *ttpb.Task, 320)
@@ -622,6 +626,7 @@ func (self *ProviderService) initTaskProcessor(taskServer string, private bool) 
 
 func (self *ProviderService) CloseTaskProcessor() {
 	defer self.taskConnection.Close()
+	self.shutdownSignal <- true
 	for _, closeSig := range self.closeSignal {
 		closeSig <- true
 	}
@@ -1060,4 +1065,79 @@ func testPing(oppositeInfo []*ttpb.OppositeInfo) []*OppositeProvider {
 	}
 	sort.Slice(result, func(i, j int) bool { return result[i].lantency < result[j].lantency })
 	return result
+}
+
+func (self *ProviderService) VerifyBlocks() {
+	if self.blocksVerifying.TryLock() {
+		defer self.blocksVerifying.UnLock()
+	} else {
+		return
+	}
+	query := true
+	var previous, last uint64
+	var miss, blocks []*ttpb.HashAndSize
+	var hasNext, respHasNext bool
+	var err error
+	for {
+	retry:
+		for i := 1; i < 4; i++ {
+			select {
+			case <-self.shutdownSignal:
+				return
+			default:
+				last, blocks, respHasNext, err = task_client.VerifyBlocks(self.ptsc, query, previous, miss)
+				// fmt.Printf("i: %d, req query: %t, previous: %d, miss count: %d, resp last: %d, blocks count: %d, respHasNext: %t, err: %s\n", i, query, previous, len(miss), last, len(blocks), respHasNext, err)
+				if err != nil {
+					fmt.Printf("verifyBlocks %d times get data from task server error: %s\n", i, err)
+				} else {
+					previous = last
+					hasNext = respHasNext
+					break retry
+				}
+			}
+		}
+		if err != nil {
+			fmt.Printf("verifyBlocks reach the maximum number of retries and terminate\n")
+			return
+		}
+		if !hasNext {
+			query = false
+		}
+		if len(blocks) == 0 {
+			fmt.Printf("VerifyBlocks finished, last: %d, previous miss: %d, current timestamp: %d\n", previous, len(miss), time.Now().Unix())
+			return
+		} else {
+			fmt.Printf("VerifyBlocks get %d blocks, last: %d, previous miss: %d, current timestamp: %d\n", len(blocks), previous, len(miss), time.Now().Unix())
+		}
+		miss = make([]*ttpb.HashAndSize, 0, 32)
+		for _, block := range blocks {
+			select {
+			case <-self.shutdownSignal:
+				return
+			default:
+				if !self.verifyBlock(block.Hash, block.Size) {
+					miss = append(miss, block)
+				}
+			}
+		}
+	}
+}
+
+func (self *ProviderService) verifyBlock(hash []byte, size uint64) bool {
+	found, smallFile, storageIdx, subPath := self.querySubPath(hash)
+	if !found {
+		return false
+	}
+	if smallFile {
+		storage := config.GetStorage(storageIdx)
+		if storage == nil {
+			return false
+		}
+		data, err := storage.SmallFileDb.Get(hash, nil)
+		return err == nil && len(data) > 0 && bytes.Equal(hash, util_hash.Sha1(data))
+	} else {
+		path := config.GetStoragePath(storageIdx, subPath)
+		sum, err := util_hash.Sha1File(path)
+		return err == nil && len(sum) > 0 && bytes.Equal(hash, sum)
+	}
 }

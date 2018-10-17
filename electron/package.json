@@ -1,5 +1,5 @@
 {
-  "name": "samos-me",
+  "name": "Samos-me",
   "version": "0.8.0",
   "description": "Samos nebula storage client",
   "main": "electron-main.js",
@@ -24,7 +24,8 @@
     "electron-context-menu": "^0.10.0",
     "electron-updater": "^3.1.1",
     "electron-builder": "20.27.1",
-    "jquery": "3.3.1"
+    "jquery": "3.3.1",
+    "electron-tabs": "0.9.4"
   },
   "dependencies": {
     "electron-context-menu": "^0.10.0",
@@ -34,6 +35,8 @@
   },
   "build": {
     "appId": "io.samos.storage",
+    "asar": true,
+    "asarUnpack": ["**/node_modules/sharp/**/*"],
     "publish": [
       {
         "provider": "generic",
@@ -41,26 +44,40 @@
       }
     ],
     "nsis": {
-        "oneClick": false,
-        "allowToChangeInstallationDirectory": true
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
     },
+   
+
     "mac": {
-        "category": "public.app-category.productivity",
-        "extraFiles": [
-            {
-                "from": "../client/dist/${os}-${arch}/nebula-client",
-                "to": "./Resources/app/"
-            }
-        ]
+      "category": "public.app-category.productivity",
+      "extraFiles": [
+        {
+          "from": "../client/dist/${os}-${arch}/nebula-client",
+          "to": "./Resources/app/"
+        }
+      ],
+      "extraResources": [
+        {
+          "from": "/usr/local/opt/pbc/lib/",
+          "to": "./app/lib/",
+          "filter": ["**/*"]
+        },
+        {
+          "from": "/usr/local/opt/gmp/lib/",
+          "to": "./app/lib/",
+          "filter": ["**/*"]
+        }
+      ]
     },
     "win": {
-        "target": "nsis",
-        "extraFiles": [
-            {
-                "from": "../client/dist/${os}-${arch}/nebula-client.exe",
-                "to": "./resources/app/"
-            }
-        ]
+      "target": "nsis",
+      "extraFiles": [
+        {
+          "from": "../client/dist/${os}-${arch}/nebula-client.exe",
+          "to": "./resources/app/"
+        }
+      ]
     },
     "linux": {
       "category": "Network",

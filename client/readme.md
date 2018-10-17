@@ -20,6 +20,7 @@ Index
 | [/api/v1/task/download](#apiv1taskdownload-post)                                   | POST      |
 | [/api/v1/task/downloaddir](#apiv1taskdownloaddir-post)                                   | POST      |
 | [/api/v1/task/status](#apiv1taskstatus-post)                                   | POST      |
+| [/api/v1/task/delete](#apiv1taskdelete-post)                                   | POST      |
 | [/api/v1/package/all](#apiv1packageall-get)                             | GET |
 | [/api/v1/package](#apiv1package-get)                             | GET |
 | [/api/v1/package/buy](#apiv1packagebuy-post)                             | POST|
@@ -488,6 +489,45 @@ curl -X POST -H "Content-Type:application/json" -d '{"task_id":"client-task:7"}'
     "errmsg": "",
     "code": 0,
     "Data": "done"
+}
+```
+
+## /api/v1/task/delete [POST]
+
+```
+URI:/api/v1/task/delete
+Method: POST
+Request Body: {
+  "task_id":string
+  }
+```
+
+Example 
+
+```
+curl -X POST -H "Content-Type:application/json" -d '{"task_id":"client-task:92"}' http://127.0.0.1:7788/api/v1/task/delete
+{
+    "errmsg": "",
+    "code": 0,
+    "Data": {
+        "Key": "client-task:92",
+        "Status": 0,
+        "Task": {
+            "type": "UploadFile",
+            "payload": {
+                "dest_dir": "/tmp",
+                "filename": "/root/test125/file.bigbig",
+                "interactive": false,
+                "is_encrypt": true,
+                "newversion": false,
+                "space_no": 0
+            }
+        },
+        "UpdatedAt": 1539525525,
+        "Seq": 92,
+        "Deleted": true,
+        "Err": ""
+    }
 }
 ```
 ## /order/packages [GET]

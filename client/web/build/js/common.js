@@ -321,6 +321,8 @@ function append(res,path,space_no,apd){
         }else{
              a = obj.extension;
         }
+        console.log(obj)
+        console.log("ext:"+a);
         let k = obj.filesize; 
         let no = '';                          //文件大小
         if(k&&k<1024){
@@ -1506,15 +1508,15 @@ websocket.onmessage = function (evt) {
 websocket.onerror = function (evt) {
     //产生异常
     console.log(evt);
-    if(evt){
-        var r=confirm("Sorry,An error in the system requires a reboot!");
-        if (r==true){
-            const {ipcRenderer} = require('electron'); 
-            ipcRenderer.send('close');
-        }else{
-            alert("You pressed Cancel! Please restart!");
-        }
-    }
+    // if(evt){
+    //     var r=confirm("Sorry,An error in the system requires a reboot!");
+    //     if (r==true){
+    //         const {ipcRenderer} = require('electron'); 
+    //         ipcRenderer.send('close');
+    //     }else{
+    //         alert("You pressed Cancel! Please restart!");
+    //     }
+    // }
 }; 
 
 

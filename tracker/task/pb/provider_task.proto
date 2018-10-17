@@ -12,6 +12,8 @@ service ProviderTaskService {
     rpc FinishProve(FinishProveReq)returns(FinishProveResp){}
 
     rpc FinishTask(FinishTaskReq)returns(FinishTaskResp){}
+
+    rpc VerifyBlocks(VerifyBlocksReq)returns(VerifyBlocksResp){}
 }
 
 
@@ -106,4 +108,26 @@ message FinishTaskReq{
 }
 
 message FinishTaskResp{
+}
+
+message HashAndSize{
+    bytes hash=1;
+    uint64 size=2;
+}
+
+message VerifyBlocksReq{
+    uint32 version=1;
+    bytes nodeId=2;
+    uint64 timestamp=3;
+    bytes sign=4;
+    bool query=5;
+    uint64 previous=6;
+    repeated HashAndSize miss=7;
+    
+}
+
+message VerifyBlocksResp{
+    uint64 last=1;
+    repeated HashAndSize blocks=2;
+    bool hasNext=3;
 }

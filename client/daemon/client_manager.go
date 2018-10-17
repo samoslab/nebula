@@ -260,7 +260,7 @@ func (c *ClientManager) ExecuteTask() error {
 	log.Info("Start task goroutine, handle unfinished task first")
 	// unfinished task
 	unhandleTasks, err := c.store.GetTaskArray(func(rwd TaskInfo) bool {
-		return rwd.Status == StatusGotTask
+		return rwd.Status == StatusGotTask && rwd.Deleted == false
 	})
 	if err != nil {
 		log.WithError(err).Error("Get unhandle task failed")
@@ -547,21 +547,21 @@ func (c *ClientManager) UploadDir(parent, dest string, interactive, newVersion, 
 			return fmt.Errorf("Password not set")
 		}
 	}
-	log.Debugf("Upload dirs %+v", dirs)
+	log.Infof("Upload dirs %+v", dirs)
 	newDirs := dirAdjust(dirs, parent, dest, runtime.GOOS)
-	log.Debugf("New upload dirs %+v", newDirs)
+	log.Infof("New upload dirs %+v", newDirs)
 	errArr := []error{}
 	var mutex sync.Mutex
 	ccControl := NewCCController(common.CCUploadFileNum)
 	for _, dpair := range newDirs {
 		if dpair.Folder {
-			log.Debugf("Mkfolder %+v", dpair)
+			log.Infof("Mkfolder %+v", dpair)
 			_, err := c.MkFolder(dpair.Parent, []string{dpair.Name}, interactive, sno)
 			if err != nil {
 				return err
 			}
 		} else {
-			log.Debugf("Upload file %+v", dpair)
+			log.Infof("Upload file %+v", dpair)
 			ccControl.Add()
 			go func(dpair DirPair) {
 				done := make(chan struct{})
@@ -747,7 +747,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 			})
 			log.Infof("File %s need split to %d blocks", fname, len(fileSlices))
 			for _, fs := range fileSlices {
-				log.Debugf("Erasure block files %s index %d", fs.FileName, fs.SliceIndex)
+				log.Infof("Erasure block files %s index %d", fs.FileName, fs.SliceIndex)
 				c.PM.SetPartitionMap(fs.FileName, uniqKey)
 				realSizeAfterRS += fs.FileSize
 			}
@@ -791,7 +791,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 		for i, part := range rspPartitions {
 			auth := part.GetProviderAuth()
 			for _, pa := range auth {
-				log.Debugf("Partition %d, %s:%d %v hashauth %d", i, pa.Server, pa.Port, pa.Spare, len(pa.HashAuth))
+				log.Infof("Partition %d, %s:%d %v hashauth %d", i, pa.Server, pa.Port, pa.Spare, len(pa.HashAuth))
 			}
 		}
 
@@ -801,7 +801,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 			if err != nil {
 				return err
 			}
-			log.Debugf("Partition %d has %d store blocks", i, len(partition.GetBlock()))
+			log.Infof("Partition %d has %d store blocks", i, len(partition.GetBlock()))
 			partitions = append(partitions, partition)
 		}
 		log.Infof("There are %d store partitions", len(partitions))
@@ -831,11 +831,11 @@ func (c *ClientManager) createUploadPrepareRequest(req *mpb.CheckFileExistReq, p
 				Size: uint32(slice.FileSize),
 			}
 			phslist = append(phslist, phs)
-			log.Debugf("%s %dth piece", slice.FileName, j)
+			log.Infof("%s %dth piece", slice.FileName, j)
 			block++
 		}
 		ufpr.Partition[i] = &mpb.SplitPartition{phslist}
-		log.Debugf("%s is %dth partitions", partInfo.FileName, i)
+		log.Infof("%s is %dth partitions", partInfo.FileName, i)
 	}
 	log.Infof("upload request has %d partitions, %d pieces", len(ufpr.Partition), block)
 	if err := ufpr.SignReq(c.cfg.Node.PriKey); err != nil {
@@ -846,7 +846,7 @@ func (c *ClientManager) createUploadPrepareRequest(req *mpb.CheckFileExistReq, p
 }
 
 func deleteTemporaryFile(log logrus.FieldLogger, fileName string) {
-	log.Debugf("delete file %s", fileName)
+	log.Infof("delete file %s", fileName)
 	if err := os.Remove(fileName); err != nil {
 		log.Errorf("delete %s failed, error %v", fileName, err)
 	}
@@ -1003,15 +1003,14 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 	partition := &mpb.StorePartition{}
 	partition.Block = []*mpb.StoreBlock{}
 	phas := rspPartition.GetProviderAuth()
-	providers, err := UsingBestProvider(phas)
-	if err != nil {
-		return nil, err
-	}
+	providers, backupPros := UsingBestProvider(phas)
+
+	backupProMap := CreateBackupProvicer(backupPros)
 
 	var errResult []error
 	var mutex sync.Mutex
 	ccControl := NewCCController(common.CCUploadGoNum)
-	for i, pro := range providers {
+	for i, sortPro := range providers {
 		checksum := i >= dataShards
 		uploadParas := &common.UploadParameter{
 			Checksum:       checksum,
@@ -1021,13 +1020,33 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 		}
 		ccControl.Add()
 		go func(pro *mpb.BlockProviderAuth, tm uint64, uploadPara *common.UploadParameter, chunkSize uint32) {
+			log := log.WithField("provider", fmt.Sprintf("%s:%d", pro.Server, pro.Port))
 			done := make(chan struct{})
 			go HandleQuit(c.quit, done, ccControl)
 			defer func() {
 				close(done)
 				ccControl.Done()
 			}()
-			block, err := c.uploadFileToErasureProvider(pro, tm, uploadParas, chunkSize)
+			var block *mpb.StoreBlock
+			var err error
+			for {
+				block, err = c.uploadFileToErasureProvider(pro, tm, uploadParas, chunkSize)
+				if err != nil {
+					mutex.Lock()
+					newPro := ChooseBackupProvicer(pro.HashAuth[0].Hash, backupProMap)
+					mutex.Unlock()
+					if newPro != nil {
+						log.Infof("Choose provider success new %s:%d", newPro.Pro.Server, newPro.Pro.Port)
+						pro = newPro.Pro
+					} else {
+						log.Info("Choose provider failed")
+						break
+					}
+				} else {
+					break
+				}
+			}
+
 			mutex.Lock()
 			defer mutex.Unlock()
 			if err != nil {
@@ -1036,7 +1055,7 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 				return
 			}
 			partition.Block = append(partition.Block, block)
-		}(pro, rspPartition.GetTimestamp(), uploadParas, chunkSize)
+		}(sortPro.Pro, rspPartition.GetTimestamp(), uploadParas, chunkSize)
 	}
 	ccControl.Wait()
 	if len(errResult) != 0 {
@@ -1060,43 +1079,17 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 	var paraStr string
 	var generator, pubKey, random []byte
 	var phi [][]byte
-	errRes := make(chan error)
-	done := make(chan struct{})
-	taskNum := 1
 	if chunkSize > 0 {
-		taskNum++
-		go func() {
-			paraStr, generator, pubKey, random, phi, err = filecheck.GenMetadata(uploadPara.HF.FileName, chunkSize)
-			if err != nil {
-				errRes <- err
-			} else {
-				done <- struct{}{}
-			}
-		}()
+		paraStr, generator, pubKey, random, phi, err = filecheck.GenMetadata(uploadPara.HF.FileName, chunkSize)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	go func() {
-		ha := pro.GetHashAuth()[0]
-		err = client.StorePiece(log, pclient, uploadPara, ha.GetAuth(), ha.GetTicket(), tm, c.PM)
-		if err != nil {
-			errRes <- err
-		} else {
-			done <- struct{}{}
-		}
-	}()
-
-	doneNum := 0
-
-	for doneNum < taskNum {
-		select {
-		case err := <-errRes:
-			log.Errorf("upload failed %v", err)
-			time.Sleep(time.Second)
-			return nil, err
-		case <-done:
-			doneNum++
-			log.Infof("doneNum %d,  taskNUm %d", doneNum, taskNum)
-		}
+	ha := pro.GetHashAuth()[0]
+	err = client.StorePiece(log, pclient, uploadPara, ha.GetAuth(), ha.GetTicket(), tm, c.PM)
+	if err != nil {
+		return nil, err
 	}
 
 	block := &mpb.StoreBlock{
@@ -1113,7 +1106,7 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 		Phi:         phi,
 	}
 	block.StoreNodeId = append(block.StoreNodeId, []byte(pro.GetNodeId()))
-	log.Debugf("Upload to provider success")
+	log.Infof("Upload to provider success")
 
 	return block, nil
 }
@@ -1124,7 +1117,7 @@ func (c *ClientManager) uploadFileToReplicaProvider(conn *grpc.ClientConn, pro *
 	log := c.Log.WithField("uploading", fileInfo.FileName).WithField("provider", server)
 	uploadPara.Provider = server
 	pclient := pb.NewProviderServiceClient(conn)
-	log.Debugf("Upload file hash %x size %d", fileInfo.FileHash, fileInfo.FileSize)
+	log.Infof("Upload file hash %x size %d", fileInfo.FileHash, fileInfo.FileSize)
 
 	err := client.StorePiece(log, pclient, uploadPara, pro.Auth, pro.Ticket, pro.Timestamp, c.PM)
 	if err != nil {
@@ -1637,11 +1630,21 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 	log.Info("This is erasure file")
 	// for progress stats
 	realSizeAfterRS := uint64(0)
+	for _, partition := range partitions {
+		for j, block := range partition.GetBlock() {
+			for _, sn := range block.GetStoreNode() {
+				fmt.Printf("block %d hash %x seq %d provider %s:%d\n", j, block.Hash, block.BlockSeq, sn.Server, sn.Port)
+			}
+		}
+	}
 	for i, partition := range partitions {
 		for j, block := range partition.GetBlock() {
 			c.PM.SetPartitionMap(hex.EncodeToString(block.GetHash()), common.ProgressKey(serverFile, sno))
 			realSizeAfterRS += block.GetSize()
 			log.Infof("Partition %d block %d hash %x size %d checksum %v seq %d", i, j, block.Hash, block.Size, block.Checksum, block.BlockSeq)
+			for _, sn := range block.GetStoreNode() {
+				log.Infof("block %d hash %x seq %d provider %s:%d", j, block.Hash, block.BlockSeq, sn.Server, sn.Port)
+			}
 		}
 	}
 	c.PM.SetProgress(common.TaskDownloadProgressType, common.ProgressKey(serverFile, sno), 0, realSizeAfterRS, sno, downFileName)
@@ -2011,4 +2014,13 @@ func (c *ClientManager) TaskStatus(taskID string) (string, error) {
 		return "", errors.New(taskInfo.Err)
 	}
 	return taskInfo.Status.String(), nil
+}
+
+// TaskDelete get task status
+func (c *ClientManager) TaskDelete(taskID string) (TaskInfo, error) {
+	return c.store.UpdateTaskInfo(taskID, func(rs TaskInfo) TaskInfo {
+		rs.UpdatedAt = common.Now()
+		rs.Deleted = true
+		return rs
+	})
 }
