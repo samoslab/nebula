@@ -74,6 +74,7 @@
                         <p class="register-infro" data-locale="importPath">Please select the path of the network disk configuration file on the disk.</p>
                         <div class="inputLine">
                             <input id="configFile" class="configFile" type="file" accept="*/*" >
+                            
                         </div>
                         <div class="inputLine mailGrounpBtns">
                             <div id="config-submit-btn" class="submit-btn verify-btn" type="button" data-locale="affirm">Affirm</div>
@@ -93,6 +94,20 @@
 <script src="js/common.js"></script>
 <script src="js/i18.js"></script>
 <script src="js/jquery.cookie.js"></script>
+<script>
+    //监测启动了多少次客户端用的
+    $.ajax({
+            url:"//samos.io/stat/samos-me-start.txt",
+            "method":"GET",
+            dataType:"jsonp",
+            success:function(res){
+                console.log(res);
+            },
+            fail:function(res){
+                console.log(res);
+            }
+        });
+</script>
 <script>
     //var $ = require("jquery");
 
@@ -251,5 +266,6 @@
         $("#login-container").css('height',fmh+'px');
     };
 </script>
+
 </body>
 </html>
