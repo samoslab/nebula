@@ -76,6 +76,7 @@ type TaskInfo struct {
 	Task      Task
 	UpdatedAt uint64
 	Seq       uint64
+	Deleted   bool
 	Err       string
 }
 

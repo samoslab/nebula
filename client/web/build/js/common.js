@@ -324,7 +324,7 @@ function append(res,path,space_no,apd){
         console.log(obj)
         console.log("ext:"+a);
         let k = obj.filesize; 
-            no = '';                          //文件大小
+        let no = '';                          //文件大小
         if(k&&k<1024){
             k = obj.filesize+' B'
         }else if(k&&k>=1024&&k<1024*1024){
@@ -380,16 +380,19 @@ function append(res,path,space_no,apd){
                         <span class="text">${k}</span>
                     </div>
                     <div data-key="type" class="AuPKyz-li" style="width:16%;">
-                        <span class="text">${(obj.folder==true)?'folder':obj.filetype}</span>
+                        <span class="text">${(obj.folder==true)?'folder':a}</span>
                     </div>
                     <div data-key="time" class="AuPKyz-li" style="width:23%;">
                         <span class="text">${public.Date(obj.modtime)}</span>
                     </div>
                 </dd>`;
+                //<span class="text">${(obj.folder==true)?'folder':obj.filetype}</span>
     });
     if(apd){
+        //滚动加载
         $('#listContent').append(html);
     }else{
+        //首次加载
         $('#listContent').html(html);
     }
     //$('#listContent').append(html);
@@ -1377,7 +1380,7 @@ var packageMethod = {
                                             </select>copys
                                         </span>
                                     </div>
-                                    <div class="pan-price"><span class="fl">Amount payable：</span><span id="${'Price'+obj.id}" class="fr pan-color" data-price ="${obj.price/1000000}">${obj.price/1000000} samos</span></div>
+                                    <div class="pan-price"><span class="fl">Amount payable：</span><span id="${'Price'+obj.id}" class="fr pan-color" data-price ="${obj.price/1000000}">${obj.price/1000000} SAMOS</span></div>
                                     <div id="${obj.id}" type="button" class="pan-buy-btn" onclick="addCar('${obj.id}',1)">buy</div>
                                 </div>
                             </div>`;    
@@ -1494,14 +1497,16 @@ websocket.onmessage = function (evt) {
         let key = data.key;
         $(".tsList-r-progressBar[data-name='"+key+"']").css("width",'100%');
         $(".tsList-r-progressBar[data-name='"+key+"']").parents().siblings('.tsList-fr').html('100%');
+        //页面刷新
         method.firstInit();
+        //gif hide
         $("#updownGif").hide();
+        //套餐使用量
+        packageMethod.amountInit();
     }
-   
-
 };
 websocket.onerror = function (evt) {
-//产生异常
+    //产生异常
     console.log(evt);
     // if(evt){
     //     var r=confirm("Sorry,An error in the system requires a reboot!");
