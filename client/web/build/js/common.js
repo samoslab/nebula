@@ -321,8 +321,8 @@ function append(res,path,space_no,apd){
         }else{
              a = obj.extension;
         }
-        console.log(obj)
-        console.log("ext:"+a);
+        // console.log(obj)
+        // console.log("ext:"+a);
         let k = obj.filesize; 
         let no = '';                          //文件大小
         if(k&&k<1024){

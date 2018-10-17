@@ -266,6 +266,33 @@
         $("#login-container").css('height',fmh+'px');
     };
 </script>
-
+<script>
+        const TabGroup = require("electron-tabs");
+        console.log(TabGroup);
+        let tabGroup = new TabGroup();
+        let tab = tabGroup.addTab({
+            title: "Dashboard",
+            src: "http://www.baidu.com",
+            visible: true,
+            closable: false,
+            active: true,
+            webviewAttributes:{
+                nodeintegration: true
+            }
+        });
+        tab.webview.addEventListener('ipc-message', (event) => {
+            console.log(event.channel)
+            var o = JSON.parse(event.channel);
+            addTab(o)
+        });
+        function addTab(arg){
+            tabGroup.addTab({
+                title: arg.title || "",
+                src: arg.src,
+                visible: true,
+                active: true
+            });
+        }
+    </script>      
 </body>
 </html>

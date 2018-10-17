@@ -25,7 +25,34 @@
                 <dt class="EHazOI">
                     <a href="javascript:;" target="_blank" title="samos"></a>
                 </dt>
-              
+
+                <div class="alert-warning" onclick="onAdd(1)"><a>Wallet</a></div>
+                <script>
+                    const {ipcRenderer} = require('electron');
+                    var arr = [
+                        {
+                        title: "NetDisk",
+                        src: 'http://www.baidu.com'  
+                        },
+                        {
+                        title: "Wallet",
+                        src: "http://www.sogou.com"  
+                        }
+                    ]
+                    function onAdd(idx){
+                        ipcRenderer.sendToHost(JSON.stringify(arr[idx])) 
+                
+                        //alert(ipcRenderer.sendToHost)
+                        //ipc.send("addTab", aSrc);
+                        //ipcRenderer.send('tabGroup',JSON.stringify(arr[idx]));
+                    }
+
+
+                    
+                   
+                </script>
+
+
                 <dd class="languageBox">
                     <a href="javascript:changeLang('index', 'zh_CN');" class="s-cnen" id="changeToCn">CN</a>
                     <a href="javascript:changeLang('index', 'en');" class="s-cnen" id="changeToEn"  style="display:none;">EN</a>
