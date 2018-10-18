@@ -117,7 +117,7 @@
       },
       {
         "from": "../../samos/src/gui/static/dist",
-        "to": "./src/gui/static/dist",
+        "to": "./app/src/gui/static/dist",
         "filter": [
           "**/*"
         ]

@@ -116,27 +116,28 @@ function startNebula() {
     exe = (() => {
       switch (process.platform) {
         case 'darwin':
-          return path.join(path.dirname(appPath), '../../../../../../../client/nebula-client');
+          return path.join(path.dirname(appPath), '../../../../../../../client/');
         case 'win32':
           // Use only the relative path on windows due to short path length
           // limits
-          return '../client/nebula-client.exe';
+          return '../client/';
         case 'linux':
-          return path.join(path.dirname(appPath), '../../../../client/nebula-client');
+          return path.join(path.dirname(appPath), '../../../../client/');
         default:
-          return './resources/app/nebula-client';
+          return './resources/app/';
       }
     })()
   }
 
   var args = [
     '--launch-browser=false',
-    '--webdir=' + path.dirname(exe) + '/web/build',
+    '--webdir=' + exe + '/web/build',
     '--server=127.0.0.1:' + mePort,
     '--collect=collector.store.samos.io:6688',
     '--tracker=tracker.store.samos.io:6677'
   ]
-  nebula = childProcess.spawn(exe, args);
+
+  nebula = childProcess.spawn(exe+'nebula-client', args);
 
   nebula.on('error', (e) => {
     dialog.showErrorBox('Failed to start nebula', e.toString());
