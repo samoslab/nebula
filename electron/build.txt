@@ -1,10 +1,20 @@
 please use command cd to change current path to electron directory first.
 
 dev mode:
+linux and mac:
 cd ../../samos/src/gui/static/&& yarn install &&yarn run build&&cd -
 go build -o ../../samos/wallet ../../samos/cmd/samos/samos.go
 go build -o ../client/nebula-client ../client/main.go
 yarn run start
+
+
+windows:
+cd ../../samos/src/gui/static/&& cnpm install &&cnpm run build&&cd -
+go build -o ../../samos/wallet.exe ../../samos/cmd/samos/samos.go
+docker build -t xgo-sliver:latest xgo-sliver
+xgo -dest dist -v -x -image='xgo-sliver' -branch=develop -deps='https://ftp.gnu.org/gnu/gmp/gmp-6.1.2.tar.bz2 https://crypto.stanford.edu/pbc/files/pbc-0.5.14.tar.gz' -targets=windows/amd64 github.com/samoslab/nebula/client
+mv dist/client-windows-4.0-amd64.exe ../client/nebula-client
+cnpm start
 
 
 
