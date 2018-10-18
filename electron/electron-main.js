@@ -20,10 +20,13 @@ require('electron-context-menu')({});
 
 global.eval = function () { throw new Error('bad!!'); }
 
-let port = 8641;
-let defaultURL = 'http://127.0.0.1:' + port + '/start.html';
+let walletPort = 8640;
+let mePort = 8641;
+
+let defaultURL = 'http://127.0.0.1:' + mePort + '/start.html';
 global.sharedObject = {
-  mePort: port
+  walletPort:walletPort,
+  mePort: mePort
 }
 // let defaultURL;
 // let filemanageURL;
@@ -69,63 +72,71 @@ let win;
  // Resolve binary location
 var appPath = app.getPath('exe');
 var exe;
- if (!devMod) {
-   exe = (() => {
-     switch (process.platform) {
-       case 'darwin':
-         return path.join(appPath, '../../Resources/app/');
-       case 'win32':
-         // Use only the relative path on windows due to short path length
-         // limits
-         return './resources/app/';
-       case 'linux':
-         return path.join(path.dirname(appPath), './resources/app/');
-       default:
-         return './resources/app/';
-     }
-   })()
- }
+if (!devMod) {
+  exe = (() => {
+    switch (process.platform) {
+      case 'darwin':
+        return path.join(appPath, '../../Resources/app/');
+      case 'win32':
+        // Use only the relative path on windows due to short path length
+        // limits
+        return './resources/app/';
+      case 'linux':
+        return path.join(path.dirname(appPath), './resources/app/');
+      default:
+        return './resources/app/';
+    }
+  })()
+}
  
 var nebula = null;
 var wallet = null;
+var nebulaStarted = false;
+var walletStarted = false;
+
 
 function startNebula() {
   console.log('Starting nebula from electron');
   console.log("PATH:"+process.env.DYLD_LIBRARY_PATH)
+
   if (nebula) {
-    console.log('Nebula already running');
-    app.emit('nebula-ready');
+    console.log('nebula already running');
+    // if(wallet){
+    //   app.emit('all-ready');
+    // }
     return
   }
+
   var reset = () => {
     nebula = null;
   }
 
+  // Resolve nebula-client binary location
   if (devMod) {
     exe = (() => {
       switch (process.platform) {
         case 'darwin':
-          return path.join(path.dirname(appPath), '../../../../../../../client/');
+          return path.join(path.dirname(appPath), '../../../../../../../client/nebula-client');
         case 'win32':
           // Use only the relative path on windows due to short path length
           // limits
-          return '../client/';
+          return '../client/nebula-client.exe';
         case 'linux':
-          return path.join(path.dirname(appPath), '../../../../client/');
+          return path.join(path.dirname(appPath), '../../../../client/nebula-client');
         default:
-          return './resources/app/';
+          return './resources/app/nebula-client';
       }
     })()
   }
- 
+
   var args = [
     '--launch-browser=false',
-    '--webdir=' + exe + 'web/build',
-    '--server=127.0.0.1:' + port,
+    '--webdir=' + path.dirname(exe) + '/web/build',
+    '--server=127.0.0.1:' + mePort,
     '--collect=collector.store.samos.io:6688',
     '--tracker=tracker.store.samos.io:6677'
   ]
-  nebula = childProcess.spawn(exe+"nebula-client", args);
+  nebula = childProcess.spawn(exe, args);
 
   nebula.on('error', (e) => {
     dialog.showErrorBox('Failed to start nebula', e.toString());
@@ -133,7 +144,7 @@ function startNebula() {
   });
 
   nebula.stdout.on('data', (data) => {
-    console.log(data.toString());
+    // console.log(data.toString());
     // Scan for the web URL string
     if (currentURL) {
       return
@@ -143,8 +154,12 @@ function startNebula() {
     if (i === -1) {
       return
     }
-    currentURL = defaultURL;
-    app.emit('nebula-ready', { url: currentURL });
+    nebulaStarted=true;
+    if(walletStarted){
+      currentURL = defaultURL;
+      app.emit('all-ready', { url: currentURL });
+    }
+    console.log(data.toString());
   });
 
   nebula.stderr.on('data', (data) => {
@@ -167,7 +182,9 @@ function startWallet() {
   console.log('Starting wallet from electron');
   if (wallet) {
     console.log('wallet already running');
-    app.emit('wallet-ready');
+    // if(nebula){
+    //   app.emit('all-ready');
+    // }
     return
   }
   var reset = () => {
@@ -203,7 +220,6 @@ function startWallet() {
     // broken (automatically generated certs do not work):
     // '-web-interface-https=true',
   ]
-  // const childProcess2 = require('child_process');
   wallet = childProcess.spawn(exe+"wallet", args);
 
   wallet.on('error', (e) => {
@@ -212,9 +228,22 @@ function startWallet() {
     app.quit();
   });
 
-  // wallet.stdout.on('data', function (data) {
+  wallet.stdout.on('data', function (data) {
+    if (currentURL) {
+      return
+    }
+    const marker = 'Starting web interface on ';
+    var i = data.indexOf(marker);
+    if (i === -1) {
+      return
+    }
+    walletStarted=true;
+    if(nebulaStarted){
+      currentURL = defaultURL;
+      app.emit('all-ready', { url: currentURL });
+    }
     // console.log(data.toString());
-  // });
+  });
 
   wallet.stderr.on('data', (data) => {
     console.log(data.toString());
@@ -335,15 +364,12 @@ if (alreadyRunning) {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-
-
 app.on('ready', function(){
-  startNebula();
   startWallet();
-  
+  startNebula();
 });
 
-app.on('nebula-ready', (e) => {
+app.on('all-ready', (e) => {
   createWindow(e.url);
 });
 
@@ -380,7 +406,3 @@ const {shell} = require('electron')
 ipcMain.on('explorer', (event,code) => {
   shell.openExternal("http://explorer.samos.io/app/address/"+code+"/1")
 }); 
-  
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.

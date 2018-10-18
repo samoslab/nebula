@@ -155,8 +155,11 @@
         render:function(){
             console.log(localStorage.verifyemail);
             if(localStorage.verifyemail=='false')return;
-            const {ipcRenderer} = require('electron')
-            ipcRenderer.send('filemanage') 
+            // const {ipcRenderer} = require('electron');
+            // ipcRenderer.send('filemanage'); 
+        //    const {ipcRenderer} = require('electron');
+        //    ipcRenderer.sendToHost('disk.html');
+            method.topage('disk.html');
         }
 
     };
@@ -265,7 +268,6 @@
         let fmh = $(window).height();
         $("#login-container").css('height',fmh+'px');
     };
-</script>
-
+</script>  
 </body>
 </html>
