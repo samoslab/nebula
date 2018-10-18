@@ -50,6 +50,7 @@
    
 
     "mac": {
+      "icon":"build/icon.icns",
       "category": "public.app-category.productivity",
       "extraFiles": [
         {
@@ -59,6 +60,10 @@
         {
           "from": "dist/wallet-${os}-${arch}",
           "to": "./Resources/app/wallet"
+        },
+        {
+          "from": "../assets/icon512x512.png",
+          "to": "./Resources/"
         }
       ],
       "extraResources": [
@@ -75,6 +80,7 @@
       ]
     },
     "win": {
+      "icon":"build/icon.ico",
       "target": "nsis",
       "extraFiles": [
         {
@@ -84,10 +90,15 @@
         {
           "from": "dist/wallet-${os}-${arch}.exe",
           "to": "./resources/app/wallet.exe"
+        },
+        {
+          "from": "../assets/icon512x512.png",
+          "to": "./resources/"
         }
       ]
     },
     "linux": {
+      "icon":"build/icons",
       "category": "Network",
       "target": [
         "AppImage"

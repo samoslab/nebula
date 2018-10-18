@@ -1,3 +1,5 @@
+please use command cd to change current path to electron directory first.
+
 dev mode:
 cd ../../samos/src/gui/static/&& yarn install &&yarn run build&&cd -
 go build -o ../../samos/wallet ../../samos/cmd/samos/samos.go
@@ -11,12 +13,10 @@ windows(cross compile):
 docker build -t xgo-sliver:latest xgo-sliver
 xgo -dest dist -v -x -image='xgo-sliver' -branch=develop -deps='https://ftp.gnu.org/gnu/gmp/gmp-6.1.2.tar.bz2 https://crypto.stanford.edu/pbc/files/pbc-0.5.14.tar.gz' -targets=windows/* github.com/samoslab/nebula/client
 cd ../../samos/src/gui/static/&& yarn install &&yarn run build&&cd -
-
 64bit:
 CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o dist/wallet-win-x64.exe ../../samos/cmd/samos/samos.go
 mv dist/client-windows-4.0-amd64.exe dist/client-win-4.0-x64.exe
 yarn run dist-win64
-
 32bit:
 CGO_ENABLED=0 GOOS=windows GOARCH=386 go build -o dist/wallet-win-ia32.exe ../../samos/cmd/samos/samos.go
 mv dist/client-windows-4.0-386.exe dist/client-win-4.0-ia32.exe

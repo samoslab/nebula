@@ -78,8 +78,7 @@ if (!devMod) {
       case 'darwin':
         return path.join(appPath, '../../Resources/app/');
       case 'win32':
-        // Use only the relative path on windows due to short path length
-        // limits
+        // Use only the relative path on windows due to short path length limits
         return './resources/app/';
       case 'linux':
         return path.join(path.dirname(appPath), './resources/app/');
@@ -118,13 +117,12 @@ function startNebula() {
         case 'darwin':
           return path.join(path.dirname(appPath), '../../../../../../../client/');
         case 'win32':
-          // Use only the relative path on windows due to short path length
-          // limits
+          // Use only the relative path on windows due to short path length limits
           return '../client/';
         case 'linux':
           return path.join(path.dirname(appPath), '../../../../client/');
         default:
-          return './resources/app/';
+        return '../client/';
       }
     })()
   }
@@ -197,13 +195,12 @@ function startWallet() {
         case 'darwin':
           return path.join(path.dirname(appPath), '../../../../../../../../samos/');
         case 'win32':
-          // Use only the relative path on windows due to short path length
-          // limits
+          // Use only the relative path on windows due to short path length limits
           return '../../samos/';
         case 'linux':
           return path.join(path.dirname(appPath), '../../../../../samos/');
         default:
-          return './resources/app/';
+        return '../../samos/';
       }
     })()
   } 
@@ -269,13 +266,28 @@ function createWindow(url) {
 
   // To fix appImage doesn't show icon in dock issue.
   var iconPath = (() => {
-    switch (process.platform) {
-      case 'linux':
-        if (!devMod) {
+    if (!devMod) {
+      switch (process.platform) {
+        case 'darwin':
+          return path.join(appPath, '../../Resources/icon512x512.png');
+        case 'win32':
+          return './resources/icon512x512.png';
+        case 'linux':
           return path.join(path.dirname(appPath), './resources/icon512x512.png');
-        }else{
+        default:
+          return './resources/icon512x512.png';
+      }
+    }else{
+      switch (process.platform) {
+        case 'darwin':
+          return path.join(path.dirname(appPath), '../../../../../../../assets/icon512x512.png');
+        case 'win32':
+          return '../assets/icon512x512.png';
+        case 'linux':
           return path.join(path.dirname(appPath), '../../../../assets/icon512x512.png');
-        }
+        default:
+          return '../assets/icon512x512.png';
+      }
     }
   })()
 
@@ -321,27 +333,27 @@ function createWindow(url) {
     e.preventDefault();
     require('electron').shell.openExternal(url);
   });
+  win.setMenu(null);
+  // // create application's main menu
+  // var template = [{
+  //   label: "Samos",
+  //   submenu: [
+  //     { label: "Quit", accelerator: "Command+Q", click: function () { app.quit(); } }
+  //   ]
+  // }, {
+  //   label: "Edit",
+  //   submenu: [
+  //     { label: "Undo", accelerator: "CmdOrCtrl+Z", selector: "undo:" },
+  //     { label: "Redo", accelerator: "Shift+CmdOrCtrl+Z", selector: "redo:" },
+  //     { type: "separator" },
+  //     { label: "Cut", accelerator: "CmdOrCtrl+X", selector: "cut:" },
+  //     { label: "Copy", accelerator: "CmdOrCtrl+C", selector: "copy:" },
+  //     { label: "Paste", accelerator: "CmdOrCtrl+V", selector: "paste:" },
+  //     { label: "Select All", accelerator: "CmdOrCtrl+A", selector: "selectAll:" }
+  //   ]
+  // }];
 
-  // create application's main menu
-  var template = [{
-    label: "Samos",
-    submenu: [
-      { label: "Quit", accelerator: "Command+Q", click: function () { app.quit(); } }
-    ]
-  }, {
-    label: "Edit",
-    submenu: [
-      { label: "Undo", accelerator: "CmdOrCtrl+Z", selector: "undo:" },
-      { label: "Redo", accelerator: "Shift+CmdOrCtrl+Z", selector: "redo:" },
-      { type: "separator" },
-      { label: "Cut", accelerator: "CmdOrCtrl+X", selector: "cut:" },
-      { label: "Copy", accelerator: "CmdOrCtrl+C", selector: "copy:" },
-      { label: "Paste", accelerator: "CmdOrCtrl+V", selector: "paste:" },
-      { label: "Select All", accelerator: "CmdOrCtrl+A", selector: "selectAll:" }
-    ]
-  }];
-
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+  // Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
 // Enforce single instance
