@@ -1,8 +1,12 @@
 //var refreshTransportTimer = null;
 var method = {
+     //页面跳转方法
+     topage:function(channel){
+        const {ipcRenderer} = require('electron');
+        ipcRenderer.sendToHost(channel);
+    },
      //判断是否注册过邮箱！
      login:function(){
-        const {ipcRenderer} = require('electron'); 
         $.ajax({
             url:"/api/v1/service/status",
             method:"GET",
@@ -10,7 +14,7 @@ var method = {
                 if(!res.status){
                    //没有注册过！跳到注册页
                    console.log(res);
-                   ipcRenderer.send('default');
+                this.topage('index.html');
                 }
             }
         })
@@ -263,9 +267,8 @@ function list(path,space_no,pagesize,pagenum,sorttype,ascorder,apd){
         success:function(res){
             console.log(res);
             if(res.code==400){
-                const {ipcRenderer} = require('electron'); 
-                      ipcRenderer.send('default');
-                      return;
+                this.topage('index.html'); 
+                return;
             }
             if(res.code!=0) {alert(res.errmsg);return;}
             //列表总数

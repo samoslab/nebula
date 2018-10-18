@@ -153,7 +153,6 @@
 
     <script>
         const TabGroup = require("electron-tabs");
-        //console.log(TabGroup);
         let tabGroup = new TabGroup();
         let tab1 = tabGroup.addTab({
             title: "NetDisk",
@@ -168,7 +167,7 @@
 
         let ta2 = tabGroup.addTab({
             title: "Wallet",
-            src: "http://127.0.0.1:8640/",
+            src: "http://127.0.0.1:8641/",
             visible: true,
             closable: false,
             active: false,
@@ -178,9 +177,10 @@
         });
         tab1.webview.addEventListener('ipc-message', (event) => {
             console.log(event.channel);
-            tab1.webview.loadURL(event.channel);
-      })
- 
+            tab1.webview.loadURL("http://127.0.0.1:7788/"+event.channel);
+      });
+
+      //打开调试工具方法 在console里 执行 tab1.webview.openDevTools();
     </script>      
 </body>
 </html>

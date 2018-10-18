@@ -157,14 +157,9 @@
             if(localStorage.verifyemail=='false')return;
             // const {ipcRenderer} = require('electron');
             // ipcRenderer.send('filemanage'); 
-
-           const {ipcRenderer} = require('electron');
-           ipcRenderer.sendToHost('http://127.0.0.1:7788/disk.html');
-
-            // let webview = tab.webview;
-            // webview.loadURL("./disk.html");
-
-
+        //    const {ipcRenderer} = require('electron');
+        //    ipcRenderer.sendToHost('disk.html');
+            method.topage('disk.html');
         }
 
     };
