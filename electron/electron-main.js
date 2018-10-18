@@ -10,7 +10,6 @@ const path = require('path');
 
 const childProcess = require('child_process');
 
-const cwd = require('process').cwd();
 
 // This adds refresh and devtools console keybindings
 // Page can refresh with cmd+r, ctrl+r, F5
@@ -21,10 +20,11 @@ require('electron-context-menu')({});
 
 global.eval = function () { throw new Error('bad!!'); }
 
-let port = 7788;
+let port = 8641;
 let defaultURL = 'http://127.0.0.1:' + port + '/start.html';
-let filemanageURL = 'http://127.0.0.1:' + port + '/disk.html';
-
+global.sharedObject = {
+  mePort: port
+}
 // let defaultURL;
 // let filemanageURL;
 // let port=7787;
@@ -67,8 +67,8 @@ process.env.DYLD_LIBRARY_PATH = env.DYLD_LIBRARY_PATH
 let win;
 
  // Resolve binary location
- var appPath = app.getPath('exe');
- var exe;
+var appPath = app.getPath('exe');
+var exe;
  if (!devMod) {
    exe = (() => {
      switch (process.platform) {
@@ -133,7 +133,7 @@ function startNebula() {
   });
 
   nebula.stdout.on('data', (data) => {
-    // console.log(data.toString());
+    console.log(data.toString());
     // Scan for the web URL string
     if (currentURL) {
       return
@@ -191,7 +191,7 @@ function startWallet() {
   } 
   var args = [
     '-launch-browser=false',
-    '-gui-dir=' + exe+"src/gui/static//",
+    '-gui-dir=' + exe+"src/gui/static/",
     '-color-log=false', // must be disabled for web interface detection
     '-logtofile=true',
     '-download-peerlist=true',
@@ -212,9 +212,9 @@ function startWallet() {
     app.quit();
   });
 
-  wallet.stdout.on('data', function (data) {
-    console.log(data.toString());
-  });
+  // wallet.stdout.on('data', function (data) {
+    // console.log(data.toString());
+  // });
 
   wallet.stderr.on('data', (data) => {
     console.log(data.toString());
@@ -233,13 +233,11 @@ function startWallet() {
 
 
 function createWindow(url) {
-  console.log(url);
   if (!url) {
     url = defaultURL;
   }
 
   // To fix appImage doesn't show icon in dock issue.
-  var appPath = app.getPath('exe');
   var iconPath = (() => {
     switch (process.platform) {
       case 'linux':
@@ -375,13 +373,6 @@ app.on('will-quit', () => {
   }
 });
 const { ipcMain } = require('electron')
-ipcMain.on('filemanage', (code) => {
-  win.loadURL(filemanageURL);
-});
-ipcMain.on('default', (code) => {
-  win.loadURL(defaultURL);
-});
-
 
 ipcMain.on('close', e=> win.close());
 
