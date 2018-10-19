@@ -101,6 +101,8 @@
         .etabs-tab-icon {
             display: inline-block;
             height: 16px;
+            position: relative;
+            top: 2px;
         }
 
         .etabs-tab-icon img {
@@ -110,7 +112,7 @@
 
         .etabs-tab-title {
             display: inline-block;
-            margin-left: 10px;
+            margin-left: 5px;
         }
 
         .etabs-tab-buttons {
@@ -156,6 +158,7 @@
         const TabGroup = require("electron-tabs");
         let tabGroup = new TabGroup();
         let tab1 = tabGroup.addTab({
+            iconURL:'./images/samosme.png',
             title: "NetDisk",
             src: "http://127.0.0.1:"+sharedObj.mePort+"/index.html",
             visible: true,
@@ -167,6 +170,7 @@
         });
 
         let tab2 = tabGroup.addTab({
+            iconURL:'./images/wallet.png',
             title: "Wallet",
             src: "http://127.0.0.1:"+sharedObj.walletPort+"/",
             visible: true,
