@@ -1,0 +1,63 @@
+please use command cd to change current path to electron directory first.
+
+dev mode:
+linux and mac:
+cd ../../samos/src/gui/static/&& yarn install &&yarn run build&&cd -
+go build -o ../../samos/wallet ../../samos/cmd/samos/samos.go
+go build -o ../client/nebula-client ../client/main.go
+yarn run start
+
+
+windows:
+cd ../../samos/src/gui/static/&& cnpm install &&cnpm run build&&cd -
+go build -o ../../samos/wallet.exe ../../samos/cmd/samos/samos.go
+docker build -t xgo-sliver:latest xgo-sliver
+xgo -dest dist -v -x -image='xgo-sliver' -branch=develop -deps='https://ftp.gnu.org/gnu/gmp/gmp-6.1.2.tar.bz2 https://crypto.stanford.edu/pbc/files/pbc-0.5.14.tar.gz' -targets=windows/amd64 github.com/samoslab/nebula/client
+mv dist/client-windows-4.0-amd64.exe ../client/nebula-client
+cnpm start
+
+
+
+package mode:
+windows(cross compile):
+docker build -t xgo-sliver:latest xgo-sliver
+xgo -dest dist -v -x -image='xgo-sliver' -branch=develop -deps='https://ftp.gnu.org/gnu/gmp/gmp-6.1.2.tar.bz2 https://crypto.stanford.edu/pbc/files/pbc-0.5.14.tar.gz' -targets=windows/* github.com/samoslab/nebula/client
+cd ../../samos/src/gui/static/&& yarn install &&yarn run build&&cd -
+64bit:
+CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -o dist/wallet-win-x64.exe ../../samos/cmd/samos/samos.go
+mv dist/client-windows-4.0-amd64.exe dist/client-win-4.0-x64.exe
+yarn run dist-win64
+32bit:
+CGO_ENABLED=0 GOOS=windows GOARCH=386 go build -o dist/wallet-win-ia32.exe ../../samos/cmd/samos/samos.go
+mv dist/client-windows-4.0-386.exe dist/client-win-4.0-ia32.exe
+yarn run dist-win32
+
+
+Linux 64bit(cross compile):
+docker build -t xgo-sliver:latest xgo-sliver
+xgo -dest dist -v -x -image='xgo-sliver' -branch=develop -deps='https://ftp.gnu.org/gnu/gmp/gmp-6.1.2.tar.bz2 https://crypto.stanford.edu/pbc/files/pbc-0.5.14.tar.gz' -targets=linux/amd64 github.com/samoslab/nebula/client
+mv dist/client-linux-amd64 dist/nebula-client-linux-x64
+cd ../../samos/src/gui/static/&& yarn install &&yarn run build&&cd -
+go build -o dist/wallet-linux-x64 ../../samos/cmd/samos/samos.go
+yarn run dist-linux64
+
+
+Mac 64bit(native compile):
+cd ../../samos/src/gui/static/&& yarn install &&yarn run build&&cd -
+go build -o dist/wallet-mac-x64 ../../samos/cmd/samos/samos.go
+go build -o dist/nebula-client-mac-x64 ../client/main.go
+yarn run dist-mac64
+
+
+Linux 64bit(native compile):
+cd ../../samos/src/gui/static/&& yarn install &&yarn run build&&cd -
+go build -o dist/wallet-linux-x64 ../../samos/cmd/samos/samos.go
+go build -ldflags -extldflags=-static -o dist/nebula-client-linux-x64 ../client/main.go
+yarn run dist-linux64
+
+
+Linux 32bit(native compile):
+cd ../../samos/src/gui/static/&& yarn install &&yarn run build&&cd -
+go build -o dist/wallet-linux-ia32 ../../samos/cmd/samos/samos.go
+go build -ldflags -extldflags=-static -o dist/nebula-client-linux-ia32 ../client/main.go
+yarn run dist-linux32

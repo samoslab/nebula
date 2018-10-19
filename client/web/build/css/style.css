@@ -511,7 +511,7 @@ body {
     color: #424e67;
     height: 45px;
     line-height: 45px;
-    padding: 0 0 0 15px;
+    padding: 0 0 0 10px;
     font-size: 14px;
     text-decoration: none;
     zoom: 1;
@@ -563,7 +563,8 @@ body {
     float:right;
 }
 .fOHAbxb .updownGif img{
-    width:45px;
+    width: 32px;
+    height: 45px;
 }
 .fOHAbxb .active a{
     /* color: #3b8cff; */
@@ -877,7 +878,7 @@ body {
     display: inline-block;
 }
 
-.file-icon{
+/* .file-icon{
     cursor: default;
     display: inline-block;
     height: 26px;
@@ -891,7 +892,7 @@ body {
     padding:10px;
 }
 /*-------------小图标类----------------------*/
-.my-file-ai { background-position: -20px -0px;  }
+/*.my-file-ai { background-position: -20px -0px;  }
 .my-file-aiff { background-position: -66px -0px;  }
 .my-file-ani { background-position: -112px -0px;  }
 .my-file-asf { background-position: -158px -0px;  }
@@ -966,6 +967,98 @@ body {
 .my-file-ac3 { background-position: -112px -322px;  }
 .my-file-folder{ background-position: -160px -322px; }
 .my-file-unknown{ background-position: -296px -92px; }
+ */
+
+ .file-icon{
+    cursor: default;
+    display: inline-block;
+    height: 26px;
+    width: 26px;
+    background:url(../images/fileicons.png) no-repeat center center;
+    vertical-align: -8px;
+    margin:0 10px;
+}
+.file-name{
+    padding:10px;
+}
+/*-------------小图标类----------------------*/
+.my-file-ai { background-position: -596px -1220px;  }
+.my-file-aiff { background-position: -596px -442px;  }  /*音频交换*/
+.my-file-ani { background-position: -596px -68px;  }    /*--动画光标--*/
+.my-file-asf { background-position: -596px -1596px;  }     /*--高级串流格式--*/
+.my-file-au { background-position: -596px -1152px;  }          /*--是一个专业音频编辑和混合环境--*/
+.my-file-avi { background-position:  -596px -1596px;   }
+.my-file-bat,.my-file-exe { background-position: -596px -1458px;  }
+.my-file-bin { background-position: -596px -68px;  }
+.my-file-bmp { background-position: -596px -306px;  }   /*--图像文件--*/
+.my-file-bup { background-position: -596px -1596px;  }     /*--DVD--*/
+.my-file-cab { background-position: -596px -1698px;  }         /*--Microsoft制订的压缩包格式--*/
+.my-file-cal { background-position: -596px -566px;  }         /*----*/
+.my-file-cat { background-position: -596px -68px;  }
+.my-file-cur { background-position: -596px -306px;  }        /*--静态光标文件--*/
+.my-file-dat { background-position: -596px -1596px;  }            /*--多媒体格式，用媒体播放软件播放--*/
+.my-file-dcr { background-position: -596px -1458px;  }            /*----多媒体制作软件Director输出的---*/
+.my-file-der { background-position: -596px -68px; }            /*--可辨别编码规则-*/
+.my-file-dic { background-position: -596px -566px; }
+.my-file-dll { background-position: -596px -68px;  }
+.my-file-doc { background-position: -596px -170px;  }
+.my-file-docx { background-position: -596px -170px;  }
+.my-file-dvd { background-position: -596px -1596px;  }
+.my-file-dwg { background-position: -596px -408px; }
+.my-file-dwt { background-position: -596px -1322px;  }
+.my-file-fon,.my-file-otf,.my-file-woff,.my-file-eot { background-position: -596px -1390px;  }
+.my-file-gif { background-position: -596px -306px; }
+.my-file-hlp { background-position: -596px -566px;  }
+.my-file-hst { background-position: -596px -566px;  }
+.my-file-html { background-position: -596px -1458px;  }
+.my-file-ico { background-position:  -596px -306px; }
+.my-file-ifo { background-position: -596px -1596px;  }
+.my-file-inf { background-position: -596px -68px;  }
+.my-file-ini { background-position: -596px -1458px;  }
+.my-file-java { background-position: -596px -68px; }
+.my-file-jif { background-position: -204px -138px;  }
+.my-file-jpg,.my-file-bmp { background-position: -596px -306px;  }
+.my-file-log { background-position: -596px -68px; }
+.my-file-m4a,.my-file-ogg { background-position:  -596px -306px;  }
+.my-file-mmf { background-position: -596px -1596px;  }
+.my-file-mmm { background-position: -596px -1596px; }
+.my-file-mov { background-position: -596px -1254px; }
+.my-file-mp2 { background-position: -596px -442px; }
+.my-file-mp2v { background-position:-596px -442px;  }
+.my-file-mp3 { background-position: -596px -442px; }
+.my-file-mp4 { background-position: -596px -442px;}
+.my-file-mpeg { background-position: -596px -442px;  }
+.my-file-msp { background-position: -596px -442px; }
+.my-file-pdf { background-position: -596px -136px;  }
+.my-file-png { background-position:  -596px -306px; }
+.my-file-ppt { background-position: -596px -204px;   }
+.my-file-pptx { background-position: -596px -204px;  }
+.my-file-psd { background-position: -596px -1152px;   }
+.my-file-ra { background-position: -596px -1666px;   }
+.my-file-rar,.my-file-cab { background-position:-596px -1666px;   }
+.my-file-reg { background-position: -596px -68px;   }
+.my-file-rtf { background-position: -596px -102px;  }
+.my-file-theme { background-position: -596px -566px;  }
+.my-file-tiff { background-position: -596px -306px;  }
+.my-file-tlb { background-position: -596px -1390px;  }
+.my-file-ttf { background-position: -596px -1390px;  }
+.my-file-txt{ background-position: -596px -102px;  }
+.my-file-ps { background-position: -596px -1152px;  }
+.my-file-vob { background-position:-596px -1596px; }
+.my-file-wav,.my-file-mid { background-position: -596px -1596px; }
+.my-file-wma,.my-file-swf { background-position:-596px -1596px; }
+.my-file-wmv { background-position: -596px -1596px;  }
+.my-file-wpl { background-position: -596px -1596px;  }
+.my-file-wri { background-position: -596px -1596px;  }
+.my-file-xls { background-position: -596px -238px;  }
+.my-file-xlsx { background-position: -596px -238px;  }
+.my-file-xml { background-position: -596px -68px;  }
+.my-file-xsl { background-position: -596px -238px;   }
+.my-file-zip,.my-file-epub,.my-file-gz,.my-file-7z,.my-file-bz2,.my-file-tar{ background-position: -596px -1666px;  }
+.my-file-ac3 { background-position: -596px -1596px;  }
+.my-file-folder{ background-position: -596px -864px; }
+.my-file-unknown{ background-position: -596px -102px; }
+
 
 
 
@@ -1307,6 +1400,11 @@ body {
     background:#0000ff;
     border:none;
     color:#fff;
+}
+.modelInputAdd{
+    width: 296px;
+    padding-left: 10px;
+    line-height: 28px;
 }
 .modelCopyBtn:active,.modelCopyBtn:focus{
     border:none;

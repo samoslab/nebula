@@ -24,14 +24,14 @@
     "electron-context-menu": "^0.10.0",
     "electron-updater": "^3.1.1",
     "electron-builder": "20.27.1",
-    "jquery": "3.3.1",
-    "electron-tabs": "0.9.4"
+    "jquery": "3.3.1"
   },
   "dependencies": {
     "electron-context-menu": "^0.10.0",
     "electron-debug": "^2.0.0",
     "electron-log": "^2.2.16",
-    "jquery": "3.3.1"
+    "jquery": "3.3.1",
+    "electron-tabs": "^0.9.4"
   },
   "build": {
     "appId": "io.samos.storage",
@@ -50,11 +50,20 @@
    
 
     "mac": {
+      "icon":"build/icon.icns",
       "category": "public.app-category.productivity",
       "extraFiles": [
         {
-          "from": "../client/dist/${os}-${arch}/nebula-client",
-          "to": "./Resources/app/"
+          "from": "dist/nebula-client-${os}-${arch}",
+          "to": "./Resources/app/nebula-client"
+        },
+        {
+          "from": "dist/wallet-${os}-${arch}",
+          "to": "./Resources/app/wallet"
+        },
+        {
+          "from": "../assets/icon512x512.png",
+          "to": "./Resources/"
         }
       ],
       "extraResources": [
@@ -71,23 +80,37 @@
       ]
     },
     "win": {
+      "icon":"build/icon.ico",
       "target": "nsis",
       "extraFiles": [
         {
-          "from": "../client/dist/${os}-${arch}/nebula-client.exe",
-          "to": "./resources/app/"
+          "from": "dist/client-${os}-4.0-${arch}.exe",
+          "to": "./resources/app/nebula-client.exe"
+        },
+        {
+          "from": "dist/wallet-${os}-${arch}.exe",
+          "to": "./resources/app/wallet.exe"
+        },
+        {
+          "from": "../assets/icon512x512.png",
+          "to": "./resources/"
         }
       ]
     },
     "linux": {
+      "icon":"build/icons",
       "category": "Network",
       "target": [
         "AppImage"
       ],
       "extraFiles": [
         {
-          "from": "../client/dist/${os}-${arch}/nebula-client",
-          "to": "./resources/app/"
+          "from": "dist/nebula-client-${os}-${arch}",
+          "to": "./resources/app/nebula-client"
+        },
+        {
+          "from": "dist/wallet-${os}-${arch}",
+          "to": "./resources/app/wallet"
         },
         {
           "from": "../assets/icon512x512.png",
@@ -99,6 +122,13 @@
       {
         "from": "../client/web/",
         "to": "./app/web/",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../../samos/src/gui/static/dist",
+        "to": "./app/src/gui/static/dist",
         "filter": [
           "**/*"
         ]

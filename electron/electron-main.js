@@ -10,7 +10,6 @@ const path = require('path');
 
 const childProcess = require('child_process');
 
-const cwd = require('process').cwd();
 
 // This adds refresh and devtools console keybindings
 // Page can refresh with cmd+r, ctrl+r, F5
@@ -21,10 +20,14 @@ require('electron-context-menu')({});
 
 global.eval = function () { throw new Error('bad!!'); }
 
-let port = 7788;
-let defaultURL = 'http://127.0.0.1:' + port + '/';
-let filemanageURL = 'http://127.0.0.1:' + port + '/disk.html';
+let walletPort = 8640;
+let mePort = 8641;
 
+let defaultURL = 'http://127.0.0.1:' + mePort + '/start.html';
+global.sharedObject = {
+  walletPort:walletPort,
+  mePort: mePort
+}
 // let defaultURL;
 // let filemanageURL;
 // let port=7787;
@@ -66,80 +69,81 @@ process.env.DYLD_LIBRARY_PATH = env.DYLD_LIBRARY_PATH
 // be closed automatically when the JavaScript object is garbage collected.
 let win;
 
-var samos = null;
+ // Resolve binary location
+var appPath = app.getPath('exe');
+var exe;
+if (!devMod) {
+  exe = (() => {
+    switch (process.platform) {
+      case 'darwin':
+        return path.join(appPath, '../../Resources/app/');
+      case 'win32':
+        // Use only the relative path on windows due to short path length limits
+        return './resources/app/';
+      case 'linux':
+        return path.join(path.dirname(appPath), './resources/app/');
+      default:
+        return './resources/app/';
+    }
+  })()
+}
+ 
+var nebula = null;
+var wallet = null;
+var nebulaStarted = false;
+var walletStarted = false;
 
-function startSamos() {
-  console.log('Starting samos from electron');
+
+function startNebula() {
+  console.log('Starting nebula from electron');
   console.log("PATH:"+process.env.DYLD_LIBRARY_PATH)
 
-  if (samos) {
-    console.log('Samos already running');
-    app.emit('samos-ready');
+  if (nebula) {
+    console.log('nebula already running');
+    // if(wallet){
+    //   app.emit('all-ready');
+    // }
     return
   }
 
   var reset = () => {
-    samos = null;
+    nebula = null;
   }
 
-  // Resolve samos binary location
-  var appPath = app.getPath('exe');
-  var exe;
-  if (!devMod) {
+  // Resolve nebula-client binary location
+  if (devMod) {
     exe = (() => {
       switch (process.platform) {
         case 'darwin':
-     // var expath = path.join(path.dirname(appPath), '../../../../../../../client/nebula-client');
-      return path.join(appPath, '../../Resources/app/nebula-client');
-
-    	console.log(expath);
-    	return expath;
+          return path.join(path.dirname(appPath), '../../../../../../../client/');
         case 'win32':
-          // Use only the relative path on windows due to short path length
-          // limits
-          return './resources/app/nebula-client.exe';
+          // Use only the relative path on windows due to short path length limits
+          return '../client/';
         case 'linux':
-          return path.join(path.dirname(appPath), './resources/app/nebula-client');
+          return path.join(path.dirname(appPath), '../../../../client/');
         default:
-          return './resources/app/nebula-client';
-      }
-    })()
-  } else {
-    exe = (() => {
-      switch (process.platform) {
-        case 'darwin':
-          var expath = path.join(path.dirname(appPath), '../../../../../../../client/nebula-client');
-        //expath =  path.join(appPath, '../../Resources/app/nebula-client');
-    	    console.log(expath);
-    	    return expath;
-        case 'win32':
-          // Use only the relative path on windows due to short path length
-          // limits
-          return '../client/nebula-client.exe';
-        case 'linux':
-          return path.join(path.dirname(appPath), '../../../../client/nebula-client');
-        default:
-          return './resources/app/nebula-client';
+        return '../client/';
       }
     })()
   }
 
   var args = [
     '--launch-browser=false',
-    '--webdir=' + path.dirname(exe) + '/web/build',
-    '--server=127.0.0.1:' + port,
+    '--webdir=' + exe + '/web/build',
+    '--server=127.0.0.1:' + mePort,
     '--collect=collector.store.samos.io:6688',
     '--tracker=tracker.store.samos.io:6677'
   ]
-  samos = childProcess.spawn(exe, args);
 
-  samos.on('error', (e) => {
-    dialog.showErrorBox('Failed to start samos', e.toString());
+  nebula = childProcess.spawn(exe+'nebula-client', args);
+
+  nebula.on('error', (e) => {
+    dialog.showErrorBox('Failed to start nebula', e.toString());
     app.quit();
   });
 
-  samos.stdout.on('data', (data) => {
-    console.log(data.toString());
+  nebula.stdout.on('data', (data) => {
+    // console.log(data.toString());
     // Scan for the web URL string
     if (currentURL) {
       return
@@ -149,45 +153,141 @@ function startSamos() {
     if (i === -1) {
       return
     }
-    currentURL = defaultURL;
-    app.emit('samos-ready', { url: currentURL });
-  });
-
-  samos.stderr.on('data', (data) => {
+    nebulaStarted=true;
+    if(walletStarted){
+      currentURL = defaultURL;
+      app.emit('all-ready', { url: currentURL });
+    }
     console.log(data.toString());
   });
 
-  samos.on('close', (code) => {
-    // log.info('Samos closed');
-    console.log('Samos closed');
+  nebula.stderr.on('data', (data) => {
+    console.log(data.toString());
+  });
+
+  nebula.on('close', (code) => {
+    console.log('nebula closed');
     reset();
   });
 
-  samos.on('exit', (code) => {
-    // log.info('Samos exited');
-    console.log('Samos exited');
+  nebula.on('exit', (code) => {
+    console.log('nebula exited');
     reset();
   });
 }
 
 
+function startWallet() {
+  console.log('Starting wallet from electron');
+  if (wallet) {
+    console.log('wallet already running');
+    // if(nebula){
+    //   app.emit('all-ready');
+    // }
+    return
+  }
+  var reset = () => {
+    wallet = null;
+  }
+  if (devMod) {
+    exe = (() => {
+      switch (process.platform) {
+        case 'darwin':
+          return path.join(path.dirname(appPath), '../../../../../../../../samos/');
+        case 'win32':
+          // Use only the relative path on windows due to short path length limits
+          return '../../samos/';
+        case 'linux':
+          return path.join(path.dirname(appPath), '../../../../../samos/');
+        default:
+        return '../../samos/';
+      }
+    })()
+  } 
+  var args = [
+    '-launch-browser=false',
+    '-gui-dir=' + exe+"src/gui/static/",
+    '-color-log=false', // must be disabled for web interface detection
+    '-logtofile=true',
+    '-download-peerlist=true',
+    '-enable-seed-api=true',
+    '-enable-wallet-api=true',
+    '-rpc-interface=false',
+    "-disable-csrf=false"
+    // will break
+    // broken (automatically generated certs do not work):
+    // '-web-interface-https=true',
+  ]
+  wallet = childProcess.spawn(exe+"wallet", args);
+
+  wallet.on('error', (e) => {
+    console.log( e.toString());
+    dialog.showErrorBox('Failed to start wallet', e.toString());
+    app.quit();
+  });
+
+  wallet.stdout.on('data', function (data) {
+    if (currentURL) {
+      return
+    }
+    const marker = 'Starting web interface on ';
+    var i = data.indexOf(marker);
+    if (i === -1) {
+      return
+    }
+    walletStarted=true;
+    if(nebulaStarted){
+      currentURL = defaultURL;
+      app.emit('all-ready', { url: currentURL });
+    }
+    // console.log(data.toString());
+  });
+
+  wallet.stderr.on('data', (data) => {
+    console.log(data.toString());
+  });
+
+  wallet.on('close', (code) => {
+    console.log('wallet closed');
+    reset();
+  });
+
+  wallet.on('exit', (code) => {
+    console.log('wallet exited');
+    reset();
+  });
+}
+
 
 function createWindow(url) {
-  console.log(url);
   if (!url) {
     url = defaultURL;
   }
 
   // To fix appImage doesn't show icon in dock issue.
-  var appPath = app.getPath('exe');
   var iconPath = (() => {
-    switch (process.platform) {
-      case 'linux':
-        if (!devMod) {
+    if (!devMod) {
+      switch (process.platform) {
+        case 'darwin':
+          return path.join(appPath, '../../Resources/icon512x512.png');
+        case 'win32':
+          return './resources/icon512x512.png';
+        case 'linux':
           return path.join(path.dirname(appPath), './resources/icon512x512.png');
-        }else{
+        default:
+          return './resources/icon512x512.png';
+      }
+    }else{
+      switch (process.platform) {
+        case 'darwin':
+          return path.join(path.dirname(appPath), '../../../../../../../assets/icon512x512.png');
+        case 'win32':
+          return '../assets/icon512x512.png';
+        case 'linux':
           return path.join(path.dirname(appPath), '../../../../assets/icon512x512.png');
-        }
+        default:
+          return '../assets/icon512x512.png';
+      }
     }
   })()
 
@@ -233,27 +333,27 @@ function createWindow(url) {
     e.preventDefault();
     require('electron').shell.openExternal(url);
   });
+  win.setMenu(null);
+  // // create application's main menu
+  // var template = [{
+  //   label: "Samos",
+  //   submenu: [
+  //     { label: "Quit", accelerator: "Command+Q", click: function () { app.quit(); } }
+  //   ]
+  // }, {
+  //   label: "Edit",
+  //   submenu: [
+  //     { label: "Undo", accelerator: "CmdOrCtrl+Z", selector: "undo:" },
+  //     { label: "Redo", accelerator: "Shift+CmdOrCtrl+Z", selector: "redo:" },
+  //     { type: "separator" },
+  //     { label: "Cut", accelerator: "CmdOrCtrl+X", selector: "cut:" },
+  //     { label: "Copy", accelerator: "CmdOrCtrl+C", selector: "copy:" },
+  //     { label: "Paste", accelerator: "CmdOrCtrl+V", selector: "paste:" },
+  //     { label: "Select All", accelerator: "CmdOrCtrl+A", selector: "selectAll:" }
+  //   ]
+  // }];
 
-  // create application's main menu
-  var template = [{
-    label: "Samos",
-    submenu: [
-      { label: "Quit", accelerator: "Command+Q", click: function () { app.quit(); } }
-    ]
-  }, {
-    label: "Edit",
-    submenu: [
-      { label: "Undo", accelerator: "CmdOrCtrl+Z", selector: "undo:" },
-      { label: "Redo", accelerator: "Shift+CmdOrCtrl+Z", selector: "redo:" },
-      { type: "separator" },
-      { label: "Cut", accelerator: "CmdOrCtrl+X", selector: "cut:" },
-      { label: "Copy", accelerator: "CmdOrCtrl+C", selector: "copy:" },
-      { label: "Paste", accelerator: "CmdOrCtrl+V", selector: "paste:" },
-      { label: "Select All", accelerator: "CmdOrCtrl+A", selector: "selectAll:" }
-    ]
-  }];
-
-  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+  // Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
 // Enforce single instance
@@ -277,9 +377,12 @@ if (alreadyRunning) {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.on('ready', startSamos);
+app.on('ready', function(){
+  startWallet();
+  startNebula();
+});
 
-app.on('samos-ready', (e) => {
+app.on('all-ready', (e) => {
   createWindow(e.url);
 });
 
@@ -301,18 +404,14 @@ app.on('activate', () => {
 });
 
 app.on('will-quit', () => {
-  if (samos) {
-    samos.kill('SIGINT');
+  if (nebula) {
+    nebula.kill('SIGINT');
+  }
+  if (wallet) {
+    wallet.kill('SIGINT');
   }
 });
 const { ipcMain } = require('electron')
-ipcMain.on('filemanage', (code) => {
-  win.loadURL(filemanageURL);
-});
-ipcMain.on('default', (code) => {
-  win.loadURL(defaultURL);
-});
-
 
 ipcMain.on('close', e=> win.close());
 
@@ -320,7 +419,3 @@ const {shell} = require('electron')
 ipcMain.on('explorer', (event,code) => {
   shell.openExternal("http://explorer.samos.io/app/address/"+code+"/1")
 }); 
-  
-
-// In this file you can include the rest of your app's specific main process
-// code. You can also put them in separate files and require them here.
