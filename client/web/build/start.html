@@ -6,6 +6,9 @@
     <meta content="SkyDrive,samos SkyDrive,Network U disk, network hard disk, free SkyDrive, SkyDrive download, SkyDrive resources, synchronization, cloud storage, external chain sharing, offline Download" name="keywords"/>
     <meta content="samos SkyDrive To provide you with network backup, synchronization and sharing services. Large space, fast speed, safe and stable." name="description"/>
     <link href="./images/favicon.ico" rel="icon"  sizes="any"/>
+    <script>if (typeof module === 'object') {window.module = module; module = undefined;}</script>
+    <script src="./js/jquery.min.js"></script>
+    <script>if (window.module) module = window.module;</script>
     <style>
         *{margin:0;padding:0;}
         .etabs-tabgroup {
@@ -180,6 +183,18 @@
                 nodeintegration: true
             }
         });
+        let tab3 = tabGroup.addTab({
+            iconURL:'./images/wallet.png',
+            title: "Exchange",
+            src: "http://samos.io/exchange/",
+            visible: true,
+            closable: false,
+            active: false,
+            webviewAttributes:{
+                nodeintegration: true
+            }
+        });
+        //netdisk 登录页跳disk页
         tab1.webview.addEventListener('ipc-message', (event) => {
             tab1.webview.loadURL("http://127.0.0.1:"+sharedObj.mePort+"/"+event.channel);
       });
