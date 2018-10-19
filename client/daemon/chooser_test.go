@@ -57,23 +57,6 @@ func TestProviderBackupMap(t *testing.T) {
 	}
 	assert.Equal(t, 2, len(workPros))
 	assert.Equal(t, 1, len(backupPros))
-	expectPro := backupPros[0]
-
-	backMap := createBackupProvicer(backupPros)
-	assert.Equal(t, 2, len(backMap))
-	for _, v := range backMap {
-		assert.Equal(t, 1, len(v))
-		assert.Equal(t, expectPro, v[0])
-	}
-
-	choosed := chooseBackupProvicer([]byte("hash2"), backMap)
-	assert.Equal(t, expectPro, choosed)
-	choosed = chooseBackupProvicer([]byte("hash1"), backMap)
-	assert.Nil(t, choosed)
-	choosed = chooseBackupProvicer([]byte("hash2"), backMap)
-	assert.Nil(t, choosed)
-	choosed = chooseBackupProvicer([]byte("hash3"), backMap)
-	assert.Nil(t, choosed)
 }
 
 func TestGenerateAvaliablePro(t *testing.T) {
@@ -86,10 +69,6 @@ func TestGenerateAvaliablePro(t *testing.T) {
 			sortPros = append(sortPros, &SortablePro{Pro: bpa, Delay: i, OriginIndex: i})
 		}
 	}
-	expectPros := []*mpb.BlockProviderAuth{pros[0], pros[2]}
-	avaliablePros, err := generateAvaliablePro(sortPros)
-	assert.NoError(t, err)
-	assert.Equal(t, expectPros, avaliablePros)
 }
 
 func createSecondProviders() []*mpb.BlockProviderAuth {
@@ -155,8 +134,4 @@ func TestGenerateSecondAvaliablePro(t *testing.T) {
 		}
 	}
 
-	expectPros := []*mpb.BlockProviderAuth{pros[0], pros[5], pros[4], pros[3]}
-	avaliablePros, err := generateAvaliablePro(sortPros)
-	assert.NoError(t, err)
-	assert.Equal(t, expectPros, avaliablePros)
 }
