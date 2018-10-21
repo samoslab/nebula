@@ -20,10 +20,10 @@ import (
 	task_client "github.com/samoslab/nebula/provider/task_client"
 	tcppb "github.com/samoslab/nebula/tracker/collector/provider/pb"
 	ttpb "github.com/samoslab/nebula/tracker/task/pb"
+	util_file "github.com/samoslab/nebula/util/file"
 	util_hash "github.com/samoslab/nebula/util/hash"
 	log "github.com/sirupsen/logrus"
 	"github.com/syndtr/goleveldb/leveldb"
-	leveldb_errors "github.com/syndtr/goleveldb/leveldb/errors"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -189,11 +189,54 @@ func (self *ProviderService) Store(stream pb.ProviderService_StoreServer) (er er
 					return
 				}
 			}
-			if found, _, _, _ := self.querySubPath(blockKey); found {
-				er = status.Errorf(codes.AlreadyExists, "hash point file exist, blockKey: %x", blockKey)
-				logWarnAndSetActionLog(er, al)
-				al.TransportSize += uint64(len(req.Data))
-				return
+			if found, smallFile, storageIdx, subPath := self.querySubPath(blockKey); found {
+				if smallFile {
+					storage := config.GetStorage(storageIdx)
+					data, err := storage.SmallFileDb.Get(blockKey, nil)
+					if err != nil && err != leveldb.ErrNotFound {
+						er = status.Errorf(codes.Internal, "read small file error, blockKey: %x error: %s", blockKey, err)
+						logWarnAndSetActionLog(er, al)
+						al.TransportSize += uint64(len(req.Data))
+						return
+					}
+					if len(data) == int(blockSize) && bytes.Equal(util_hash.Sha1(data), blockKey) {
+						er = status.Errorf(codes.AlreadyExists, "hash point file exist, blockKey: %x", blockKey)
+						logWarnAndSetActionLog(er, al)
+						al.TransportSize += uint64(len(req.Data))
+						return
+					}
+				} else {
+					path := config.GetStoragePath(storageIdx, subPath)
+					fileInfo, err := os.Stat(path)
+					if err != nil && !os.IsNotExist(err) {
+						er = status.Errorf(codes.Internal, "stat file failed, blockKey: %x error: %s", blockKey, err)
+						logWarnAndSetActionLog(er, al)
+						al.TransportSize += uint64(len(req.Data))
+						return
+					}
+					if fileInfo != nil && fileInfo.Size() == int64(blockSize) {
+						hash, err := util_hash.Sha1File(path)
+						if err != nil {
+							er = status.Errorf(codes.Internal, "sha1 sum file error, blockKey: %x error: %s", blockKey, err)
+							logWarnAndSetActionLog(er, al)
+							al.TransportSize += uint64(len(req.Data))
+							return
+						}
+						if bytes.Equal(hash, blockKey) {
+							er = status.Errorf(codes.AlreadyExists, "hash point file exist, blockKey: %x", blockKey)
+							logWarnAndSetActionLog(er, al)
+							al.TransportSize += uint64(len(req.Data))
+							return
+						} else {
+							if err = os.Remove(path); err != nil {
+								er = status.Errorf(codes.Internal, "remove old file failed, path: %s, blockKey: %x error: %s", path, blockKey, err)
+								logWarnAndSetActionLog(er, al)
+								al.TransportSize += uint64(len(req.Data))
+								return
+							}
+						}
+					}
+				}
 			}
 			storage = config.GetWriteStorage(blockSize)
 			if storage == nil {
@@ -553,7 +596,7 @@ func (self *ProviderService) queryByKey(key []byte) []byte {
 	val, err := self.providerDb.Get(key, nil)
 	if err == nil {
 		return val
-	} else if err != leveldb_errors.ErrNotFound {
+	} else if err != leveldb.ErrNotFound {
 		log.Errorf("get %x from provider db error: %s", key, err)
 	}
 	return nil
@@ -921,7 +964,7 @@ func (self *ProviderService) taskReplicate(fileHash []byte, fileSize uint64, blo
 		if smallFile {
 			storage := config.GetStorage(storageIdx)
 			data, er := storage.SmallFileDb.Get(blockHash, nil)
-			if er != nil {
+			if er != nil && er != leveldb.ErrNotFound {
 				return fmt.Errorf("read small file error, error: %s", er)
 			}
 			if len(data) == int(blockSize) && bytes.Equal(util_hash.Sha1(data), blockHash) {
@@ -930,10 +973,10 @@ func (self *ProviderService) taskReplicate(fileHash []byte, fileSize uint64, blo
 		} else {
 			path := config.GetStoragePath(storageIdx, subPath)
 			fileInfo, er := os.Stat(path)
-			if er != nil {
+			if er != nil && !os.IsNotExist(er) {
 				return fmt.Errorf("stat file failed, error: %s", er)
 			}
-			if fileInfo.Size() == int64(blockSize) {
+			if fileInfo != nil && fileInfo.Size() == int64(blockSize) {
 				hash, err := util_hash.Sha1File(path)
 				if err != nil {
 					return fmt.Errorf("sha1 sum file error: %s", err)
@@ -1014,8 +1057,10 @@ func (self *ProviderService) taskReplicate(fileHash []byte, fileSize uint64, blo
 			}
 			if found {
 				path := config.GetStoragePath(storageIdx, subPath)
-				if err = os.Remove(path); err != nil {
-					return fmt.Errorf("remove old file failed, path: %s error: %s", path, err)
+				if util_file.Exists(path) {
+					if err = os.Remove(path); err != nil {
+						return fmt.Errorf("remove old file failed, path: %s error: %s", path, err)
+					}
 				}
 			}
 			if err := self.saveFile(blockHash, blockSize, tempFilePath, storage); err != nil {
