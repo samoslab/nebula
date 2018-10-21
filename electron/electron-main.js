@@ -43,7 +43,7 @@ let currentURL;
 
 
 // Force everything localhost, in case of a leak
-app.commandLine.appendSwitch('host-rules', 'MAP * 127.0.0.1, EXCLUDE *.store.samos.io, *.samos.io');
+app.commandLine.appendSwitch('host-rules', 'MAP * 127.0.0.1, EXCLUDE *.store.samos.io, EXCLUDE *.samos.io, EXCLUDE samos.io');
 app.commandLine.appendSwitch('ssl-version-fallback-min', 'tls1.2');
 app.commandLine.appendSwitch('--no-proxy-server');
 app.setAsDefaultProtocolClient('samos');
@@ -158,7 +158,7 @@ function startNebula() {
       currentURL = defaultURL;
       app.emit('all-ready', { url: currentURL });
     }
-    console.log(data.toString());
+    // console.log(data.toString());
   });
 
   nebula.stderr.on('data', (data) => {
@@ -240,7 +240,7 @@ function startWallet() {
       currentURL = defaultURL;
       app.emit('all-ready', { url: currentURL });
     }
-    // console.log(data.toString());
+    console.log(data.toString());
   });
 
   wallet.stderr.on('data', (data) => {
