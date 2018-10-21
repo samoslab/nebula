@@ -347,7 +347,7 @@ func (c *ClientManager) ExecuteTask() error {
 						err = errors.New("unknown")
 					}
 					errStr := ""
-					if err != nil {
+					if err != nil && !strings.Contains(err.Error(), "path is not exists") {
 						log.WithError(err).Error("Execute task failed")
 						code, errMsg := common.StatusErrFromError(err)
 						if code == 300 && retry < 3 {
@@ -412,6 +412,7 @@ func (c *ClientManager) SendProgressMsg() error {
 					continue
 				}
 				for _, msg := range msgList {
+					log.Infof("progress message %+v", msg)
 					c.AddDoneMsg(msg)
 				}
 			}
@@ -660,18 +661,22 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 			log.Info("Space password not set")
 			return fmt.Errorf("Password not set")
 		}
-		encryptKey, err = rsalong.EncryptLong(c.TrackerPubkey, password, 256)
-		if err != nil {
-			log.WithError(err).Info("Encrypt password")
-			return err
+		if sno == 0 {
+			encryptKey, err = rsalong.EncryptLong(c.TrackerPubkey, password, 256)
+			if err != nil {
+				log.WithError(err).Info("Encrypt password")
+				return err
+			}
 		}
 	}
 
+	fileType := filetype.FileType(fileName)
 	// privacy space need encryp file whole
 	if sno > 0 && isEncrypt {
 		if len(password) == 0 {
 			return errors.New("privacy no password")
 		}
+		log.Infof("privacy space %d , so encrypt file first", sno)
 		originFileName := fileName
 		// change fileName to encypted file avoid origin file modified
 		_, onlyFileName := filepath.Split(fileName)
@@ -684,7 +689,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 		log = log.WithField("encrypted file", fileName)
 	}
 
-	req, rsp, err := c.CheckFileExists(fileName, dest, interactive, newVersion, password, encryptKey, sno)
+	req, rsp, err := c.CheckFileExists(fileName, dest, interactive, newVersion, password, encryptKey, sno, fileType)
 	if err != nil {
 		return err
 	}
@@ -871,7 +876,7 @@ func deleteTemporaryFile(log logrus.FieldLogger, fileName string) {
 }
 
 // CheckFileExists check file exists or not in tracker
-func (c *ClientManager) CheckFileExists(fileName, dest string, interactive, newVersion bool, password, encryptKey []byte, sno uint32) (*mpb.CheckFileExistReq, *mpb.CheckFileExistResp, error) {
+func (c *ClientManager) CheckFileExists(fileName, dest string, interactive, newVersion bool, password, encryptKey []byte, sno uint32, fileType filetype.MIME) (*mpb.CheckFileExistReq, *mpb.CheckFileExistResp, error) {
 	log := c.Log.WithField("filename", fileName)
 	// privacy space
 	hash, err := util_hash.Sha1File(fileName)
@@ -882,7 +887,6 @@ func (c *ClientManager) CheckFileExists(fileName, dest string, interactive, newV
 	if err != nil {
 		return nil, nil, err
 	}
-	fileType := filetype.FileType(fileName)
 	_, fname := filepath.Split(fileName)
 	ctx := context.Background()
 	req := &mpb.CheckFileExistReq{
@@ -1599,11 +1603,23 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 	}
 
 	password := []byte{}
-	encryptKey := rsp.GetEncryptKey()
-	if len(encryptKey) > 0 {
-		password, err = rsalong.DecryptLong(c.cfg.Node.PriKey, encryptKey, 256)
+	if sno > 0 {
+		password, err = c.getSpacePassword(sno)
 		if err != nil {
+			log.WithError(err).Info("Get space password")
 			return err
+		}
+		if len(password) == 0 {
+			log.Info("Space %d password not set", sno)
+			return fmt.Errorf("sno %d password not set", sno)
+		}
+	} else {
+		encryptKey := rsp.GetEncryptKey()
+		if len(encryptKey) > 0 {
+			password, err = rsalong.DecryptLong(c.cfg.Node.PriKey, encryptKey, 256)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	// tiny file
