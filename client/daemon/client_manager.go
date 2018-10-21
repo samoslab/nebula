@@ -666,6 +666,24 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 			return err
 		}
 	}
+
+	// privacy space need encryp file whole
+	if sno > 0 && isEncrypt {
+		if len(password) == 0 {
+			return errors.New("privacy no password")
+		}
+		originFileName := fileName
+		// change fileName to encypted file avoid origin file modified
+		_, onlyFileName := filepath.Split(fileName)
+		fileName = filepath.Join(c.TempDir, onlyFileName)
+		err := aes.EncryptFile(originFileName, password, fileName)
+		if err != nil {
+			log.Errorf("Encrypt error %v", err)
+			return err
+		}
+		log = log.WithField("encrypted file", fileName)
+	}
+
 	req, rsp, err := c.CheckFileExists(fileName, dest, interactive, newVersion, password, encryptKey, sno)
 	if err != nil {
 		return err
@@ -688,7 +706,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 		log.Infof("Upload manner is multi-replication")
 		// encrypt file
 		originFileName := fileName
-		if isEncrypt {
+		if sno == 0 && isEncrypt {
 			_, onlyFileName := filepath.Split(fileName)
 			// change fileName to encypted file avoid origin file modified
 			fileName = filepath.Join(c.TempDir, onlyFileName)
@@ -852,8 +870,10 @@ func deleteTemporaryFile(log logrus.FieldLogger, fileName string) {
 	}
 }
 
+// CheckFileExists check file exists or not in tracker
 func (c *ClientManager) CheckFileExists(fileName, dest string, interactive, newVersion bool, password, encryptKey []byte, sno uint32) (*mpb.CheckFileExistReq, *mpb.CheckFileExistResp, error) {
 	log := c.Log.WithField("filename", fileName)
+	// privacy space
 	hash, err := util_hash.Sha1File(fileName)
 	if err != nil {
 		return nil, nil, err
@@ -890,7 +910,7 @@ func (c *ClientManager) CheckFileExists(fileName, dest string, interactive, newV
 			log.Errorf("Read file data error %v", err)
 			return nil, nil, err
 		}
-		if len(password) != 0 {
+		if sno == 0 && len(password) != 0 {
 			fileData, err = aes.Encrypt(fileData, password)
 			if err != nil {
 				log.Errorf("Encrypt file error %v", err)
@@ -900,7 +920,7 @@ func (c *ClientManager) CheckFileExists(fileName, dest string, interactive, newV
 		req.FileData = fileData
 		sp := serverPath(dest, fileName)
 		c.PM.SetProgress(common.TaskUploadProgressType, common.ProgressKey(sp, sno), req.FileSize, req.FileSize, sno, fileName)
-		fmt.Printf("Origin filesize %d, encrypted size %d\n", req.FileSize, len(req.FileData))
+		log.Infof("Origin filesize %d, encrypted size %d", req.FileSize, len(req.FileData))
 	}
 	err = req.SignReq(c.cfg.Node.PriKey)
 	if err != nil {
@@ -974,7 +994,7 @@ func (c *ClientManager) onlyFileSplit(fileName string, dataNum, verifyNum int, i
 		log.Errorf("Reedsolomon encoder error %v", err)
 		return nil, err
 	}
-	if isEncrypt {
+	if sno == 0 && isEncrypt {
 		for i := range fileSlices {
 			err := aes.EncryptFile(fileSlices[i].FileName, password, fileSlices[i].FileName)
 			if err != nil {
@@ -1677,7 +1697,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 			return err
 		}
 
-		if len(password) != 0 {
+		if sno == 0 && len(password) != 0 {
 			for _, file := range middleFiles {
 				log.Infof("middle file %s", file)
 				if err := aes.DecryptFile(file, password, file); err != nil {
@@ -1707,6 +1727,12 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 			}
 		}()
 
+		if sno > 0 && len(password) > 0 {
+			if err := aes.DecryptFile(tempDownFileName, password, tempDownFileName); err != nil {
+				return err
+			}
+		}
+
 		return RenameCrossOS(tempDownFileName, downFileName)
 	}
 	partFiles := []string{}
@@ -1732,7 +1758,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 				}
 			}
 		}
-		if len(password) != 0 {
+		if sno == 0 && len(password) != 0 {
 			for _, file := range middleFiles {
 				log.Infof("middle file %s", file)
 				if err := aes.DecryptFile(file, password, file); err != nil {
@@ -1750,6 +1776,12 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 		err = RsDecoder(log, tempDownFileName, "", int64(partitionFileSize), datas, paritys)
 		if err != nil {
 			return err
+		}
+
+		if sno > 0 && len(password) > 0 {
+			if err := aes.DecryptFile(tempDownFileName, password, tempDownFileName); err != nil {
+				return err
+			}
 		}
 
 		partFiles = append(partFiles, tempDownFileName)
