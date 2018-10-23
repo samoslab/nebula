@@ -1319,11 +1319,11 @@ var packageMethod = {
                                                 </div>
                                             </div>
                                             <div class="order-list-total">
-                                                <div class="order-list-t" data-locale="totalAmount">${(lan=='en')?'Total Amount':'总额'}</div>
+                                                <div class="order-list-t" data-locale="totalAmount">${(lan=='en')?'Amount':'总额'}</div>
                                                 <div>${obj.totalAmount/1000000}</div>
                                             </div>
                                             <div class="order-list-quanlity">
-                                                <div class="order-list-t" data-locale="amount">${(lan=='en')?'Amount':'数量'}</div>
+                                                <div class="order-list-t" data-locale="quantity">${(lan=='en')?'Quantity':'数量'}</div>
                                                 <div>${obj.quanlity}</div>
                                             </div>
                                             <div class="order-list-pay">

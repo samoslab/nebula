@@ -1568,8 +1568,152 @@ body {
     background:#0000ff;
 }
 
+/*--------------------------------------platform-------------------------------------------------------------------*/
+.ab{
+    position:absolute;
+}
+.platformNav{
+   height:60px;
+   padding-top:15px;
+}
+.pfContent{
+    background:#f3f5f9;
+    border:0.01rem solid transparent;
+    margin:0  1rem;
+}
+.pf-t{
+    margin:0.6rem 0 1.35rem;
+    color:#121212;
+    font-size:0.32rem;
+    font-family: PingFangSC-Semibold,Raleway-ExtraBold, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    text-align: center;
+}
+.pf-imgBox{
+    position: relative;
+    padding-bottom: 2.1rem;
+}
+.pf-imgBox>img{
+    max-width: 100%;
+    width: 10.22rem;
+    margin: 0 auto;
+    display: block;
+}
+.pf-d-t{
+    font-size:0.24rem;
+    color:#121633;
+    font-family: PingFangSC-Semibold,Raleway-ExtraBold, "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+.pf-d-c{
+    font-size:0.18rem;
+    color:#121633;
+    font-family: PingFangSC-Regular,Raleway-ExtraBold, "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+.pf-d1{
+    width:2.15rem;
+    top:1rem;
+    left:3.3rem;
+}
+
+.pf-d2{
+    width:2.86rem;
+    top:-0.2rem;
+    left:12.25rem;
+}
+.pf-d3{
+    width: 2.1rem;
+    top: 3.5rem;
+    left: 2rem;
+}
+.pf-d4{
+    width: 2.1rem;
+    top: 5.7rem;
+    left: 13.9rem;
+}
+.pf-d5{
+    width: 3.7rem;
+    top: 10rem;
+    left: 0.5rem;
+}
+.pf-d6{
+    width: 2.3rem;
+    top: 9rem;
+    left: 13.5rem;
+}
+.pf-d7{
+    width: 4rem;
+    top: 12rem;
+    left: 3.8rem;
+    text-align: center;
+}
+.pf-d8{
+    width: 2.3rem;
+    top: 11.45rem;
+    left: 12.35rem;
+}
+.pf-d9{
+    width: 2.1rem;
+    top: 13.7rem;
+    left: 8.4rem;
+    text-align: center;
+}
 
 
+@media (max-width: 550px){
+    .pf-t{
+        font-size:14px;
+    }
+    .pf-t,.pf-d-t{
+        font-weight: bold;
+    }
+    .pf-imgBox{
+        word-break:break-all;
+        word-wrap:break-word;
+        line-height: 1;
+    }
+    .pf-d1{
+        width: 6.15rem;
+        top: -1rem;
+        left: 0.5rem;
+    }
+    .pf-d2{
+        top: -1.2rem;
+        width:4.8rem;
+    }
+    .pf-d3{
+        width: 5.1rem;
+        top: 2.55rem;
+        left: 0.5rem;
+    }
+    .pf-d4{
+        width: 4.1rem;
+        top: 4.5rem;
+        left: 13.9rem;
+    }
+    .pf-d5{
+        width: 6.2rem;
+        top: 7.5rem;
+        left: 0.25rem;
+    }
+    .pf-d6{
+        width: 4.5rem;
+        top: 9rem;
+        left: 13.5rem;
+    }
+    .pf-d7{
+        width: 6rem;
+        top: 13.3rem;
+        left: 0.5rem;
+    }
+    .pf-d8{
+        width: 4.8rem;
+        top: 13.5rem;
+    }
+    .pf-d9{
+        width: 4.2rem;
+        top: 13.8rem;
+        left: 7.4rem;
+    }
+}
 
 
 

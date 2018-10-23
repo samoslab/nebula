@@ -21,10 +21,6 @@
             -webkit-user-select: none;
             user-select: none;
         }
-
-        .etabs-tabs {
-        }
-
         .etabs-tab {
             display: none;
             position: relative;
@@ -142,10 +138,6 @@
             border-top: 1px solid #aaa;
             height: calc(100vh - 33px);
         }
-
-        .etab-view {
-
-        }
     </style>
 </head>
 <body>
@@ -184,9 +176,20 @@
             }
         });
         let tab3 = tabGroup.addTab({
-            iconURL:'./images/wallet.png',
+            iconURL:'./images/tokenswitchlogo.png',
             title: "Exchange",
             src: "http://samos.io/exchange/",
+            visible: true,
+            closable: false,
+            active: false,
+            webviewAttributes:{
+                nodeintegration: true
+            }
+        });
+        let tab4 = tabGroup.addTab({
+            iconURL:'./images/plantformlogo.png',
+            title: "Platform",
+            src: "http://127.0.0.1:"+sharedObj.mePort+"/platform.html",
             visible: true,
             closable: false,
             active: false,
