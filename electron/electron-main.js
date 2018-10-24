@@ -49,20 +49,25 @@ app.commandLine.appendSwitch('--no-proxy-server');
 app.setAsDefaultProtocolClient('samos');
 
 
-var env = {}
-env.PATH = [
-  '$PATH'
-  // Add third-party binaries paths here
-].join(':')
+if (process.platform == "darwin") {
+  var env = {}
+  env.PATH = [
+    '$PATH'
+    // Add third-party binaries paths here
+  ].join(':')
 
-// 3rd party libraries
-env.DYLD_LIBRARY_PATH = [
-  '$DYLD_LIBRARY_PATH',
-  '/Applications/Samos-me.app/Contents/Resources/app/lib/',
-  // Add more third-party lib paths here
-].join(':')
+  // 3rd party libraries
+  env.DYLD_LIBRARY_PATH = [
+    '$DYLD_LIBRARY_PATH',
+    '/Applications/Samos-me.app/Contents/Resources/app/lib/',
+    '/Applications/Samos-me.app/Contents/Frameworks/',
 
-process.env.DYLD_LIBRARY_PATH = env.DYLD_LIBRARY_PATH
+    // Add more third-party lib paths here
+  ].join(':')
+
+  process.env.DYLD_LIBRARY_PATH = env.DYLD_LIBRARY_PATH
+}
+
 //for macos
 
 // Keep a global reference of the window object, if you don't, the window will
