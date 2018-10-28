@@ -49,7 +49,7 @@ app.commandLine.appendSwitch('--no-proxy-server');
 app.setAsDefaultProtocolClient('samos');
 
 
-if (process.platform == "darwin") {
+//if (process.platform == "darwin") {
   var env = {}
   env.PATH = [
     '$PATH'
@@ -66,7 +66,7 @@ if (process.platform == "darwin") {
   ].join(':')
 
   process.env.DYLD_LIBRARY_PATH = env.DYLD_LIBRARY_PATH
-}
+//}
 
 //for macos
 
