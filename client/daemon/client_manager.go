@@ -66,6 +66,8 @@ var (
 	// ReplicaNum number of muliti-replication
 	ReplicaNum    = 4
 	MinReplicaNum = 3
+
+	RetryCount = 3
 )
 
 // DownFile list files format, used when download file
@@ -350,18 +352,18 @@ func (c *ClientManager) ExecuteTask() error {
 					if err != nil && !strings.Contains(err.Error(), "path is not exists") {
 						log.WithError(err).Error("Execute task failed")
 						code, errMsg := common.StatusErrFromError(err)
-						if code == 300 && retry < 3 {
+						if code == 300 && retry < RetryCount {
 							log.WithError(err).Error("Execute task failed, retrying")
 							goto RETRY
 						}
-						if strings.Contains(errMsg, "context deadline exceeded") && retry < 3 {
+						if strings.Contains(errMsg, "context deadline exceeded") && retry < RetryCount-1 {
 							log.WithError(err).Error("Execute task failed, retrying")
 							goto RETRY
 						}
-						if retry < 3 {
-							log.WithError(err).Error("Execute task failed, retrying")
-							goto RETRY
-						}
+						//if retry < RetryCount {
+						//	log.WithError(err).Error("Execute task failed, retrying")
+						//	goto RETRY
+						//}
 						errStr = err.Error()
 						doneMsg.SetError(1, err)
 					} else {
@@ -1474,7 +1476,7 @@ func (c *ClientManager) startDownloadDir(path, destDir string, sno uint32) error
 		retry++
 		if err != nil {
 			code, _ := common.StatusErrFromError(err)
-			if code == 300 && retry < 3 {
+			if code == 300 && retry < RetryCount {
 				goto RETRY
 			}
 			return err
