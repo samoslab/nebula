@@ -1548,7 +1548,7 @@ body {
 .tsList-fr{
     flex:0.3;
     line-height: 60px;
-    text-align: right;
+    text-align: center;
 }
 .tsList-r-Bar{
     position: relative;

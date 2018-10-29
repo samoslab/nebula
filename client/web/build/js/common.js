@@ -1213,7 +1213,7 @@ var transportMethod = {
                                             <div class="tsList-r-progressBar" data-name="${idx}" style="width:${Math.round(obj.rate*100)+'%'};"></div>
                                         </div>
                                     </div>
-                                    <div class="tsList-fr"></div>
+                                    <div class="tsList-fr">${Math.round(obj.rate*100)+'%'}</div>
                                 </li>`;
                     })
                     $("#tsMenu").html(html);  
