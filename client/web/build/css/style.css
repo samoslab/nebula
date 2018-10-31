@@ -253,7 +253,7 @@ body {
     margin-bottom:20px;
 }
 .inputLine>label{
-    width:50px;
+    width:70px;
     font-size:16px;
     text-align:right;
     display: inline-block;
@@ -263,7 +263,7 @@ body {
 .pass-form-inpt{
     position: relative;
     z-index: 17;
-    width: 325px;
+    width: 305px;
     font-size: 14px;
     color: #fff;
     line-height: 50px;

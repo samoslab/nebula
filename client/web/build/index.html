@@ -97,16 +97,16 @@
 <script>
     //监测启动了多少次客户端用的
     $.ajax({
-            url:"//samos.io/stat/samos-me-start.txt",
-            "method":"GET",
-            dataType:"jsonp",
-            success:function(res){
-                console.log(res);
-            },
-            fail:function(res){
-                console.log(res);
-            }
-        });
+        dataType:"jsonp",
+        url:"//samos.io/stat/samos-me-start.txt",
+        "method":"GET",
+        success:function(res){
+            console.log(res);
+        },
+        fail:function(res){
+            console.log(res);
+        }
+    });
 </script>
 <script>
     //var $ = require("jquery");
