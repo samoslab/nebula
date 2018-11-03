@@ -22,4 +22,5 @@ var (
 
 	MsgQueueLen  = 1000
 	TaskQuqueLen = 1000
+	MetaQuqueLen = 1000
 )

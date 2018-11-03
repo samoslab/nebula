@@ -68,6 +68,8 @@ var (
 	MinReplicaNum = 3
 
 	RetryCount = 3
+
+	ErrNoMetaData = errors.New("no metadata")
 )
 
 // DownFile list files format, used when download file
@@ -86,6 +88,40 @@ type DownFile struct {
 type FilePages struct {
 	Total uint32      `json:"total"`
 	Files []*DownFile `json:"files"`
+}
+
+type MetaData struct {
+	paraStr   string
+	generator []byte
+	pubKey    []byte
+	random    []byte
+	phi       [][]byte
+	err       error
+}
+
+type MetaDataMap struct {
+	md    map[string]MetaData
+	mutex sync.Mutex
+}
+
+func (m *MetaDataMap) Add(fileName, paraStr string, generator, pubKey, random []byte, phi [][]byte, err error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.md[fileName] = MetaData{paraStr: paraStr, generator: generator, pubKey: pubKey, random: random, phi: phi, err: err}
+}
+
+func (m *MetaDataMap) Get(fileName string) (paraStr string, generator, pubKey, random []byte, phi [][]byte, err error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if md, ok := m.md[fileName]; ok {
+		return md.paraStr, md.generator, md.pubKey, md.random, md.phi, md.err
+	}
+	return "", nil, nil, nil, nil, ErrNoMetaData
+}
+
+type MetaKey struct {
+	FileName  string
+	ChunkSize uint32
 }
 
 // ClientManager client manager
@@ -111,6 +147,8 @@ type ClientManager struct {
 	cfg           *config.ClientConfig
 	PM            *progress.ProgressManager
 	mclient       mpb.MatadataServiceClient
+	mdm           *MetaDataMap
+	MetaChan      chan MetaKey
 }
 
 // NewClientManager create manager
@@ -177,6 +215,8 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 		mclient:       mpb.NewMatadataServiceClient(conn),
 		MsgChan:       make(chan string, common.MsgQueueLen),
 		TaskChan:      make(chan TaskInfo, common.TaskQuqueLen),
+		MetaChan:      make(chan MetaKey, common.MetaQuqueLen),
+		mdm:           &MetaDataMap{md: map[string]MetaData{}},
 	}
 
 	collectClient.NodePtr = cfg.Node
@@ -193,6 +233,7 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 
 	go c.ExecuteTask()
 	go c.SendProgressMsg()
+	go c.GenMetadataInOrder()
 
 	return c, nil
 }
@@ -417,6 +458,31 @@ func (c *ClientManager) SendProgressMsg() error {
 					log.Infof("progress message %+v", msg)
 					c.AddDoneMsg(msg)
 				}
+			}
+		}
+	}()
+	wg.Wait()
+	return nil
+}
+
+// GenMetadataInOrder gen metadata by single goroutine due to crash if runing by multi-goroutine
+func (c *ClientManager) GenMetadataInOrder() error {
+	log := c.Log
+	log.Info("Start send progress")
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer func() {
+			wg.Done()
+			log.Infof("Shutdown progress goroutine")
+		}()
+		for {
+			select {
+			case <-c.quit:
+				return
+			case mk := <-c.MetaChan:
+				paraStr, generator, pubKey, random, phi, err := filecheck.GenMetadata(mk.FileName, mk.ChunkSize)
+				c.mdm.Add(mk.FileName, paraStr, generator, pubKey, random, phi, err)
 			}
 		}
 	}()
@@ -1102,18 +1168,33 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 	defer conn.Close()
 	pclient := pb.NewProviderServiceClient(conn)
 
-	var paraStr string
-	var generator, pubKey, random []byte
-	var phi [][]byte
-	if chunkSize > 0 {
-		paraStr, generator, pubKey, random, phi, err = filecheck.GenMetadata(uploadPara.HF.FileName, chunkSize)
-		if err != nil {
-			return nil, err
-		}
+	if chunkSize <= 0 {
+		log.Errorf("chunksize[%d] can not less than 0", chunkSize)
+		return nil, fmt.Errorf("chunksize[%d] can not less than 0", chunkSize)
 	}
+
+	t1 := time.Now()
+	c.MetaChan <- MetaKey{FileName: uploadPara.HF.FileName, ChunkSize: chunkSize}
 
 	ha := pro.GetHashAuth()[0]
 	err = client.StorePiece(log, pclient, uploadPara, ha.GetAuth(), ha.GetTicket(), tm, c.PM)
+	if err != nil {
+		return nil, err
+	}
+
+	var paraStr string
+	var generator, pubKey, random []byte
+	var phi [][]byte
+	var waitCount int
+	paraStr, generator, pubKey, random, phi, err = c.mdm.Get(uploadPara.HF.FileName)
+	for err != nil && err == ErrNoMetaData && waitCount < 60*60 {
+		time.Sleep(1)
+		paraStr, generator, pubKey, random, phi, err = c.mdm.Get(uploadPara.HF.FileName)
+		waitCount++
+	}
+	t2 := time.Now()
+	log.Infof("gen %s metadata time elapased %+v\n", uploadPara.HF.FileName, t2.Sub(t1).Seconds())
+
 	if err != nil {
 		return nil, err
 	}
@@ -1213,18 +1294,30 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 
 	t1 := time.Now()
 	fmt.Printf("chunksize %d, filename %s\n", rsp.GetChunkSize(), fileName)
+
+	if rsp.GetChunkSize() > 0 {
+		log.Errorf("chunksize[%d] can not less than 0", rsp.GetChunkSize())
+		return nil, fmt.Errorf("chunksize[%d] can not less than 0", rsp.GetChunkSize())
+	}
+
+	c.MetaChan <- MetaKey{FileName: fileName, ChunkSize: rsp.GetChunkSize()}
 	var paraStr string
 	var generator, pubKey, random []byte
 	var phi [][]byte
 
-	if rsp.GetChunkSize() > 0 {
-		paraStr, generator, pubKey, random, phi, err = filecheck.GenMetadata(fileName, rsp.GetChunkSize())
-		if err != nil {
-			return nil, err
-		}
+	var waitCount int
+	paraStr, generator, pubKey, random, phi, err = c.mdm.Get(fileName)
+	for err != nil && err == ErrNoMetaData && waitCount < 60*60 {
+		time.Sleep(1)
+		paraStr, generator, pubKey, random, phi, err = c.mdm.Get(fileName)
+		waitCount++
+	}
+
+	if err != nil {
+		return nil, err
 	}
 	t2 := time.Now()
-	fmt.Printf("gen metadata time elapased %+v\n", t2.Sub(t1).Seconds())
+	log.Infof("gen %s metadata time elapased %+v\n", fileName, t2.Sub(t1).Seconds())
 
 	block := &mpb.StoreBlock{
 		Checksum:    false,
