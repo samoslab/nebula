@@ -1298,7 +1298,7 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 	t1 := time.Now()
 	fmt.Printf("chunksize %d, filename %s\n", rsp.GetChunkSize(), fileName)
 
-	if rsp.GetChunkSize() > 0 {
+	if rsp.GetChunkSize() <= 0 {
 		log.Errorf("chunksize[%d] can not less than 0", rsp.GetChunkSize())
 		return nil, fmt.Errorf("chunksize[%d] can not less than 0", rsp.GetChunkSize())
 	}
