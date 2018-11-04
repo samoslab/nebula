@@ -481,7 +481,10 @@ func (c *ClientManager) GenMetadataInOrder() error {
 			case <-c.quit:
 				return
 			case mk := <-c.MetaChan:
+				t1 := time.Now()
 				paraStr, generator, pubKey, random, phi, err := filecheck.GenMetadata(mk.FileName, mk.ChunkSize)
+				t2 := time.Now()
+				log.Infof("gen %s metadata time elapased %+v", mk.FileName, t2.Sub(t1).Seconds())
 				c.mdm.Add(mk.FileName, paraStr, generator, pubKey, random, phi, err)
 			}
 		}
@@ -1193,7 +1196,7 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 		waitCount++
 	}
 	t2 := time.Now()
-	log.Infof("gen %s metadata time elapased %+v\n", uploadPara.HF.FileName, t2.Sub(t1).Seconds())
+	log.Infof("upload %s time elapased %+v", uploadPara.HF.FileName, t2.Sub(t1).Seconds())
 
 	if err != nil {
 		return nil, err
@@ -1317,7 +1320,7 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 		return nil, err
 	}
 	t2 := time.Now()
-	log.Infof("gen %s metadata time elapased %+v\n", fileName, t2.Sub(t1).Seconds())
+	log.Infof("upload %s time elapased %+v", fileName, t2.Sub(t1).Seconds())
 
 	block := &mpb.StoreBlock{
 		Checksum:    false,
