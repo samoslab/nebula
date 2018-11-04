@@ -114,6 +114,7 @@ func (m *MetaDataMap) Get(fileName string) (paraStr string, generator, pubKey, r
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	if md, ok := m.md[fileName]; ok {
+		delete(m.md, fileName)
 		return md.paraStr, md.generator, md.pubKey, md.random, md.phi, md.err
 	}
 	return "", nil, nil, nil, nil, ErrNoMetaData
