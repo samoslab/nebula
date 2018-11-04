@@ -7,10 +7,10 @@ var (
 	MaxInvalidDelay = 100
 
 	// CC is concurrent
-	CCDownloadGoNum = 1
-	CCUploadGoNum   = 1
-	CCUploadFileNum = 1
-	CCTaskHandleNum = 1
+	CCDownloadGoNum = 3
+	CCUploadGoNum   = 3
+	CCUploadFileNum = 3
+	CCTaskHandleNum = 3
 
 	TaskUploadFileType   = "UploadFile"
 	TaskUploadDirType    = "UploadDir"
