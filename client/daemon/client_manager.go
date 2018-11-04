@@ -133,6 +133,7 @@ type ClientManager struct {
 	PubkeyHash    []byte
 	Root          string
 	mutex         sync.Mutex
+	metaMutex     sync.Mutex
 	MsgCount      uint32
 	MsgChan       chan string
 	done          chan struct{}
@@ -469,6 +470,12 @@ func (c *ClientManager) SendProgressMsg() error {
 // GenMetadataInOrder gen metadata by single goroutine due to crash if runing by multi-goroutine
 func (c *ClientManager) GenMetadataInOrder() error {
 	log := c.Log
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error("!!!!!get panic info, recover it %s", r)
+			debug.PrintStack()
+		}
+	}()
 	log.Info("Start send progress")
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -483,7 +490,10 @@ func (c *ClientManager) GenMetadataInOrder() error {
 				return
 			case mk := <-c.MetaChan:
 				t1 := time.Now()
+				log.Infof("gen %s metadata chunksize %d", mk.FileName, mk.ChunkSize)
+				c.metaMutex.Lock()
 				paraStr, generator, pubKey, random, phi, err := filecheck.GenMetadata(mk.FileName, mk.ChunkSize)
+				c.metaMutex.Unlock()
 				t2 := time.Now()
 				log.Infof("gen %s metadata time elapased %+v", mk.FileName, t2.Sub(t1).Seconds())
 				c.mdm.Add(mk.FileName, paraStr, generator, pubKey, random, phi, err)
@@ -1160,6 +1170,12 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 	return partition, nil
 }
 
+func (c *ClientManager) AddMetaKey(fileName string, chunkSize uint32) {
+	c.mutex.Lock()
+	c.MetaChan <- MetaKey{FileName: fileName, ChunkSize: chunkSize}
+	c.mutex.Unlock()
+}
+
 func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, tm uint64, uploadPara *common.UploadParameter, chunkSize uint32) (*mpb.StoreBlock, error) {
 	server := fmt.Sprintf("%s:%d", pro.GetServer(), pro.GetPort())
 	log := c.Log.WithField("server", server).WithField("erasurefile", uploadPara.HF.FileName)
@@ -1178,7 +1194,7 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 	}
 
 	t1 := time.Now()
-	c.MetaChan <- MetaKey{FileName: uploadPara.HF.FileName, ChunkSize: chunkSize}
+	c.AddMetaKey(uploadPara.HF.FileName, chunkSize)
 
 	ha := pro.GetHashAuth()[0]
 	err = client.StorePiece(log, pclient, uploadPara, ha.GetAuth(), ha.GetTicket(), tm, c.PM)
@@ -1304,7 +1320,7 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 		return nil, fmt.Errorf("chunksize[%d] can not less than 0", rsp.GetChunkSize())
 	}
 
-	c.MetaChan <- MetaKey{FileName: fileName, ChunkSize: rsp.GetChunkSize()}
+	c.AddMetaKey(fileName, rsp.GetChunkSize())
 	var paraStr string
 	var generator, pubKey, random []byte
 	var phi [][]byte
