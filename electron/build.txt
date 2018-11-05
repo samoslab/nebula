@@ -46,7 +46,7 @@ Mac 64bit(native compile):
 cd ../../samos/src/gui/static/&& yarn install &&yarn run build&&cd -
 go build -o dist/wallet-mac-x64 ../../samos/cmd/samos/samos.go
 go build -o dist/nebula-client-mac-x64 ../client/main.go
-yarn run dist-mac64
+yarn run dist-mac
 
 
 Linux 64bit(native compile):
