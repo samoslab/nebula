@@ -51,7 +51,8 @@ func (self *GenMetadataRunner) doGen(pacs *pathAndChunkSize) {
 }
 
 func (self *GenMetadataRunner) GetResult(path string) (exist bool, paramStr string, generator []byte, pubKeyBytes []byte, random []byte, phi [][]byte, er error) {
-	vi, exist := self.result.Load(path)
+	var vi interface{}
+	vi, exist = self.result.Load(path)
 	if exist {
 		v := vi.(*metadataInfo)
 		paramStr, generator, pubKeyBytes, random, phi, er = v.paramStr, v.generator, v.pubKeyBytes, v.random, v.phi, v.er
