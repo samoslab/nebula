@@ -1445,7 +1445,7 @@ $("#initBalance").click(function(){
 //复制钱包地址
 $("#samosWalletCopyBtn").click(function(){
     $('#samosWalletAddress').css('background','#3b8cff');
-    var clipboard = new ClipboardJS('.samosWalletCopyBtn',{
+    var clipboard = new ClipboardJS('#samosWalletCopyBtn',{
         container: document.getElementById("myModal")
     });
     clipboard.on('success', function(e) {
