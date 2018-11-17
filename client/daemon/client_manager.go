@@ -69,7 +69,7 @@ var (
 
 	RetryCount = 3
 
-	ErrNoMetaData = errors.New("no metadata")
+	// ErrNoMetaData = errors.New("no metadata")
 )
 
 // DownFile list files format, used when download file
@@ -90,40 +90,40 @@ type FilePages struct {
 	Files []*DownFile `json:"files"`
 }
 
-type MetaData struct {
-	paraStr   string
-	generator []byte
-	pubKey    []byte
-	random    []byte
-	phi       [][]byte
-	err       error
-}
+// type MetaData struct {
+// 	paraStr   string
+// 	generator []byte
+// 	pubKey    []byte
+// 	random    []byte
+// 	phi       [][]byte
+// 	err       error
+// }
 
-type MetaDataMap struct {
-	md    map[string]MetaData
-	mutex sync.Mutex
-}
+// type MetaDataMap struct {
+// 	md    map[string]MetaData
+// 	mutex sync.Mutex
+// }
 
-func (m *MetaDataMap) Add(fileName, paraStr string, generator, pubKey, random []byte, phi [][]byte, err error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	m.md[fileName] = MetaData{paraStr: paraStr, generator: generator, pubKey: pubKey, random: random, phi: phi, err: err}
-}
+// func (m *MetaDataMap) Add(fileName, paraStr string, generator, pubKey, random []byte, phi [][]byte, err error) {
+// 	m.mutex.Lock()
+// 	defer m.mutex.Unlock()
+// 	m.md[fileName] = MetaData{paraStr: paraStr, generator: generator, pubKey: pubKey, random: random, phi: phi, err: err}
+// }
 
-func (m *MetaDataMap) Get(fileName string) (paraStr string, generator, pubKey, random []byte, phi [][]byte, err error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	if md, ok := m.md[fileName]; ok {
-		delete(m.md, fileName)
-		return md.paraStr, md.generator, md.pubKey, md.random, md.phi, md.err
-	}
-	return "", nil, nil, nil, nil, ErrNoMetaData
-}
+// func (m *MetaDataMap) Get(fileName string) (paraStr string, generator, pubKey, random []byte, phi [][]byte, err error) {
+// 	m.mutex.Lock()
+// 	defer m.mutex.Unlock()
+// 	if md, ok := m.md[fileName]; ok {
+// 		delete(m.md, fileName)
+// 		return md.paraStr, md.generator, md.pubKey, md.random, md.phi, md.err
+// 	}
+// 	return "", nil, nil, nil, nil, ErrNoMetaData
+// }
 
-type MetaKey struct {
-	FileName  string
-	ChunkSize uint32
-}
+// type MetaKey struct {
+// 	FileName  string
+// 	ChunkSize uint32
+// }
 
 // ClientManager client manager
 type ClientManager struct {
@@ -149,8 +149,9 @@ type ClientManager struct {
 	cfg           *config.ClientConfig
 	PM            *progress.ProgressManager
 	mclient       mpb.MatadataServiceClient
-	mdm           *MetaDataMap
-	MetaChan      chan MetaKey
+	// mdm               *MetaDataMap
+	// MetaChan          chan MetaKey
+	genMetadataRunner *filecheck.GenMetadataRunner
 }
 
 // NewClientManager create manager
@@ -217,8 +218,9 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 		mclient:       mpb.NewMatadataServiceClient(conn),
 		MsgChan:       make(chan string, common.MsgQueueLen),
 		TaskChan:      make(chan TaskInfo, common.TaskQuqueLen),
-		MetaChan:      make(chan MetaKey, common.MetaQuqueLen),
-		mdm:           &MetaDataMap{md: map[string]MetaData{}},
+		// MetaChan:          make(chan MetaKey, common.MetaQuqueLen),
+		// mdm:               &MetaDataMap{md: map[string]MetaData{}},
+		genMetadataRunner: filecheck.NewRunner(),
 	}
 
 	collectClient.NodePtr = cfg.Node
@@ -235,8 +237,8 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 
 	go c.ExecuteTask()
 	go c.SendProgressMsg()
-	go c.GenMetadataInOrder()
-
+	// go c.GenMetadataInOrder()
+	go c.genMetadataRunner.Run()
 	return c, nil
 }
 
@@ -467,42 +469,42 @@ func (c *ClientManager) SendProgressMsg() error {
 	return nil
 }
 
-// GenMetadataInOrder gen metadata by single goroutine due to crash if runing by multi-goroutine
-func (c *ClientManager) GenMetadataInOrder() error {
-	log := c.Log
-	defer func() {
-		if r := recover(); r != nil {
-			log.Error("!!!!!get panic info, recover it %s", r)
-			debug.PrintStack()
-		}
-	}()
-	log.Info("Start send progress")
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer func() {
-			wg.Done()
-			log.Infof("Shutdown progress goroutine")
-		}()
-		for {
-			select {
-			case <-c.quit:
-				return
-			case mk := <-c.MetaChan:
-				t1 := time.Now()
-				log.Infof("gen %s metadata chunksize %d", mk.FileName, mk.ChunkSize)
-				c.metaMutex.Lock()
-				paraStr, generator, pubKey, random, phi, err := filecheck.GenMetadata(mk.FileName, mk.ChunkSize)
-				c.metaMutex.Unlock()
-				t2 := time.Now()
-				log.Infof("gen %s metadata time elapased %+v", mk.FileName, t2.Sub(t1).Seconds())
-				c.mdm.Add(mk.FileName, paraStr, generator, pubKey, random, phi, err)
-			}
-		}
-	}()
-	wg.Wait()
-	return nil
-}
+// // GenMetadataInOrder gen metadata by single goroutine due to crash if runing by multi-goroutine
+// func (c *ClientManager) GenMetadataInOrder() error {
+// 	log := c.Log
+// 	defer func() {
+// 		if r := recover(); r != nil {
+// 			log.Error("!!!!!get panic info, recover it %s", r)
+// 			debug.PrintStack()
+// 		}
+// 	}()
+// 	log.Info("Start send progress")
+// 	var wg sync.WaitGroup
+// 	wg.Add(1)
+// 	go func() {
+// 		defer func() {
+// 			wg.Done()
+// 			log.Infof("Shutdown progress goroutine")
+// 		}()
+// 		for {
+// 			select {
+// 			case <-c.quit:
+// 				return
+// 			case mk := <-c.MetaChan:
+// 				t1 := time.Now()
+// 				log.Infof("gen %s metadata chunksize %d", mk.FileName, mk.ChunkSize)
+// 				c.metaMutex.Lock()
+// 				paraStr, generator, pubKey, random, phi, err := filecheck.GenMetadata(mk.FileName, mk.ChunkSize)
+// 				c.metaMutex.Unlock()
+// 				t2 := time.Now()
+// 				log.Infof("gen %s metadata time elapased %+v", mk.FileName, t2.Sub(t1).Seconds())
+// 				c.mdm.Add(mk.FileName, paraStr, generator, pubKey, random, phi, err)
+// 			}
+// 		}
+// 	}()
+// 	wg.Wait()
+// 	return nil
+// }
 
 func (c *ClientManager) SendPingMsg() error {
 	req := &mpb.PingReq{
@@ -1171,9 +1173,7 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 }
 
 func (c *ClientManager) AddMetaKey(fileName string, chunkSize uint32) {
-	c.mutex.Lock()
-	c.MetaChan <- MetaKey{FileName: fileName, ChunkSize: chunkSize}
-	c.mutex.Unlock()
+	c.genMetadataRunner.AddPath(fileName, chunkSize)
 }
 
 func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, tm uint64, uploadPara *common.UploadParameter, chunkSize uint32) (*mpb.StoreBlock, error) {
@@ -1206,11 +1206,15 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 	var generator, pubKey, random []byte
 	var phi [][]byte
 	var waitCount int
-	paraStr, generator, pubKey, random, phi, err = c.mdm.Get(uploadPara.HF.FileName)
-	for err != nil && err == ErrNoMetaData && waitCount < 60*60 {
-		time.Sleep(1)
-		paraStr, generator, pubKey, random, phi, err = c.mdm.Get(uploadPara.HF.FileName)
+	var exist bool
+	exist, paraStr, generator, pubKey, random, phi, err = c.genMetadataRunner.GetResult(uploadPara.HF.FileName) //c.mdm.Get(uploadPara.HF.FileName)
+	for !exist && waitCount < 30 {
+		time.Sleep(time.Second)
+		exist, paraStr, generator, pubKey, random, phi, err = c.genMetadataRunner.GetResult(uploadPara.HF.FileName)
 		waitCount++
+	}
+	if exist {
+		c.genMetadataRunner.RemoveResult(uploadPara.HF.FileName)
 	}
 	t2 := time.Now()
 	log.Infof("upload %s time elapased %+v", uploadPara.HF.FileName, t2.Sub(t1).Seconds())
@@ -1326,15 +1330,18 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 	var phi [][]byte
 
 	var waitCount int
-	paraStr, generator, pubKey, random, phi, err = c.mdm.Get(fileName)
-	for err != nil && err == ErrNoMetaData && waitCount < 60*60 {
-		time.Sleep(1)
-		paraStr, generator, pubKey, random, phi, err = c.mdm.Get(fileName)
+	var exist bool
+	exist, paraStr, generator, pubKey, random, phi, err = c.genMetadataRunner.GetResult(fileName)
+	for !exist && waitCount < 30 {
+		time.Sleep(time.Second)
+		exist, paraStr, generator, pubKey, random, phi, err = c.genMetadataRunner.GetResult(fileName)
 		waitCount++
 	}
-
 	if err != nil {
 		return nil, err
+	}
+	if exist {
+		c.genMetadataRunner.RemoveResult(fileName)
 	}
 	t2 := time.Now()
 	log.Infof("upload %s time elapased %+v", fileName, t2.Sub(t1).Seconds())
