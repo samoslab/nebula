@@ -273,6 +273,7 @@ func (c *ClientManager) Shutdown() {
 	<-c.done
 	close(c.TaskChan)
 	close(c.MsgChan)
+	c.genMetadataRunner.Quit()
 }
 
 func map2Req(taskInfo TaskInfo) (TaskInfo, error) {
