@@ -20,7 +20,7 @@ func main() {
 	go runner.Run()
 	sig := make(chan bool)
 	go clean(sig)
-	filepath.Walk("/", walkfunc)
+	filepath.Walk("/Users/lijt/Downloads/", walkfunc)
 	for {
 		time.Sleep(30 * time.Second)
 		if getPathsLen() == 0 {
@@ -38,11 +38,32 @@ func walkfunc(path string, info os.FileInfo, err error) (er error) {
 	// if !strings.HasSuffix(info.Name(), ".jar") {
 	// 	return
 	// }
-	runner.AddPath(path, 32768)
+
+	runner.AddPath(path, getChunkSize(uint64(info.Size())))
 	pathsLock.Lock()
 	defer pathsLock.Unlock()
 	paths[path] = struct{}{}
 	return
+}
+
+func getChunkSize(fileSize uint64) uint32 {
+	if fileSize < 32768 {
+		return 2048
+	} else if fileSize < 131072 {
+		return 4096
+	} else if fileSize < 524288 {
+		return 8192
+	} else if fileSize < 4194304 {
+		return 16384
+	} else if fileSize < 16777216 {
+		return 32768
+	} else if fileSize < 33554432 {
+		return 65536
+	} else if fileSize < 67108864 {
+		return 131072
+	} else {
+		return 262144
+	}
 }
 
 func clean(sig chan bool) {
