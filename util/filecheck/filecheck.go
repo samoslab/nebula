@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"os"
 
+	"github.com/Nik-U/pbc"
 	util_bytes "github.com/samoslab/nebula/util/bytes"
 )
 
@@ -35,7 +36,7 @@ func GenMetadata(filepath string, chunkSize uint32) (paramStr string, generator 
 	// params := pbc.GenerateA(160, 512)
 	// paramStr = params.String()
 	paramStr = param_str
-	pairing, err := NewPairingFromString(param_str)
+	pairing, err := pbc.NewPairingFromString(param_str)
 	if err != nil {
 		panic(err)
 	}
