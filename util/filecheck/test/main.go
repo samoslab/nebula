@@ -20,7 +20,9 @@ func main() {
 	go runner.Run()
 	sig := make(chan bool)
 	go clean(sig)
-	filepath.Walk("/Users/lijt/Downloads/", walkfunc)
+	for i := 0; i < 1000; i++ {
+		filepath.Walk("/", walkfunc)
+	}
 	for {
 		time.Sleep(30 * time.Second)
 		if getPathsLen() == 0 {
