@@ -20,6 +20,7 @@ const (
 	xssProtectionHeader  = "X-XSS-Protection"
 	xssProtectionValue   = "1; mode=block"
 	cspHeader            = "Content-Security-Policy"
+	cspReportOnlyHeader  = "Content-Security-Policy-Report-Only"
 	hpkpHeader           = "Public-Key-Pins"
 	referrerPolicyHeader = "Referrer-Policy"
 	featurePolicyHeader  = "Feature-Policy"
@@ -63,6 +64,8 @@ type Options struct {
 	STSPreload bool
 	// ContentSecurityPolicy allows the Content-Security-Policy header value to be set with a custom value. Default is "".
 	ContentSecurityPolicy string
+	// ContentSecurityPolicyReportOnly allows the Content-Security-Policy-Report-Only header value to be set with a custom value. Default is "".
+	ContentSecurityPolicyReportOnly string
 	// CustomBrowserXssValue allows the X-XSS-Protection header value to be set with a custom value. This overrides the BrowserXssFilter option. Default is "".
 	CustomBrowserXssValue string // nolint: golint
 	// Passing a template string will replace `$NONCE` with a dynamic nonce value of 16 bytes for each request which can be later retrieved using the Nonce function.
@@ -129,10 +132,6 @@ func (s *Secure) SetBadHostHandler(handler http.Handler) {
 // Handler implements the http.HandlerFunc for integration with the standard net/http lib.
 func (s *Secure) Handler(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.opt.nonceEnabled {
-			r = withCSPNonce(r, cspRandNonce())
-		}
-
 		// Let secure process the request. If it returns an error,
 		// that indicates the request should not continue.
 		err := s.Process(w, r)
@@ -150,10 +149,6 @@ func (s *Secure) Handler(h http.Handler) http.Handler {
 // Note that this is for requests only and will not write any headers.
 func (s *Secure) HandlerForRequestOnly(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if s.opt.nonceEnabled {
-			r = withCSPNonce(r, cspRandNonce())
-		}
-
 		// Let secure process the request. If it returns an error,
 		// that indicates the request should not continue.
 		responseHeader, err := s.processRequest(w, r)
@@ -173,10 +168,6 @@ func (s *Secure) HandlerForRequestOnly(h http.Handler) http.Handler {
 
 // HandlerFuncWithNext is a special implementation for Negroni, but could be used elsewhere.
 func (s *Secure) HandlerFuncWithNext(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
-	if s.opt.nonceEnabled {
-		r = withCSPNonce(r, cspRandNonce())
-	}
-
 	// Let secure process the request. If it returns an error,
 	// that indicates the request should not continue.
 	err := s.Process(w, r)
@@ -190,10 +181,6 @@ func (s *Secure) HandlerFuncWithNext(w http.ResponseWriter, r *http.Request, nex
 // HandlerFuncWithNextForRequestOnly is a special implementation for Negroni, but could be used elsewhere.
 // Note that this is for requests only and will not write any headers.
 func (s *Secure) HandlerFuncWithNextForRequestOnly(w http.ResponseWriter, r *http.Request, next http.HandlerFunc) {
-	if s.opt.nonceEnabled {
-		r = withCSPNonce(r, cspRandNonce())
-	}
-
 	// Let secure process the request. If it returns an error,
 	// that indicates the request should not continue.
 	responseHeader, err := s.processRequest(w, r)
@@ -223,6 +210,11 @@ func (s *Secure) Process(w http.ResponseWriter, r *http.Request) error {
 
 // processRequest runs the actual checks on the request and returns an error if the middleware chain should stop.
 func (s *Secure) processRequest(w http.ResponseWriter, r *http.Request) (http.Header, error) {
+	// Setup nouce if required.
+	if s.opt.nonceEnabled {
+		r = withCSPNonce(r, cspRandNonce())
+	}
+
 	// Resolve the host for the request, using proxy headers if present.
 	host := r.Host
 	for _, header := range s.opt.HostsProxyHeaders {
@@ -346,6 +338,15 @@ func (s *Secure) processRequest(w http.ResponseWriter, r *http.Request) (http.He
 			responseHeader.Set(cspHeader, fmt.Sprintf(s.opt.ContentSecurityPolicy, CSPNonce(r.Context())))
 		} else {
 			responseHeader.Set(cspHeader, s.opt.ContentSecurityPolicy)
+		}
+	}
+
+	// Content Security Policy Report Only header.
+	if len(s.opt.ContentSecurityPolicyReportOnly) > 0 {
+		if s.opt.nonceEnabled {
+			responseHeader.Set(cspReportOnlyHeader, fmt.Sprintf(s.opt.ContentSecurityPolicyReportOnly, CSPNonce(r.Context())))
+		} else {
+			responseHeader.Set(cspReportOnlyHeader, s.opt.ContentSecurityPolicyReportOnly)
 		}
 	}
 
