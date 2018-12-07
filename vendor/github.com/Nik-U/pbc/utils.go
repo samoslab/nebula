@@ -1,4 +1,4 @@
-// Copyright © 2015 Nik Unger
+// Copyright © 2018 Nik Unger
 //
 // This file is part of The PBC Go Wrapper.
 //
@@ -81,8 +81,8 @@ func SetRandomProvider(provider RandomSource) {
 
 //export goGenerateRandom
 func goGenerateRandom(out, limit unsafe.Pointer) {
-	outMpz := &mpz{i: *(*C.mpz_t)(out)}
-	limitMpz := &mpz{i: *(*C.mpz_t)(limit)}
+	outMpz := &mpz{i: *(**C.mpz_t)(out)}
+	limitMpz := &mpz{i: *(**C.mpz_t)(limit)}
 	r := randomProvider.Rand(mpz2big(limitMpz))
 	big2thisMpz(r, outMpz)
 }

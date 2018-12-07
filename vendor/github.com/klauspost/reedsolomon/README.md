@@ -24,15 +24,19 @@ go get -u github.com/klauspost/reedsolomon
 
 # Changes
 
+## November 18, 2017
+
+Added [WithAutoGoroutines](https://godoc.org/github.com/klauspost/reedsolomon#WithAutoGoroutines) which will attempt to calculate the optimal number of goroutines to use based on your expected shard size and detected CPU.
+
 ## October 1, 2017
 
 * [Cauchy Matrix](https://godoc.org/github.com/klauspost/reedsolomon#WithCauchyMatrix) is now an option. Thanks to [templexxx](https://github.com/templexxx) for the basis of this.
 * Default maximum number of [goroutines](https://godoc.org/github.com/klauspost/reedsolomon#WithMaxGoroutines) has been increased for better multi-core scaling.
-* After several requests the Reconstruct and ReconstructData now slices of zero length but sufficient capacityto be used instead of allocating new memory.
+* After several requests the Reconstruct and ReconstructData now slices of zero length but sufficient capacity to be used instead of allocating new memory.
 
 ## August 26, 2017
 
-*  The[`Encoder()`](https://godoc.org/github.com/klauspost/reedsolomon#Encoder) now contains an `Update` function contributed by [chenzhongtao](https://github.com/chenzhongtao).
+*  The [`Encoder()`](https://godoc.org/github.com/klauspost/reedsolomon#Encoder) now contains an `Update` function contributed by [chenzhongtao](https://github.com/chenzhongtao).
 * [Frank Wessels](https://github.com/fwessels) kindly contributed ARM 64 bit assembly, which gives a huge performance boost on this platform.
 
 ## July 20, 2017
@@ -160,7 +164,7 @@ It might seem like a limitation that all data should be in memory, but an import
       splitA[i] = data[i][:25000]
       splitB[i] = data[i][25000:]
       
-      // Concencate it to itself
+      // Concatenate it to itself
 	  merged[i] = append(make([]byte, 0, len(data[i])*2), data[i]...)
 	  merged[i] = append(merged[i], data[i]...)
     }
@@ -262,8 +266,10 @@ By exploiting NEON instructions the performance for ARM has been accelerated. Be
 # Links
 * [Backblaze Open Sources Reed-Solomon Erasure Coding Source Code](https://www.backblaze.com/blog/reed-solomon/).
 * [JavaReedSolomon](https://github.com/Backblaze/JavaReedSolomon). Compatible java library by Backblaze.
+* [ocaml-reed-solomon-erasure](https://gitlab.com/darrenldl/ocaml-reed-solomon-erasure). Compatible OCaml implementation.
 * [reedsolomon-c](https://github.com/jannson/reedsolomon-c). C version, compatible with output from this package.
 * [Reed-Solomon Erasure Coding in Haskell](https://github.com/NicolasT/reedsolomon). Haskell port of the package with similar performance.
+* [reed-solomon-erasure](https://github.com/darrenldl/reed-solomon-erasure). Compatible Rust implementation.
 * [go-erasure](https://github.com/somethingnew2-0/go-erasure). A similar library using cgo, slower in my tests.
 * [rsraid](https://github.com/goayame/rsraid). A similar library written in Go. Slower, but supports more shards.
 * [Screaming Fast Galois Field Arithmetic](http://www.snia.org/sites/default/files2/SDC2013/presentations/NewThinking/EthanMiller_Screaming_Fast_Galois_Field%20Arithmetic_SIMD%20Instructions.pdf). Basis for SSE3 optimizations.
