@@ -66,6 +66,10 @@ var (
 	// ReplicaNum number of muliti-replication
 	ReplicaNum    = 4
 	MinReplicaNum = 3
+
+	RetryCount = 3
+
+	ErrNoMetaData = errors.New("no metadata")
 )
 
 // DownFile list files format, used when download file
@@ -86,6 +90,41 @@ type FilePages struct {
 	Files []*DownFile `json:"files"`
 }
 
+type MetaData struct {
+	paraStr   string
+	generator []byte
+	pubKey    []byte
+	random    []byte
+	phi       [][]byte
+	err       error
+}
+
+type MetaDataMap struct {
+	md    map[string]MetaData
+	mutex sync.Mutex
+}
+
+func (m *MetaDataMap) Add(fileName, paraStr string, generator, pubKey, random []byte, phi [][]byte, err error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.md[fileName] = MetaData{paraStr: paraStr, generator: generator, pubKey: pubKey, random: random, phi: phi, err: err}
+}
+
+func (m *MetaDataMap) Get(fileName string) (paraStr string, generator, pubKey, random []byte, phi [][]byte, err error) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	if md, ok := m.md[fileName]; ok {
+		delete(m.md, fileName)
+		return md.paraStr, md.generator, md.pubKey, md.random, md.phi, md.err
+	}
+	return "", nil, nil, nil, nil, ErrNoMetaData
+}
+
+type MetaKey struct {
+	FileName  string
+	ChunkSize uint32
+}
+
 // ClientManager client manager
 type ClientManager struct {
 	NodeId        []byte
@@ -94,6 +133,7 @@ type ClientManager struct {
 	PubkeyHash    []byte
 	Root          string
 	mutex         sync.Mutex
+	metaMutex     sync.Mutex
 	MsgCount      uint32
 	MsgChan       chan string
 	done          chan struct{}
@@ -109,6 +149,8 @@ type ClientManager struct {
 	cfg           *config.ClientConfig
 	PM            *progress.ProgressManager
 	mclient       mpb.MatadataServiceClient
+	mdm           *MetaDataMap
+	MetaChan      chan MetaKey
 }
 
 // NewClientManager create manager
@@ -175,6 +217,8 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 		mclient:       mpb.NewMatadataServiceClient(conn),
 		MsgChan:       make(chan string, common.MsgQueueLen),
 		TaskChan:      make(chan TaskInfo, common.TaskQuqueLen),
+		MetaChan:      make(chan MetaKey, common.MetaQuqueLen),
+		mdm:           &MetaDataMap{md: map[string]MetaData{}},
 	}
 
 	collectClient.NodePtr = cfg.Node
@@ -191,6 +235,7 @@ func NewClientManager(log logrus.FieldLogger, webcfg config.Config, cfg *config.
 
 	go c.ExecuteTask()
 	go c.SendProgressMsg()
+	go c.GenMetadataInOrder()
 
 	return c, nil
 }
@@ -347,21 +392,21 @@ func (c *ClientManager) ExecuteTask() error {
 						err = errors.New("unknown")
 					}
 					errStr := ""
-					if err != nil {
+					if err != nil && !strings.Contains(err.Error(), "path is not exists") {
 						log.WithError(err).Error("Execute task failed")
 						code, errMsg := common.StatusErrFromError(err)
-						if code == 300 && retry < 3 {
+						if code == 300 && retry < RetryCount {
 							log.WithError(err).Error("Execute task failed, retrying")
 							goto RETRY
 						}
-						if strings.Contains(errMsg, "context deadline exceeded") && retry < 3 {
+						if strings.Contains(errMsg, "context deadline exceeded") && retry < RetryCount-1 {
 							log.WithError(err).Error("Execute task failed, retrying")
 							goto RETRY
 						}
-						if retry < 3 {
-							log.WithError(err).Error("Execute task failed, retrying")
-							goto RETRY
-						}
+						//if retry < RetryCount {
+						//	log.WithError(err).Error("Execute task failed, retrying")
+						//	goto RETRY
+						//}
 						errStr = err.Error()
 						doneMsg.SetError(1, err)
 					} else {
@@ -412,8 +457,46 @@ func (c *ClientManager) SendProgressMsg() error {
 					continue
 				}
 				for _, msg := range msgList {
+					log.Infof("progress message %+v", msg)
 					c.AddDoneMsg(msg)
 				}
+			}
+		}
+	}()
+	wg.Wait()
+	return nil
+}
+
+// GenMetadataInOrder gen metadata by single goroutine due to crash if runing by multi-goroutine
+func (c *ClientManager) GenMetadataInOrder() error {
+	log := c.Log
+	defer func() {
+		if r := recover(); r != nil {
+			log.Error("!!!!!get panic info, recover it %s", r)
+			debug.PrintStack()
+		}
+	}()
+	log.Info("Start send progress")
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer func() {
+			wg.Done()
+			log.Infof("Shutdown progress goroutine")
+		}()
+		for {
+			select {
+			case <-c.quit:
+				return
+			case mk := <-c.MetaChan:
+				t1 := time.Now()
+				log.Infof("gen %s metadata chunksize %d", mk.FileName, mk.ChunkSize)
+				c.metaMutex.Lock()
+				paraStr, generator, pubKey, random, phi, err := filecheck.GenMetadata(mk.FileName, mk.ChunkSize)
+				c.metaMutex.Unlock()
+				t2 := time.Now()
+				log.Infof("gen %s metadata time elapased %+v", mk.FileName, t2.Sub(t1).Seconds())
+				c.mdm.Add(mk.FileName, paraStr, generator, pubKey, random, phi, err)
 			}
 		}
 	}()
@@ -660,13 +743,35 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 			log.Info("Space password not set")
 			return fmt.Errorf("Password not set")
 		}
-		encryptKey, err = rsalong.EncryptLong(c.TrackerPubkey, password, 256)
-		if err != nil {
-			log.WithError(err).Info("Encrypt password")
-			return err
+		if sno == 0 {
+			encryptKey, err = rsalong.EncryptLong(c.TrackerPubkey, password, 256)
+			if err != nil {
+				log.WithError(err).Info("Encrypt password")
+				return err
+			}
 		}
 	}
-	req, rsp, err := c.CheckFileExists(fileName, dest, interactive, newVersion, password, encryptKey, sno)
+
+	fileType := filetype.FileType(fileName)
+	// privacy space need encryp file whole
+	if sno > 0 && isEncrypt {
+		if len(password) == 0 {
+			return errors.New("privacy no password")
+		}
+		log.Infof("privacy space %d , so encrypt file first", sno)
+		originFileName := fileName
+		// change fileName to encypted file avoid origin file modified
+		_, onlyFileName := filepath.Split(fileName)
+		fileName = filepath.Join(c.TempDir, onlyFileName)
+		err := aes.EncryptFile(originFileName, password, fileName)
+		if err != nil {
+			log.Errorf("Encrypt error %v", err)
+			return err
+		}
+		log = log.WithField("encrypted file", fileName)
+	}
+
+	req, rsp, err := c.CheckFileExists(fileName, dest, interactive, newVersion, password, encryptKey, sno, fileType)
 	if err != nil {
 		return err
 	}
@@ -688,7 +793,7 @@ func (c *ClientManager) UploadFile(fileName, dest string, interactive, newVersio
 		log.Infof("Upload manner is multi-replication")
 		// encrypt file
 		originFileName := fileName
-		if isEncrypt {
+		if sno == 0 && isEncrypt {
 			_, onlyFileName := filepath.Split(fileName)
 			// change fileName to encypted file avoid origin file modified
 			fileName = filepath.Join(c.TempDir, onlyFileName)
@@ -852,8 +957,10 @@ func deleteTemporaryFile(log logrus.FieldLogger, fileName string) {
 	}
 }
 
-func (c *ClientManager) CheckFileExists(fileName, dest string, interactive, newVersion bool, password, encryptKey []byte, sno uint32) (*mpb.CheckFileExistReq, *mpb.CheckFileExistResp, error) {
+// CheckFileExists check file exists or not in tracker
+func (c *ClientManager) CheckFileExists(fileName, dest string, interactive, newVersion bool, password, encryptKey []byte, sno uint32, fileType filetype.MIME) (*mpb.CheckFileExistReq, *mpb.CheckFileExistResp, error) {
 	log := c.Log.WithField("filename", fileName)
+	// privacy space
 	hash, err := util_hash.Sha1File(fileName)
 	if err != nil {
 		return nil, nil, err
@@ -862,7 +969,6 @@ func (c *ClientManager) CheckFileExists(fileName, dest string, interactive, newV
 	if err != nil {
 		return nil, nil, err
 	}
-	fileType := filetype.FileType(fileName)
 	_, fname := filepath.Split(fileName)
 	ctx := context.Background()
 	req := &mpb.CheckFileExistReq{
@@ -890,7 +996,7 @@ func (c *ClientManager) CheckFileExists(fileName, dest string, interactive, newV
 			log.Errorf("Read file data error %v", err)
 			return nil, nil, err
 		}
-		if len(password) != 0 {
+		if sno == 0 && len(password) != 0 {
 			fileData, err = aes.Encrypt(fileData, password)
 			if err != nil {
 				log.Errorf("Encrypt file error %v", err)
@@ -900,7 +1006,7 @@ func (c *ClientManager) CheckFileExists(fileName, dest string, interactive, newV
 		req.FileData = fileData
 		sp := serverPath(dest, fileName)
 		c.PM.SetProgress(common.TaskUploadProgressType, common.ProgressKey(sp, sno), req.FileSize, req.FileSize, sno, fileName)
-		fmt.Printf("Origin filesize %d, encrypted size %d\n", req.FileSize, len(req.FileData))
+		log.Infof("Origin filesize %d, encrypted size %d", req.FileSize, len(req.FileData))
 	}
 	err = req.SignReq(c.cfg.Node.PriKey)
 	if err != nil {
@@ -974,7 +1080,7 @@ func (c *ClientManager) onlyFileSplit(fileName string, dataNum, verifyNum int, i
 		log.Errorf("Reedsolomon encoder error %v", err)
 		return nil, err
 	}
-	if isEncrypt {
+	if sno == 0 && isEncrypt {
 		for i := range fileSlices {
 			err := aes.EncryptFile(fileSlices[i].FileName, password, fileSlices[i].FileName)
 			if err != nil {
@@ -1064,6 +1170,12 @@ func (c *ClientManager) uploadFileBatchByErasure(req *mpb.UploadFilePrepareReq, 
 	return partition, nil
 }
 
+func (c *ClientManager) AddMetaKey(fileName string, chunkSize uint32) {
+	c.mutex.Lock()
+	c.MetaChan <- MetaKey{FileName: fileName, ChunkSize: chunkSize}
+	c.mutex.Unlock()
+}
+
 func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, tm uint64, uploadPara *common.UploadParameter, chunkSize uint32) (*mpb.StoreBlock, error) {
 	server := fmt.Sprintf("%s:%d", pro.GetServer(), pro.GetPort())
 	log := c.Log.WithField("server", server).WithField("erasurefile", uploadPara.HF.FileName)
@@ -1076,18 +1188,33 @@ func (c *ClientManager) uploadFileToErasureProvider(pro *mpb.BlockProviderAuth, 
 	defer conn.Close()
 	pclient := pb.NewProviderServiceClient(conn)
 
-	var paraStr string
-	var generator, pubKey, random []byte
-	var phi [][]byte
-	if chunkSize > 0 {
-		paraStr, generator, pubKey, random, phi, err = filecheck.GenMetadata(uploadPara.HF.FileName, chunkSize)
-		if err != nil {
-			return nil, err
-		}
+	if chunkSize <= 0 {
+		log.Errorf("chunksize[%d] can not less than 0", chunkSize)
+		return nil, fmt.Errorf("chunksize[%d] can not less than 0", chunkSize)
 	}
+
+	t1 := time.Now()
+	c.AddMetaKey(uploadPara.HF.FileName, chunkSize)
 
 	ha := pro.GetHashAuth()[0]
 	err = client.StorePiece(log, pclient, uploadPara, ha.GetAuth(), ha.GetTicket(), tm, c.PM)
+	if err != nil {
+		return nil, err
+	}
+
+	var paraStr string
+	var generator, pubKey, random []byte
+	var phi [][]byte
+	var waitCount int
+	paraStr, generator, pubKey, random, phi, err = c.mdm.Get(uploadPara.HF.FileName)
+	for err != nil && err == ErrNoMetaData && waitCount < 60*60 {
+		time.Sleep(1)
+		paraStr, generator, pubKey, random, phi, err = c.mdm.Get(uploadPara.HF.FileName)
+		waitCount++
+	}
+	t2 := time.Now()
+	log.Infof("upload %s time elapased %+v", uploadPara.HF.FileName, t2.Sub(t1).Seconds())
+
 	if err != nil {
 		return nil, err
 	}
@@ -1187,18 +1314,30 @@ func (c *ClientManager) uploadFileByMultiReplica(originFileName, fileName string
 
 	t1 := time.Now()
 	fmt.Printf("chunksize %d, filename %s\n", rsp.GetChunkSize(), fileName)
+
+	if rsp.GetChunkSize() <= 0 {
+		log.Errorf("chunksize[%d] can not less than 0", rsp.GetChunkSize())
+		return nil, fmt.Errorf("chunksize[%d] can not less than 0", rsp.GetChunkSize())
+	}
+
+	c.AddMetaKey(fileName, rsp.GetChunkSize())
 	var paraStr string
 	var generator, pubKey, random []byte
 	var phi [][]byte
 
-	if rsp.GetChunkSize() > 0 {
-		paraStr, generator, pubKey, random, phi, err = filecheck.GenMetadata(fileName, rsp.GetChunkSize())
-		if err != nil {
-			return nil, err
-		}
+	var waitCount int
+	paraStr, generator, pubKey, random, phi, err = c.mdm.Get(fileName)
+	for err != nil && err == ErrNoMetaData && waitCount < 60*60 {
+		time.Sleep(1)
+		paraStr, generator, pubKey, random, phi, err = c.mdm.Get(fileName)
+		waitCount++
+	}
+
+	if err != nil {
+		return nil, err
 	}
 	t2 := time.Now()
-	fmt.Printf("gen metadata time elapased %+v\n", t2.Sub(t1).Seconds())
+	log.Infof("upload %s time elapased %+v", fileName, t2.Sub(t1).Seconds())
 
 	block := &mpb.StoreBlock{
 		Checksum:    false,
@@ -1450,7 +1589,7 @@ func (c *ClientManager) startDownloadDir(path, destDir string, sno uint32) error
 		retry++
 		if err != nil {
 			code, _ := common.StatusErrFromError(err)
-			if code == 300 && retry < 3 {
+			if code == 300 && retry < RetryCount {
 				goto RETRY
 			}
 			return err
@@ -1579,11 +1718,23 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 	}
 
 	password := []byte{}
-	encryptKey := rsp.GetEncryptKey()
-	if len(encryptKey) > 0 {
-		password, err = rsalong.DecryptLong(c.cfg.Node.PriKey, encryptKey, 256)
+	if sno > 0 {
+		password, err = c.getSpacePassword(sno)
 		if err != nil {
+			log.WithError(err).Info("Get space password")
 			return err
+		}
+		if len(password) == 0 {
+			log.Info("Space %d password not set", sno)
+			return fmt.Errorf("sno %d password not set", sno)
+		}
+	} else {
+		encryptKey := rsp.GetEncryptKey()
+		if len(encryptKey) > 0 {
+			password, err = rsalong.DecryptLong(c.cfg.Node.PriKey, encryptKey, 256)
+			if err != nil {
+				return err
+			}
 		}
 	}
 	// tiny file
@@ -1677,7 +1828,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 			return err
 		}
 
-		if len(password) != 0 {
+		if sno == 0 && len(password) != 0 {
 			for _, file := range middleFiles {
 				log.Infof("middle file %s", file)
 				if err := aes.DecryptFile(file, password, file); err != nil {
@@ -1707,6 +1858,12 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 			}
 		}()
 
+		if sno > 0 && len(password) > 0 {
+			if err := aes.DecryptFile(tempDownFileName, password, tempDownFileName); err != nil {
+				return err
+			}
+		}
+
 		return RenameCrossOS(tempDownFileName, downFileName)
 	}
 	partFiles := []string{}
@@ -1732,7 +1889,7 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 				}
 			}
 		}
-		if len(password) != 0 {
+		if sno == 0 && len(password) != 0 {
 			for _, file := range middleFiles {
 				log.Infof("middle file %s", file)
 				if err := aes.DecryptFile(file, password, file); err != nil {
@@ -1750,6 +1907,12 @@ func (c *ClientManager) DownloadFile(downFileName, destDir, filehash string, fil
 		err = RsDecoder(log, tempDownFileName, "", int64(partitionFileSize), datas, paritys)
 		if err != nil {
 			return err
+		}
+
+		if sno > 0 && len(password) > 0 {
+			if err := aes.DecryptFile(tempDownFileName, password, tempDownFileName); err != nil {
+				return err
+			}
 		}
 
 		partFiles = append(partFiles, tempDownFileName)

@@ -43,26 +43,31 @@ let currentURL;
 
 
 // Force everything localhost, in case of a leak
-app.commandLine.appendSwitch('host-rules', 'MAP * 127.0.0.1, EXCLUDE *.store.samos.io, *.samos.io');
+app.commandLine.appendSwitch('host-rules', 'MAP * 127.0.0.1, EXCLUDE *.store.samos.io, EXCLUDE *.samos.io, EXCLUDE samos.io');
 app.commandLine.appendSwitch('ssl-version-fallback-min', 'tls1.2');
 app.commandLine.appendSwitch('--no-proxy-server');
 app.setAsDefaultProtocolClient('samos');
 
 
-var env = {}
-env.PATH = [
-  '$PATH'
-  // Add third-party binaries paths here
-].join(':')
+//if (process.platform == "darwin") {
+  var env = {}
+  env.PATH = [
+    '$PATH'
+    // Add third-party binaries paths here
+  ].join(':')
 
-// 3rd party libraries
-env.DYLD_LIBRARY_PATH = [
-  '$DYLD_LIBRARY_PATH',
-  '/Applications/Samos-me.app/Contents/Resources/app/lib/',
-  // Add more third-party lib paths here
-].join(':')
+  // 3rd party libraries
+  env.DYLD_LIBRARY_PATH = [
+    '$DYLD_LIBRARY_PATH',
+    '/Applications/Samos-me.app/Contents/Resources/app/lib/',
+    '/Applications/Samos-me.app/Contents/Frameworks/',
 
-process.env.DYLD_LIBRARY_PATH = env.DYLD_LIBRARY_PATH
+    // Add more third-party lib paths here
+  ].join(':')
+
+  process.env.DYLD_LIBRARY_PATH = env.DYLD_LIBRARY_PATH
+//}
+
 //for macos
 
 // Keep a global reference of the window object, if you don't, the window will
@@ -158,7 +163,7 @@ function startNebula() {
       currentURL = defaultURL;
       app.emit('all-ready', { url: currentURL });
     }
-    console.log(data.toString());
+    // console.log(data.toString());
   });
 
   nebula.stderr.on('data', (data) => {
@@ -240,7 +245,7 @@ function startWallet() {
       currentURL = defaultURL;
       app.emit('all-ready', { url: currentURL });
     }
-    // console.log(data.toString());
+    console.log(data.toString());
   });
 
   wallet.stderr.on('data', (data) => {

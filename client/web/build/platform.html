@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>samos</title>
+    <meta content="" name="description"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="./images/favicon.ico" rel="icon"  sizes="any"/>
+    <link href="./css/style.css" rel="stylesheet" type="text/css"/>
+    <script>if (typeof module === 'object') {window.module = module; module = undefined;}</script>
+    <script src="./js/jquery.min.js"></script>
+    <script>if (window.module) module = window.module;</script>
+    <style>
+        html{
+            font-size:100px;
+        }
+    </style>
+</head>
+<body>
+<div class="platformWrap">
+    <div class="platformNav">
+        <div class="languageBox">
+            <a id="changeToCn" class="s-cnen" href="javascript:changeLang('index', 'zh_CN');">CN</a>
+            <a id="changeToEn" class="s-cnen" href="javascript:changeLang('index', 'en');">EN</a>
+        </div>
+    </div>
+
+    <div class="pfContent"><!--内容区开始-->
+        <h2 class="pf-t" data-locale="pf-t">Samos Distributed Business Platform</h2>
+        <div class="pf-imgBox">
+            <img src="./images/plantform.png">
+            <div class="ab pf-d1">
+                <div class="pf-d-t" data-locale="pf-d1-t">SAMOS Distributed Website Builder</div>
+                <div class="pf-d-c" data-locale="pf-d1-c">offers a variety of shop decoration templates</div>
+            </div>
+            <div class="ab pf-d2">
+                <div class="pf-d-t" data-locale="pf-d2-t">Samos checkout counter</div>
+                <div class="pf-d-c" data-locale="pf-d2-c">Support multi-category digital currency to directly purchase virtual goods and services on the platform</div>
+            </div>
+            <div class="ab pf-d3">
+                <div class="pf-d-t" data-locale="pf-d3-t">Natio unlimited booth</div>
+                <div class="pf-d-c" data-locale="pf-d3-c">Share personal idle storage space and bandwidth, do Samos Mall real estate developer</div>
+            </div>
+            <div class="ab pf-d4">
+                <div class="pf-d-t" data-locale="pf-d4-t">SDN</div>
+                <div class="pf-d-c" data-locale="pf-d4-c">24h*7 private bodyguard to protect personal privacy and prevent hackers</div>
+            </div>
+            <div class="ab pf-d5">
+                <div class="pf-d-t" data-locale="pf-d5-t">Samos Object System encrypted information transmission system</div>
+                <div class="pf-d-c" data-locale="pf-d5-c"> Truly decentralized operation, stay away from third-party interference. Your shop, your call!</div>
+            </div>
+            <div class="ab pf-d6">
+                <div class="pf-d-t" data-locale="pf-d6-t">Natio encrypted storage</div>
+                <div class="pf-d-c" data-locale="pf-d6-c">Strong encryption to prevent information leakage</div>
+            </div>
+            <div class="ab pf-d7">
+                <div class="pf-d-t" data-locale="pf-d7-t">Samos Services Provider</div>
+                <div class="pf-d-c" data-locale="pf-d7-c">Become a Samos partner and share an infinite future</div>
+            </div>
+            <div class="ab pf-d8">
+                <div class="pf-d-t" data-locale="pf-d8-t">Samos AI Audit</div>
+                <div class="pf-d-c" data-locale="pf-d8-c">Identify threats and eliminate hidden dangers</div>
+            </div>
+            <div class="ab pf-d9">
+                <div class="pf-d-t" data-locale="pf-d9-t">Samos Mobile</div>
+                <div class="pf-d-c" data-locale="pf-d9-c">Anytime, anywhere, lightning trading</div>
+            </div>
+        </div>
+
+    </div><!--内容区结束-->
+</div>
+
+<script src="./js/jquery.i18n.properties.js" type="text/javascript"></script>
+<script src="js/i18.js" type="text/javascript"></script>
+<script src="js/jquery.cookie.js" type="text/javascript"></script>
+<script>
+    //语言
+    $(document).ready(function () {
+        var l = getLanguage();
+        loadProperties('index', l);
+        showSwitch(l);
+    });
+    //resize
+    (function (doc, win) {
+        var docEl = doc.documentElement,
+            resizeEvt = 'orientationchange' in window ? 'orientationchange' : 'resize',
+            recalc = function () {
+                var clientWidth = docEl.clientWidth;
+                if (!clientWidth) return;
+                docEl.style.fontSize = 100 * (clientWidth / 1920) + 'px';
+            };
+
+        if (!doc.addEventListener) return;
+        win.addEventListener(resizeEvt, recalc, false);
+        doc.addEventListener('DOMContentLoaded', recalc, false);
+    })(document, window);
+
+</script>
+</body>
+</html>

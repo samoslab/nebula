@@ -959,7 +959,7 @@ Args:
 Example 
 
 ```
-curl -X POST -H "Content-Type:application/json" -d '{"password":"12345678abcdefg", "space_no":0 }' http://127.0.0.1:7788/api/v1/service/password
+curl -X POST -H "Content-Type:application/json" -d '{"password":"12345678abcdefg", "space_no":0 }' http://127.0.0.1:7788/api/v1/space/password
 ```
 
 ## /api/v1/space/verify [POST]

@@ -1213,7 +1213,7 @@ var transportMethod = {
                                             <div class="tsList-r-progressBar" data-name="${idx}" style="width:${Math.round(obj.rate*100)+'%'};"></div>
                                         </div>
                                     </div>
-                                    <div class="tsList-fr"></div>
+                                    <div class="tsList-fr">${Math.round(obj.rate*100)+'%'}</div>
                                 </li>`;
                     })
                     $("#tsMenu").html(html);  
@@ -1319,11 +1319,11 @@ var packageMethod = {
                                                 </div>
                                             </div>
                                             <div class="order-list-total">
-                                                <div class="order-list-t" data-locale="totalAmount">${(lan=='en')?'Total Amount':'总额'}</div>
+                                                <div class="order-list-t" data-locale="totalAmount">${(lan=='en')?'Amount':'总额'}</div>
                                                 <div>${obj.totalAmount/1000000}</div>
                                             </div>
                                             <div class="order-list-quanlity">
-                                                <div class="order-list-t" data-locale="amount">${(lan=='en')?'Amount':'数量'}</div>
+                                                <div class="order-list-t" data-locale="quantity">${(lan=='en')?'Quantity':'数量'}</div>
                                                 <div>${obj.quanlity}</div>
                                             </div>
                                             <div class="order-list-pay">
@@ -1445,7 +1445,7 @@ $("#initBalance").click(function(){
 //复制钱包地址
 $("#samosWalletCopyBtn").click(function(){
     $('#samosWalletAddress').css('background','#3b8cff');
-    var clipboard = new ClipboardJS('.samosWalletCopyBtn',{
+    var clipboard = new ClipboardJS('#samosWalletCopyBtn',{
         container: document.getElementById("myModal")
     });
     clipboard.on('success', function(e) {
